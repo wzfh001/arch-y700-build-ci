@@ -155,6 +155,81 @@ unmount_chroot_runtime() {
   set -e
 }
 
+rootfs_pids() {
+  local root=$1
+  local root_real pid procdir link target
+  root_real=$(readlink -f "$root")
+
+  for procdir in /proc/[0-9]*; do
+    [ -d "$procdir" ] || continue
+    pid=${procdir##*/}
+    [ "$pid" = "$$" ] && continue
+    [ "$pid" = "${BASHPID:-}" ] && continue
+
+    for link in "$procdir/root" "$procdir/cwd" "$procdir/exe" "$procdir/fd"/*; do
+      [ -e "$link" ] || [ -L "$link" ] || continue
+      target=$(readlink "$link" 2>/dev/null || true)
+      target=${target% (deleted)}
+      case "$target" in
+        "$root_real"|"$root_real"/*)
+          printf '%s\n' "$pid"
+          break
+          ;;
+      esac
+    done
+  done | sort -un
+}
+
+log_rootfs_pids() {
+  local root=$1
+  local pid comm cmdline
+  while IFS= read -r pid; do
+    [ -n "$pid" ] || continue
+    comm=$(cat "/proc/$pid/comm" 2>/dev/null || true)
+    cmdline=$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)
+    ci_log "rootfs busy pid=$pid comm=${comm:-unknown} cmdline=${cmdline:-unknown}"
+  done < <(rootfs_pids "$root")
+}
+
+terminate_rootfs_processes() {
+  local root=$1
+  local -a pids=()
+  mapfile -t pids < <(rootfs_pids "$root")
+  [ "${#pids[@]}" -gt 0 ] || return 0
+
+  ci_log "terminating processes still using rootfs: ${pids[*]}"
+  kill -TERM "${pids[@]}" 2>/dev/null || true
+  sleep 2
+
+  mapfile -t pids < <(rootfs_pids "$root")
+  [ "${#pids[@]}" -gt 0 ] || return 0
+
+  ci_log "force killing processes still using rootfs: ${pids[*]}"
+  kill -KILL "${pids[@]}" 2>/dev/null || true
+  sleep 1
+}
+
+stop_chroot_background_services() {
+  [ -x "$rootfs_dir/usr/bin/gpgconf" ] || return 0
+  arch_chroot /usr/bin/gpgconf --kill all || true
+  arch_chroot /usr/bin/env GNUPGHOME=/etc/pacman.d/gnupg /usr/bin/gpgconf --kill all || true
+}
+
+finalize_rootfs_mount() {
+  stop_chroot_background_services
+  unmount_chroot_runtime
+  terminate_rootfs_processes "$rootfs_dir"
+  sync
+
+  if ! umount "$rootfs_dir"; then
+    ci_log "rootfs unmount failed; remaining mounts:"
+    findmnt -R "$rootfs_dir" || true
+    log_rootfs_pids "$rootfs_dir"
+    umount "$rootfs_dir"
+  fi
+  mounted_rootfs=0
+}
+
 arch_chroot() {
   chroot "$rootfs_dir" /usr/bin/env -i \
     HOME=/root \
@@ -728,9 +803,7 @@ INFO
 ci_log "writing rootfs manifest"
 (cd "$rootfs_dir" && find . -xdev -printf '%y\t%u\t%g\t%m\t%s\t%p\n' | sort) > "$manifest"
 
-unmount_chroot_runtime
-umount "$rootfs_dir"
-mounted_rootfs=0
+finalize_rootfs_mount
 e2fsck -f -y "$rootfs_img"
 
 ci_log "checksumming rootfs image"
