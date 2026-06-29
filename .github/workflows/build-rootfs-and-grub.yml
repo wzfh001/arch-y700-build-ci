@@ -273,6 +273,21 @@ jobs:
             out/ci-grub/*
             out/ci-release/SHA256SUMS.txt
 
+      - name: Upload metadata artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.output_prefix }}-metadata
+          path: |
+            out/ci-rootfs/*.BUILD-INFO.txt
+            out/ci-rootfs/*.SHA256SUMS
+            out/ci-rootfs/*.manifest
+            out/ci-rootfs/*.packages
+            out/ci-rootfs/*.raw.sha256
+            out/ci-grub/*.SHA256SUMS
+            out/ci-grub/*.raw.sha256
+            out/ci-release/SHA256SUMS.txt
+            ${{ env.BUILD_CONFIG_NOTES_DIR }}/*
+
       - name: Upload release assets
         if: ${{ inputs.release_tag != '' }}
         env:
