@@ -1,0 +1,11 @@
+out/
+*.img
+*.img.*
+!source/boot-image/boot.img.7z
+*.raw.sha256
+*.manifest
+*.BUILD-INFO.txt
+*.SHA256SUMS
+.rootfs-build.*
+.arch-rootfs-build.*
+.grub-build.*
