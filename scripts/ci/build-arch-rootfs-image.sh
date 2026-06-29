@@ -241,7 +241,7 @@ verify_required_y700_payload() {
     [ -e "$root/$rel" ] || [ -L "$root/$rel" ] || ci_die "missing required Y700/desktop payload: /$rel"
   done
 
-  find "$root/usr/lib/modules/$KERNEL_VERSION" -type f -name '*.ko*' | grep -q . || \
+  [ -n "$(find "$root/usr/lib/modules/$KERNEL_VERSION" -type f -name '*.ko*' -print -quit)" ] || \
     ci_die "no kernel modules found for $KERNEL_VERSION"
 }
 
