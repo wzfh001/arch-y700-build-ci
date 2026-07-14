@@ -20,9 +20,9 @@ Environment inputs:
   ROOTFS_PARTLABEL            default: userdata, informational for build metadata
   HOSTNAME_NAME               default: y700
   DEFAULT_USER_NAME           default: y700
-  DEFAULT_USER_PASSWORD       default: 1234
+  DEFAULT_USER_PASSWORD_HASH  crypt(3) hash supplied via secret; default: locked
   ROOT_PASSWORD_MODE          locked|set|empty, default: locked
-  ROOT_PASSWORD               used when ROOT_PASSWORD_MODE=set
+  ROOT_PASSWORD_HASH          crypt(3) hash used when ROOT_PASSWORD_MODE=set
   USER_SUDO_MODE              password|nopasswd|none, default: password
   SDDM_AUTOLOGIN              1/0, default: 0
   SDDM_AUTOLOGIN_SESSION      default: plasma
@@ -65,6 +65,8 @@ ci_require_cmd curl
 ci_require_cmd tar
 ci_require_cmd mount
 ci_require_cmd umount
+ci_require_cmd findmnt
+ci_require_cmd realpath
 ci_require_cmd truncate
 ci_require_cmd mkfs.ext4
 ci_require_cmd e2fsck
@@ -78,16 +80,18 @@ REPO_ROOT=$(cd -- "$SCRIPT_DIR/../.." && pwd -P)
 
 OUTPUT_DIR=${OUTPUT_DIR:-out/ci-rootfs}
 OUTPUT_PREFIX=${OUTPUT_PREFIX:-y700-archlinuxarm}
-ARCH_ROOTFS_URL=${ARCH_ROOTFS_URL:-http://os.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz}
+ci_validate_output_prefix "$OUTPUT_PREFIX"
+ARCH_ROOTFS_URL=${ARCH_ROOTFS_URL:-https://os.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz}
+ARCH_ROOTFS_SHA256=${ARCH_ROOTFS_SHA256:-}
 ARCH_MIRROR=${ARCH_MIRROR:-'http://os.archlinuxarm.org/$arch/$repo'}
 ROOTFS_IMAGE_SIZE=${ROOTFS_IMAGE_SIZE:-20G}
 ROOTFS_LABEL=${ROOTFS_LABEL:-ArchLinux}
 ROOTFS_PARTLABEL=${ROOTFS_PARTLABEL:-userdata}
 HOSTNAME_NAME=${HOSTNAME_NAME:-y700}
 DEFAULT_USER_NAME=${DEFAULT_USER_NAME:-y700}
-DEFAULT_USER_PASSWORD=${DEFAULT_USER_PASSWORD:-1234}
+DEFAULT_USER_PASSWORD_HASH=${DEFAULT_USER_PASSWORD_HASH:-!}
 ROOT_PASSWORD_MODE=${ROOT_PASSWORD_MODE:-locked}
-ROOT_PASSWORD=${ROOT_PASSWORD:-}
+ROOT_PASSWORD_HASH=${ROOT_PASSWORD_HASH:-}
 USER_SUDO_MODE=${USER_SUDO_MODE:-password}
 SDDM_AUTOLOGIN=${SDDM_AUTOLOGIN:-0}
 SDDM_AUTOLOGIN_SESSION=${SDDM_AUTOLOGIN_SESSION:-plasma}
@@ -100,17 +104,25 @@ INSTALL_FCITX5_CHINESE=${INSTALL_FCITX5_CHINESE:-1}
 INSTALL_FIREFOX=${INSTALL_FIREFOX:-1}
 INSTALL_CAMERA_APPS=${INSTALL_CAMERA_APPS:-1}
 DEVICE_DEB_ARCHIVE=${DEVICE_DEB_ARCHIVE:-}
+DEVICE_DEB_ARCHIVE_SHA256=${DEVICE_DEB_ARCHIVE_SHA256:-}
 DEVICE_DEB_DIR=${DEVICE_DEB_DIR:-}
 SENSOR_DEB_ARCHIVE=${SENSOR_DEB_ARCHIVE:-}
+SENSOR_DEB_ARCHIVE_SHA256=${SENSOR_DEB_ARCHIVE_SHA256:-}
 SENSOR_DEB_DIR=${SENSOR_DEB_DIR:-}
 HAPTICS_DEB_ARCHIVE=${HAPTICS_DEB_ARCHIVE:-}
+HAPTICS_DEB_ARCHIVE_SHA256=${HAPTICS_DEB_ARCHIVE_SHA256:-}
 HAPTICS_DEB_DIR=${HAPTICS_DEB_DIR:-}
 CAMERA_STACK_ARCHIVE=${CAMERA_STACK_ARCHIVE:-}
+CAMERA_STACK_ARCHIVE_SHA256=${CAMERA_STACK_ARCHIVE_SHA256:-}
 CAMERA_STACK_DIR=${CAMERA_STACK_DIR:-}
 BUILD_TB321FU_GPU_SENSOR=${BUILD_TB321FU_GPU_SENSOR:-1}
 TB321FU_GPU_SENSOR_SOURCE_ARCHIVE=${TB321FU_GPU_SENSOR_SOURCE_ARCHIVE:-}
+TB321FU_GPU_SENSOR_SOURCE_ARCHIVE_SHA256=${TB321FU_GPU_SENSOR_SOURCE_ARCHIVE_SHA256:-}
 TB321FU_GPU_SENSOR_SOURCE_DIR=${TB321FU_GPU_SENSOR_SOURCE_DIR:-}
 OVERLAY_ARCHIVE=${OVERLAY_ARCHIVE:-}
+OVERLAY_ARCHIVE_SHA256=${OVERLAY_ARCHIVE_SHA256:-}
+SOURCE_DATE_EPOCH=$(ci_source_date_epoch)
+export SOURCE_DATE_EPOCH
 OVERLAY_DIR=${OVERLAY_DIR:-}
 KERNEL_VERSION=${KERNEL_VERSION:-7.1.1-g5df8e852ea72}
 APPLY_Y700_FIRMWARE_FIXES=${APPLY_Y700_FIRMWARE_FIXES:-1}
@@ -122,6 +134,8 @@ KEEP_RAW_IMAGE=${KEEP_RAW_IMAGE:-0}
 mkdir -p "$OUTPUT_DIR"
 work_dir=$(mktemp -d "$OUTPUT_DIR/.arch-rootfs-build.XXXXXX")
 rootfs_dir="$work_dir/rootfs"
+arch_import_stage="$work_dir/arch-import-stage"
+arch_import_sources="$work_dir/arch-import-sources.tsv"
 rootfs_img="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.img"
 build_info="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.BUILD-INFO.txt"
 manifest="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.manifest"
@@ -130,17 +144,13 @@ bind_mounts=()
 
 cleanup() {
   set +e
-  if [ "${#bind_mounts[@]}" -gt 0 ]; then
-    local i target
-    for ((i=${#bind_mounts[@]} - 1; i >= 0; i--)); do
-      target=${bind_mounts[$i]}
-      mountpoint -q "$target" && umount -l "$target"
-    done
-  fi
   if [ "$mounted_rootfs" = 1 ]; then
-    mountpoint -q "$rootfs_dir" && umount -l "$rootfs_dir"
+    ci_unmount_tree "$rootfs_dir" ||
+      ci_log "cleanup preserved mounted work tree for manual recovery: $work_dir"
   fi
-  rm -rf "$work_dir"
+  if ! ci_safe_rmtree "$work_dir" "$OUTPUT_DIR" .arch-rootfs-build.; then
+    ci_log "cleanup refused to remove work tree: $work_dir"
+  fi
 }
 trap cleanup EXIT
 
@@ -168,14 +178,14 @@ mount_chroot_runtime() {
 }
 
 unmount_chroot_runtime() {
-  set +e
   local i target
   for ((i=${#bind_mounts[@]} - 1; i >= 0; i--)); do
     target=${bind_mounts[$i]}
-    mountpoint -q "$target" && umount -l "$target"
+    if mountpoint -q "$target"; then
+      umount -- "$target" || ci_die "failed to unmount chroot runtime path: $target"
+    fi
   done
   bind_mounts=()
-  set -e
 }
 
 rootfs_pids() {
@@ -244,11 +254,12 @@ finalize_rootfs_mount() {
   terminate_rootfs_processes "$rootfs_dir"
   sync
 
-  if ! umount "$rootfs_dir"; then
+  if ! ci_unmount_tree "$rootfs_dir"; then
     ci_log "rootfs unmount failed; remaining mounts:"
     findmnt -R "$rootfs_dir" || true
     log_rootfs_pids "$rootfs_dir"
-    umount "$rootfs_dir"
+    terminate_rootfs_processes "$rootfs_dir"
+    ci_unmount_tree "$rootfs_dir" || ci_die "rootfs remains mounted: $rootfs_dir"
   fi
   mounted_rootfs=0
 }
@@ -263,6 +274,58 @@ arch_chroot() {
     HTTPS_PROXY="${HTTPS_PROXY:-}" \
     PATH=/usr/local/sbin:/usr/local/bin:/usr/bin \
     "$@"
+}
+
+assert_pacman_remote_policy_tokens() {
+  local context=$1
+  local policy=$2
+
+  grep -Fxq PackageRequired <<< "$policy" ||
+    ci_die "$context does not require remote package signatures"
+  grep -Fxq PackageTrustedOnly <<< "$policy" ||
+    ci_die "$context accepts remote package signatures from untrusted keys"
+  if grep -Eqx 'Package(Optional|Never|TrustAll)' <<< "$policy"; then
+    ci_die "$context weakens remote package signature verification"
+  fi
+}
+
+assert_pacman_local_policy_tokens() {
+  local context=$1
+  local policy=$2
+
+  grep -Eqx 'Package(Optional|Required)' <<< "$policy" ||
+    ci_die "$context has an unsupported local package signature policy"
+  grep -Fxq PackageTrustedOnly <<< "$policy" ||
+    ci_die "$context accepts local package signatures from untrusted keys"
+  if grep -Eqx 'Package(Never|TrustAll)' <<< "$policy"; then
+    ci_die "$context disables trusted local package signature handling"
+  fi
+}
+
+assert_arch_remote_signature_policy() {
+  local policy repo
+  local -a repos=()
+
+  policy=$(arch_chroot /usr/bin/pacman-conf SigLevel) ||
+    ci_die "failed to resolve global pacman signature policy"
+  assert_pacman_remote_policy_tokens "global pacman policy" "$policy"
+
+  mapfile -t repos < <(arch_chroot /usr/bin/pacman-conf --repo-list)
+  [ "${#repos[@]}" -gt 0 ] || ci_die "pacman has no configured repositories"
+  for repo in "${repos[@]}"; do
+    [ -n "$repo" ] || ci_die "pacman returned an empty repository name"
+    policy=$(arch_chroot /usr/bin/pacman-conf -r "$repo" SigLevel) ||
+      ci_die "failed to resolve pacman signature policy for repository: $repo"
+    assert_pacman_remote_policy_tokens "pacman repository $repo" "$policy"
+  done
+}
+
+assert_arch_local_signature_policy() {
+  local policy
+
+  policy=$(arch_chroot /usr/bin/pacman-conf LocalFileSigLevel) ||
+    ci_die "failed to resolve local pacman signature policy"
+  assert_pacman_local_policy_tokens "local pacman policy" "$policy"
 }
 
 apply_y700_firmware_fixes() {
@@ -345,6 +408,11 @@ verify_required_y700_payload() {
     opt/libcamera-y700/libexec/libcamera/soft_ipa_proxy
     opt/libcamera-y700/lib/aarch64-linux-gnu/gstreamer-1.0/libgstlibcamera.so
     usr/lib/spa-0.2/libcamera/libspa-libcamera.so
+    usr/lib/gstreamer-1.0/libgstlibcamera.so
+    usr/lib/libaperture-0.so.0
+    usr/lib/libaperture-0.so
+    usr/lib/tb321fu/refresh-camera-compat-paths
+    usr/share/libalpm/hooks/98-tb321fu-camera-compat.hook
     etc/systemd/user/pipewire.service.d/50-y700-libcamera-ipa.conf
     etc/systemd/user/pipewire.service.d/60-y700-libcamera-paths.conf
     etc/systemd/user/wireplumber.service.d/60-y700-libcamera-paths.conf
@@ -360,12 +428,28 @@ verify_required_y700_payload() {
   if ci_bool "$BUILD_TB321FU_GPU_SENSOR"; then
     required+=(usr/lib/qt6/plugins/ksystemstats/ksystemstats_plugin_tb321fu_gpu.so)
     required+=(usr/share/tb321fu-ksystemstats-gpu/ksystemstats_plugin_tb321fu_gpu.so.sha256)
+    required+=(usr/lib/tb321fu/disable-stock-ksystemstats-gpu)
+    required+=(usr/share/libalpm/hooks/99-tb321fu-disable-stock-ksystemstats-gpu.hook)
   fi
 
   local rel
   for rel in "${required[@]}"; do
     [ -e "$root/$rel" ] || [ -L "$root/$rel" ] || ci_die "missing required Y700/desktop payload: /$rel"
   done
+
+  for rel in \
+    opt/libcamera-y700/bin/cam \
+    opt/libcamera-y700/bin/libcamera-bug-report \
+    opt/libcamera-y700/libexec/libcamera/soft_ipa_proxy \
+    usr/local/bin/y700-camera-env \
+    usr/local/bin/y700-camera-cam \
+    usr/local/bin/y700-camera-preview \
+    usr/lib/tb321fu/refresh-camera-compat-paths; do
+    [ "$(stat -c '%a' "$root/$rel")" = 755 ] || ci_die "camera executable has wrong mode: /$rel"
+  done
+  [ "$(readlink "$root/usr/lib/libaperture-0.so")" = libaperture-0.so.0 ] || ci_die "Arch libaperture compatibility symlink has wrong target"
+  [ "$(readlink "$root/usr/lib/gstreamer-1.0/libgstlibcamera.so")" = /opt/libcamera-y700/lib/aarch64-linux-gnu/gstreamer-1.0/libgstlibcamera.so ] || ci_die "Arch GStreamer camera symlink has wrong target"
+  grep -Fxq 'RestrictNamespaces=user net' "$root/etc/systemd/user/pipewire.service.d/50-y700-libcamera-ipa.conf" || ci_die "PipeWire camera namespace allowlist is missing"
 
   [ -n "$(find "$root/usr/lib/modules/$KERNEL_VERSION" -type f -name '*.ko*' -print -quit)" ] || \
     ci_die "no kernel modules found for $KERNEL_VERSION"
@@ -374,6 +458,7 @@ verify_required_y700_payload() {
     etc/systemd/system/iio-sensor-proxy.service.d/10-y700-ssc.conf
     etc/systemd/system/y700-sns-init.service
     etc/systemd/system/y700-aw86937-haptics.service
+    etc/systemd/system/sddm.service.d/10-y700-audio-card-guard.conf
     usr/lib/systemd/system/y700-sns-init.service
     usr/lib/systemd/system/y700-aw86937-haptics.service
     etc/systemd/system/multi-user.target.wants/y700-sns-init.service
@@ -434,6 +519,8 @@ remove_legacy_y700_payload() {
     "$root/etc/systemd/system/iio-sensor-proxy.service.d/10-y700-ssc.conf" \
     "$root/etc/systemd/system/y700-sns-init.service" \
     "$root/etc/systemd/system/y700-aw86937-haptics.service" \
+    "$root/etc/systemd/system/smartmontools.service" \
+    "$root/etc/systemd/system/sddm.service.d/10-y700-audio-card-guard.conf" \
     "$root/usr/lib/systemd/system/y700-sns-init.service" \
     "$root/usr/lib/systemd/system/y700-aw86937-haptics.service" \
     "$root/etc/udev/rules.d/80-y700-iio-sensor-proxy.rules" \
@@ -452,6 +539,48 @@ remove_legacy_y700_payload() {
       "$root/etc/systemd/system/multi-user.target.wants/y700-sns-init.service" \
       "$root/etc/systemd/system/multi-user.target.wants/y700-aw86937-haptics.service"
   fi
+}
+
+validate_tb321fu_compat_firmware_stage() {
+  local archive=$1
+  local stage=$2
+  local expected="$work_dir/tb321fu-compat-firmware.sha256"
+  local archive_sha actual_files expected_files member mode leftover target
+
+  [ "$(basename "$archive")" = y700-compat1-extra-rootfs-overlay.tar.gz ] || \
+    ci_die "unexpected nested device overlay: $(basename "$archive")"
+  archive_sha=$(sha256sum "$archive" | awk '{print $1}')
+  [ "$archive_sha" = a3f55ddee04aac465465c2ff8fcddebc1b65b7e7d3af82e5e5c8ce0a4766c414 ] || \
+    ci_die "TB321FU compat overlay checksum mismatch: $archive_sha"
+  cat > "$expected" <<'COMPAT_SHA256'
+25237c161d727b8ea92b4beb837a31651b44ea78bfc34d95672af8f346a45825  ./usr/lib/firmware/qcom/gen70900_aqe.fw
+a739a1ef14e4418c5a1f1e1da444deb71aeeb4a31370ab41a4dddf378ab5683d  ./usr/lib/firmware/qcom/gen70900_sqe.fw
+9685f62c42543befcaee68d25355e16bf55cdb0d573bddcc9f6633f59eec3f72  ./usr/lib/firmware/qcom/gmu_gen70900.bin
+8166b1fde9725547bd07eba4add22f442dc938f17274fbf358dbdcfc88ec5f31  ./usr/lib/firmware/qcom/vpu/vpu33_p4.mbn
+COMPAT_SHA256
+  leftover=$(find "$stage" -mindepth 1 ! -type d ! -type f -print -quit)
+  [ -z "$leftover" ] || ci_die "unsupported special member in TB321FU compat overlay: $leftover"
+  actual_files=$(cd "$stage" && find . -type f -print | LC_ALL=C sort)
+  expected_files=$(awk '{print $2}' "$expected" | LC_ALL=C sort)
+  [ "$actual_files" = "$expected_files" ] || ci_die "TB321FU compat overlay member list mismatch"
+  (cd "$stage" && sha256sum -c "$expected") || ci_die "TB321FU compat firmware content mismatch"
+  while IFS= read -r member; do
+    mode=$(stat -c '%a' "$stage/${member#./}")
+    [ "$mode" = 644 ] || ci_die "unsafe TB321FU compat firmware mode $mode: $member"
+    target="$rootfs_dir/${member#./}"
+    if [ -e "$target" ] && ! cmp -s "$stage/${member#./}" "$target"; then
+      ci_die "TB321FU compat firmware collides with different existing content: $member"
+    fi
+  done <<< "$expected_files"
+
+  install -D -m 0644 "$expected" "$stage/usr/share/tb321fu/imported-compat-firmware.sha256"
+  cat > "$stage/usr/share/tb321fu/imported-compat-firmware.provenance" <<PROVENANCE
+source_archive=$(basename "$archive")
+source_archive_sha256=$archive_sha
+ownership=staged-for-native-pacman-package
+PROVENANCE
+  chmod 0644 "$stage/usr/share/tb321fu/imported-compat-firmware.provenance"
+  rm -f -- "$expected"
 }
 
 remove_legacy_camera_payload() {
@@ -476,12 +605,191 @@ rsync_stage_to_rootfs() {
   rsync -aH --numeric-ids "$stage"/ "$rootfs_dir"/
 }
 
+sanitize_arch_import_stage() {
+  local stage=$1
+
+  rm -f \
+    "$stage/BUILD-INFO.txt" \
+    "$stage/SHA256SUMS" \
+    "$stage/SHA256SUMS.txt" \
+    "$stage/Y700-ROOTFS-OVERLAY-MANIFEST.tsv"
+  if [ -d "$stage/usr/lib/modules" ]; then
+    find "$stage/usr/lib/modules" -mindepth 2 -maxdepth 2 -type l \
+      \( -name build -o -name source \) -delete
+  fi
+}
+
+discard_arch_import_source_stage() {
+  local stage=$1
+  local stage_real work_real
+  stage_real=$(realpath -m "$stage")
+  work_real=$(realpath -m "$work_dir")
+  case "$stage_real" in
+    "$work_real"/*-stage-*.d|"$work_real"/device-overlay-stage-*.d) ;;
+    *) ci_die "refusing to remove unbounded Arch import staging path: $stage_real" ;;
+  esac
+  mountpoint -q "$stage_real" && \
+    ci_die "refusing to remove mounted Arch import staging path: $stage_real"
+  rm -rf --one-file-system -- "$stage_real"
+}
+
+merge_stage_to_arch_import() {
+  local stage=$1
+  local source_id=$2
+  local special unreadable path relative target source_meta target_meta
+
+  [[ $source_id =~ ^[A-Za-z0-9._:+-]+$ ]] || ci_die "unsafe Arch import source id: $source_id"
+  sanitize_arch_import_stage "$stage"
+  special=$(find "$stage" -mindepth 1 ! -type d ! -type f ! -type l -print -quit)
+  [ -z "$special" ] || ci_die "unsupported special member in Arch import: $special"
+  unreadable=$(find "$stage" -type f ! -perm -0004 -print -quit)
+  [ -z "$unreadable" ] || ci_die "Arch import is not readable by the package builder: $unreadable"
+  unreadable=$(find "$stage" -type d ! -perm -0001 -print -quit)
+  [ -z "$unreadable" ] || ci_die "Arch import directory is not traversable by the package builder: $unreadable"
+
+  install -d -m 0755 "$arch_import_stage"
+  while IFS= read -r -d '' path; do
+    relative=${path#"$stage"/}
+    target="$arch_import_stage/$relative"
+    if [ -e "$target" ] || [ -L "$target" ]; then
+      if [ -L "$path" ] && [ -L "$target" ]; then
+        [ "$(readlink "$path")" = "$(readlink "$target")" ] || \
+          ci_die "conflicting Arch import symlink: $relative"
+      elif [ -f "$path" ] && [ -f "$target" ] && [ ! -L "$target" ]; then
+        cmp -s "$path" "$target" || ci_die "conflicting Arch import file: $relative"
+        source_meta=$(stat -c '%u:%g:%a' "$path")
+        target_meta=$(stat -c '%u:%g:%a' "$target")
+        [ "$source_meta" = "$target_meta" ] || \
+          ci_die "conflicting Arch import file metadata: $relative"
+      elif [ -d "$path" ] && [ -d "$target" ] && [ ! -L "$target" ]; then
+        source_meta=$(stat -c '%u:%g:%a' "$path")
+        target_meta=$(stat -c '%u:%g:%a' "$target")
+        [ "$source_meta" = "$target_meta" ] || \
+          ci_die "conflicting Arch import directory metadata: $relative"
+      else
+        ci_die "conflicting Arch import member type: $relative"
+      fi
+    fi
+  done < <(find "$stage" -mindepth 1 -print0 | sort -z)
+
+  rsync -aH --numeric-ids "$stage"/ "$arch_import_stage"/
+  if [ ! -f "$arch_import_sources" ]; then
+    printf 'source_id\n' > "$arch_import_sources"
+  fi
+  printf '%s\n' "$source_id" >> "$arch_import_sources"
+  discard_arch_import_source_stage "$stage"
+}
+
+install_arch_import_package() {
+  local package_name=tb321fu-imported-release-payload
+  local package_hash package_version package_file build_user=tb321fu-pkgbuild
+  local build_dir=/run/tb321fu-import-package-build
+  local bind_path=/run/tb321fu-import-stage
+  local host_build_dir="$work_dir/arch-import-package-build"
+  local host_build_bind="$rootfs_dir$build_dir"
+  local host_bind_path="$rootfs_dir$bind_path"
+  local payload_manifest="$work_dir/arch-import-payload.sha256"
+  local target
+  local -a built_packages=() remaining_binds=()
+
+  [ -d "$arch_import_stage" ] || return 0
+  [ -n "$(find "$arch_import_stage" -mindepth 1 -print -quit)" ] || return 0
+
+  (cd "$arch_import_stage" && find . -type f -print0 | sort -z | xargs -0 -r sha256sum) > "$payload_manifest"
+  package_hash=$(
+    {
+      (cd "$arch_import_stage" && find . -xdev -printf '%y\t%U\t%G\t%m\t%s\t%p\t%l\0' | sort -z)
+      sha256sum "$payload_manifest" "$arch_import_sources"
+    } | sha256sum | awk '{print $1}'
+  )
+  package_version="1.${package_hash:0:16}"
+  install -D -m 0644 "$payload_manifest" \
+    "$arch_import_stage/usr/share/tb321fu/imported-release-payload.sha256"
+  install -D -m 0644 "$arch_import_sources" \
+    "$arch_import_stage/usr/share/tb321fu/imported-release-sources.tsv"
+
+  [ -z "$(find "$arch_import_stage" -type f ! -perm -0004 -print -quit)" ] || \
+    ci_die "final Arch import is not readable by the package builder"
+  [ -z "$(find "$arch_import_stage" -type d ! -perm -0001 -print -quit)" ] || \
+    ci_die "final Arch import directory is not traversable by the package builder"
+  if arch_chroot /usr/bin/id -u "$build_user" >/dev/null 2>&1; then
+    ci_die "reserved Arch package-build account already exists: $build_user"
+  fi
+
+  install -d -m 0755 "$host_build_dir" "$host_build_bind" "$host_bind_path"
+  mount_bind "$host_build_dir" "$host_build_bind"
+  mount_bind "$arch_import_stage" "$host_bind_path"
+  arch_chroot /usr/bin/useradd --system --no-create-home --home-dir "$build_dir" \
+    --shell /usr/bin/nologin "$build_user"
+  chown -R "$(arch_chroot /usr/bin/id -u "$build_user")":"$(arch_chroot /usr/bin/id -g "$build_user")" \
+    "$host_build_dir"
+  cat > "$host_build_dir/PKGBUILD" <<PKGBUILD
+pkgname=$package_name
+pkgver=$package_version
+pkgrel=1
+pkgdesc='Content-locked TB321FU payload imported from the tested Ubuntu release packages'
+arch=('aarch64')
+url='https://github.com/GUF296/tb321fu-linux'
+license=('custom')
+options=('!strip' 'docs' 'libtool' 'emptydirs' '!zipman' '!purge' '!debug' '!lto')
+source=()
+
+package() {
+  cp -a $bind_path/. "\$pkgdir/"
+}
+PKGBUILD
+  chown "$(arch_chroot /usr/bin/id -u "$build_user")":"$(arch_chroot /usr/bin/id -g "$build_user")" \
+    "$host_build_dir/PKGBUILD"
+
+  arch_chroot /usr/bin/runuser -u "$build_user" -- /usr/bin/env \
+    HOME="$build_dir" \
+    PKGDEST="$build_dir" \
+    SRCDEST="$build_dir/srcdest" \
+    BUILDDIR="$build_dir/build" \
+    SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-0}" \
+    /usr/bin/makepkg --noconfirm --nodeps --cleanbuild --clean --force
+
+  while IFS= read -r -d '' package_file; do
+    built_packages+=("$package_file")
+  done < <(find "$host_build_dir" -maxdepth 1 -type f -name "$package_name-*.pkg.tar.*" -print0 | sort -z)
+  [ "${#built_packages[@]}" -eq 1 ] || \
+    ci_die "expected one native Arch import package, found ${#built_packages[@]}"
+  package_file=${built_packages[0]}
+  assert_arch_local_signature_policy
+  arch_chroot /usr/bin/pacman -U --noconfirm "$build_dir/$(basename "$package_file")"
+  arch_chroot /usr/bin/pacman -Q "$package_name" | \
+    grep -Fx "$package_name $package_version-1" >/dev/null || \
+    ci_die "native Arch import package identity mismatch"
+  arch_chroot /usr/bin/pacman -Qkk "$package_name" >/dev/null || \
+    ci_die "native Arch import package failed its immediate file check"
+  printf '%s=%s-1\n' "$package_name" "$package_version" >> \
+    "$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.packages"
+
+  arch_chroot /usr/bin/userdel "$build_user"
+  umount -- "$host_bind_path" || ci_die "failed to unmount Arch import staging bind"
+  umount -- "$host_build_bind" || ci_die "failed to unmount Arch import build bind"
+  for target in "${bind_mounts[@]}"; do
+    case "$target" in
+      "$host_bind_path"|"$host_build_bind") ;;
+      *) remaining_binds+=("$target") ;;
+    esac
+  done
+  bind_mounts=("${remaining_binds[@]}")
+  rmdir "$host_bind_path" "$host_build_bind"
+  rm -rf --one-file-system -- "$host_build_dir"
+  rm -rf --one-file-system -- "$arch_import_stage"
+  rm -f -- "$payload_manifest" "$arch_import_sources"
+  ci_log "installed pacman-owned TB321FU release payload: $package_name $package_version-1"
+}
+
 enable_y700_device_services() {
   local root=$1
 
   install -d -m 0755 "$root/etc/systemd/system/multi-user.target.wants"
   for service in y700-audio-card-guard.service; do
     if [ -f "$root/etc/systemd/system/$service" ]; then
+      grep -q '^Restart=on-failure$' "$root/etc/systemd/system/$service" || \
+        ci_die "audio card guard does not retry asynchronously"
       ln -sfn "/etc/systemd/system/$service" \
         "$root/etc/systemd/system/multi-user.target.wants/$service"
     fi
@@ -517,7 +825,7 @@ extract_device_payload_dir() {
     dpkg-deb -x "$deb" "$stage"
     remove_legacy_y700_payload "$stage"
     remove_legacy_camera_payload "$stage"
-    rsync_stage_to_rootfs "$stage"
+    merge_stage_to_arch_import "$stage" "deb:$(basename "$deb"):$(sha256sum "$deb" | awk '{print $1}')"
   done < <(find "$payload_dir" -type f -name '*.deb' -print0 | sort -z)
 
   while IFS= read -r -d '' overlay; do
@@ -527,15 +835,11 @@ extract_device_payload_dir() {
         stage="$work_dir/device-overlay-stage-$(basename "$overlay").d"
         rm -rf "$stage"
         mkdir -p "$stage"
-        case "$overlay" in
-          *.tar) tar -C "$stage" -xf "$overlay" ;;
-          *.tar.gz|*.tgz) tar -C "$stage" -xzf "$overlay" ;;
-          *.tar.xz) tar -C "$stage" -xJf "$overlay" ;;
-          *.tar.zst) tar -C "$stage" --zstd -xf "$overlay" ;;
-        esac
+        ci_extract_archive "$overlay" "$stage"
+        validate_tb321fu_compat_firmware_stage "$overlay" "$stage"
         remove_legacy_y700_payload "$stage"
         remove_legacy_camera_payload "$stage"
-        rsync_stage_to_rootfs "$stage"
+        merge_stage_to_arch_import "$stage" "overlay:$(basename "$overlay"):$(sha256sum "$overlay" | awk '{print $1}')"
         ;;
     esac
   done < <(find "$payload_dir" -type f \( -name '*.tar' -o -name '*.tar.gz' -o -name '*.tgz' -o -name '*.tar.xz' -o -name '*.tar.zst' \) -print0 | sort -z)
@@ -546,7 +850,7 @@ apply_device_payloads() {
     local archive="$work_dir/device-payload.archive"
     local extract="$work_dir/device-payload"
     ci_log "downloading device payload archive: $DEVICE_DEB_ARCHIVE"
-    ci_download "$DEVICE_DEB_ARCHIVE" "$archive"
+    ci_download "$DEVICE_DEB_ARCHIVE" "$archive" "$DEVICE_DEB_ARCHIVE_SHA256"
     ci_extract_archive "$archive" "$extract"
     extract_device_payload_dir "$extract"
   fi
@@ -571,7 +875,7 @@ extract_tb321fu_deb_payload_dir() {
     dpkg-deb -x "$deb" "$stage"
     remove_legacy_y700_payload "$stage"
     remove_legacy_camera_payload "$stage"
-    rsync_stage_to_rootfs "$stage"
+    merge_stage_to_arch_import "$stage" "deb:$(basename "$deb"):$(sha256sum "$deb" | awk '{print $1}')"
   done < <(find "$payload_dir" -type f -name '*.deb' -print0 | sort -z)
 
   [ "$found" = 1 ] || ci_die "$label payload directory has no .deb files: $payload_dir"
@@ -584,7 +888,7 @@ apply_tb321fu_deb_payloads() {
     archive="$work_dir/sensor-payload.archive"
     extract="$work_dir/sensor-payload"
     ci_log "downloading TB321FU sensor package archive: $SENSOR_DEB_ARCHIVE"
-    ci_download "$SENSOR_DEB_ARCHIVE" "$archive"
+    ci_download "$SENSOR_DEB_ARCHIVE" "$archive" "$SENSOR_DEB_ARCHIVE_SHA256"
     ci_extract_archive "$archive" "$extract"
     extract_tb321fu_deb_payload_dir "$extract" sensor
   fi
@@ -596,7 +900,7 @@ apply_tb321fu_deb_payloads() {
     archive="$work_dir/haptics-payload.archive"
     extract="$work_dir/haptics-payload"
     ci_log "downloading TB321FU haptics package archive: $HAPTICS_DEB_ARCHIVE"
-    ci_download "$HAPTICS_DEB_ARCHIVE" "$archive"
+    ci_download "$HAPTICS_DEB_ARCHIVE" "$archive" "$HAPTICS_DEB_ARCHIVE_SHA256"
     ci_extract_archive "$archive" "$extract"
     extract_tb321fu_deb_payload_dir "$extract" haptics
   fi
@@ -606,7 +910,9 @@ apply_tb321fu_deb_payloads() {
 }
 
 find_camera_source_root() {
-  local root=$1 found
+  local root=$1 found candidate
+  local -a markers=() candidates=()
+  local -A seen=()
 
   if [ -d "$root/rootfs-overlay/opt/libcamera-y700" ] && \
      [ -f "$root/rootfs-overlay/usr/lib/aarch64-linux-gnu/spa-0.2/libcamera/libspa-libcamera.so" ]; then
@@ -619,23 +925,25 @@ find_camera_source_root() {
     return 0
   fi
 
-  found=$(find "$root" -type f -path '*/rootfs-overlay/usr/lib/aarch64-linux-gnu/spa-0.2/libcamera/libspa-libcamera.so' -print -quit)
-  if [ -n "$found" ]; then
-    found=${found%/rootfs-overlay/usr/lib/aarch64-linux-gnu/spa-0.2/libcamera/libspa-libcamera.so}
-    [ -d "$found/rootfs-overlay/opt/libcamera-y700" ] || return 1
-    printf '%s\n' "$found/rootfs-overlay"
-    return 0
-  fi
-
-  found=$(find "$root" -type f -path '*/usr/lib/aarch64-linux-gnu/spa-0.2/libcamera/libspa-libcamera.so' -print -quit)
-  if [ -n "$found" ]; then
-    found=${found%/usr/lib/aarch64-linux-gnu/spa-0.2/libcamera/libspa-libcamera.so}
-    [ -d "$found/opt/libcamera-y700" ] || return 1
-    printf '%s\n' "$found"
-    return 0
-  fi
-
-  return 1
+  mapfile -d '' -t markers < <(find "$root" -type f \
+    -path '*/usr/lib/aarch64-linux-gnu/spa-0.2/libcamera/libspa-libcamera.so' -print0 | sort -z)
+  for found in "${markers[@]}"; do
+    candidate=${found%/usr/lib/aarch64-linux-gnu/spa-0.2/libcamera/libspa-libcamera.so}
+    [ -d "$candidate/opt/libcamera-y700" ] || continue
+    if [ -z "${seen[$candidate]+set}" ]; then
+      seen[$candidate]=1
+      candidates+=("$candidate")
+    fi
+  done
+  case ${#candidates[@]} in
+    0) return 1 ;;
+    1) printf '%s\n' "${candidates[0]}" ;;
+    *)
+      printf 'ambiguous camera source roots:\n' >&2
+      printf '  %s\n' "${candidates[@]}" >&2
+      return 2
+      ;;
+  esac
 }
 
 apply_tb321fu_camera_stack() {
@@ -645,7 +953,7 @@ apply_tb321fu_camera_stack() {
     archive="$work_dir/camera-stack.archive"
     extract="$work_dir/camera-stack"
     ci_log "downloading TB321FU camera stack archive: $CAMERA_STACK_ARCHIVE"
-    ci_download "$CAMERA_STACK_ARCHIVE" "$archive"
+    ci_download "$CAMERA_STACK_ARCHIVE" "$archive" "$CAMERA_STACK_ARCHIVE_SHA256"
     ci_extract_archive "$archive" "$extract"
     source_root=$(find_camera_source_root "$extract") || ci_die "CAMERA_STACK_ARCHIVE does not contain verified camera stack"
   elif [ -n "$CAMERA_STACK_DIR" ]; then
@@ -667,25 +975,69 @@ apply_tb321fu_camera_stack() {
 
 adapt_ubuntu_multilib_paths_for_arch() {
   local root=$1
+  local executable
 
-  if [ -d "$root/usr/lib/aarch64-linux-gnu" ]; then
-    rsync -aH "$root/usr/lib/aarch64-linux-gnu"/ "$root/usr/lib"/
-  fi
+  install -d -m 0755 "$root/usr/lib/tb321fu" "$root/usr/share/libalpm/hooks"
+  cat > "$root/usr/lib/tb321fu/refresh-camera-compat-paths" <<'CAMERA_COMPAT'
+#!/bin/sh
+set -eu
+root=${TB321FU_ROOT:-}
+case "$root" in
+  ""|/*) ;;
+  *) echo "TB321FU_ROOT must be empty or absolute" >&2; exit 2 ;;
+esac
+multiarch=$root/usr/lib/aarch64-linux-gnu
 
-  if [ -f "$root/usr/lib/aarch64-linux-gnu/spa-0.2/libcamera/libspa-libcamera.so" ]; then
-    install -d -m 0755 "$root/usr/lib/spa-0.2/libcamera"
-    cp -a "$root/usr/lib/aarch64-linux-gnu/spa-0.2/libcamera/libspa-libcamera.so" \
-      "$root/usr/lib/spa-0.2/libcamera/libspa-libcamera.so"
-  fi
-  if [ -f "$root/opt/libcamera-y700/lib/aarch64-linux-gnu/gstreamer-1.0/libgstlibcamera.so" ]; then
-    install -d -m 0755 "$root/usr/lib/gstreamer-1.0"
-    ln -sfn /opt/libcamera-y700/lib/aarch64-linux-gnu/gstreamer-1.0/libgstlibcamera.so \
-      "$root/usr/lib/gstreamer-1.0/libgstlibcamera.so"
-  fi
+if [ -f "$multiarch/libaperture-0.so.0" ]; then
+  install -m 0644 "$multiarch/libaperture-0.so.0" "$root/usr/lib/libaperture-0.so.0"
+fi
+if [ -L "$multiarch/libaperture-0.so" ]; then
+  target=$(readlink "$multiarch/libaperture-0.so")
+  [ "$target" = libaperture-0.so.0 ] || { echo "unsafe libaperture symlink target: $target" >&2; exit 1; }
+  ln -sfn "$target" "$root/usr/lib/libaperture-0.so"
+fi
+
+spa=$multiarch/spa-0.2/libcamera/libspa-libcamera.so
+[ -f "$spa" ] || { echo "missing TB321FU camera SPA source: $spa" >&2; exit 1; }
+install -d -m 0755 "$root/usr/lib/spa-0.2/libcamera" "$root/usr/lib/gstreamer-1.0"
+install -m 0644 "$spa" "$root/usr/lib/spa-0.2/libcamera/libspa-libcamera.so"
+ln -sfn /opt/libcamera-y700/lib/aarch64-linux-gnu/gstreamer-1.0/libgstlibcamera.so \
+  "$root/usr/lib/gstreamer-1.0/libgstlibcamera.so"
+CAMERA_COMPAT
+  chmod 0755 "$root/usr/lib/tb321fu/refresh-camera-compat-paths"
+  cat > "$root/usr/share/libalpm/hooks/98-tb321fu-camera-compat.hook" <<'CAMERA_HOOK'
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Path
+Target = usr/lib/spa-0.2/libcamera/libspa-libcamera.so
+Target = usr/lib/gstreamer-1.0/libgstlibcamera.so
+
+[Action]
+Description = Restore TB321FU camera compatibility paths after package upgrades
+When = PostTransaction
+Exec = /usr/lib/tb321fu/refresh-camera-compat-paths
+CAMERA_HOOK
+  chmod 0644 "$root/usr/share/libalpm/hooks/98-tb321fu-camera-compat.hook"
+  TB321FU_ROOT="$root" "$root/usr/lib/tb321fu/refresh-camera-compat-paths"
+
+  for executable in \
+    "$root/opt/libcamera-y700/bin/cam" \
+    "$root/opt/libcamera-y700/bin/libcamera-bug-report" \
+    "$root/opt/libcamera-y700/libexec/libcamera/soft_ipa_proxy" \
+    "$root/usr/local/bin/y700-camera-env" \
+    "$root/usr/local/bin/y700-camera-cam" \
+    "$root/usr/local/bin/y700-camera-preview"; do
+    [ -f "$executable" ] || ci_die "missing camera executable: ${executable#"$root"}"
+    chmod 0755 "$executable"
+  done
+  find "$root/opt/libcamera-y700" "$root/usr/lib/aarch64-linux-gnu/spa-0.2/libcamera" \
+    -type f -name '*.so*' -exec chmod 0644 {} +
 }
 
 find_gpu_sensor_source_root() {
   local root=$1 found
+  local -a candidates=()
 
   if [ -f "$root/CMakeLists.txt" ] && [ -f "$root/tb321fu_gpu.cpp" ] && [ -f "$root/metadata.json" ]; then
     printf '%s\n' "$root"
@@ -695,8 +1047,16 @@ find_gpu_sensor_source_root() {
     find_gpu_sensor_source_root "$root/source/tb321fu-ksystemstats-adreno-freq"
     return $?
   fi
-  found=$(find "$root" -type f -path '*/tb321fu-ksystemstats-adreno-freq/CMakeLists.txt' -print -quit)
-  [ -n "$found" ] || return 1
+  mapfile -d '' -t candidates < <(find "$root" -type f -path '*/tb321fu-ksystemstats-adreno-freq/CMakeLists.txt' -print0 | sort -z)
+  case ${#candidates[@]} in
+    0) return 1 ;;
+    1) found=${candidates[0]} ;;
+    *)
+      printf 'ambiguous GPU sensor source roots:\n' >&2
+      printf '  %s\n' "${candidates[@]}" >&2
+      return 2
+      ;;
+  esac
   found=${found%/CMakeLists.txt}
   [ -f "$found/tb321fu_gpu.cpp" ] || return 1
   [ -f "$found/metadata.json" ] || return 1
@@ -711,11 +1071,11 @@ apply_tb321fu_gpu_sensor() {
     archive="$work_dir/gpu-sensor-source.archive"
     extract="$work_dir/gpu-sensor-source"
     ci_log "downloading TB321FU GPU sensor source archive: $TB321FU_GPU_SENSOR_SOURCE_ARCHIVE"
-    ci_download "$TB321FU_GPU_SENSOR_SOURCE_ARCHIVE" "$archive"
+    ci_download "$TB321FU_GPU_SENSOR_SOURCE_ARCHIVE" "$archive" "$TB321FU_GPU_SENSOR_SOURCE_ARCHIVE_SHA256"
     ci_extract_archive "$archive" "$extract"
-    source_root=$(find_gpu_sensor_source_root "$extract") || ci_die "GPU sensor source archive is missing expected project"
+    source_root=$(find_gpu_sensor_source_root "$extract") || ci_die "GPU sensor source archive is missing or ambiguously contains the expected project"
   elif [ -n "$TB321FU_GPU_SENSOR_SOURCE_DIR" ]; then
-    source_root=$(find_gpu_sensor_source_root "$TB321FU_GPU_SENSOR_SOURCE_DIR") || ci_die "GPU sensor source dir is missing expected project"
+    source_root=$(find_gpu_sensor_source_root "$TB321FU_GPU_SENSOR_SOURCE_DIR") || ci_die "GPU sensor source dir is missing or ambiguously contains the expected project"
   else
     source_root=$(find_gpu_sensor_source_root "$REPO_ROOT/source/tb321fu-ksystemstats-adreno-freq") || ci_die "repository GPU sensor source is missing"
   fi
@@ -738,10 +1098,33 @@ apply_tb321fu_gpu_sensor() {
   arch_chroot /usr/bin/cmake --install "$rootfs_build"
 
   rm -rf "$root$rootfs_src" "$root$rootfs_build"
+  install -d -m 0755 "$root/usr/lib/tb321fu" "$root/usr/share/libalpm/hooks"
+  cat > "$root/usr/lib/tb321fu/disable-stock-ksystemstats-gpu" <<'GPU_DISABLE'
+#!/bin/sh
+set -eu
+stock=/usr/lib/qt6/plugins/ksystemstats/ksystemstats_plugin_gpu.so
+disabled=$stock.disabled-tb321fu-adreno
+if [ -f "$stock" ]; then
+  mv -f -- "$stock" "$disabled"
+fi
+GPU_DISABLE
+  chmod 0755 "$root/usr/lib/tb321fu/disable-stock-ksystemstats-gpu"
+  cat > "$root/usr/share/libalpm/hooks/99-tb321fu-disable-stock-ksystemstats-gpu.hook" <<'GPU_HOOK'
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Path
+Target = usr/lib/qt6/plugins/ksystemstats/ksystemstats_plugin_gpu.so
+
+[Action]
+Description = Keep the stock KSystemStats GPU provider disabled on TB321FU
+When = PostTransaction
+Exec = /usr/lib/tb321fu/disable-stock-ksystemstats-gpu
+GPU_HOOK
+  chmod 0644 "$root/usr/share/libalpm/hooks/99-tb321fu-disable-stock-ksystemstats-gpu.hook"
   if [ -f "$root/$stock_plugin_rel" ]; then
     had_stock_plugin=1
-    rm -f "$root/$disabled_stock_plugin_rel"
-    mv "$root/$stock_plugin_rel" "$root/$disabled_stock_plugin_rel"
+    arch_chroot /usr/lib/tb321fu/disable-stock-ksystemstats-gpu
   fi
   install -d -m 0755 "$root/usr/share/tb321fu-ksystemstats-gpu"
   sha256sum "$root/$plugin_rel" > "$root/usr/share/tb321fu-ksystemstats-gpu/ksystemstats_plugin_tb321fu_gpu.so.sha256"
@@ -751,6 +1134,8 @@ apply_tb321fu_gpu_sensor() {
   if [ "$had_stock_plugin" = 1 ]; then
     [ -f "$root/$disabled_stock_plugin_rel" ] || ci_die "disabled stock KSystemStats GPU plugin missing: /$disabled_stock_plugin_rel"
   fi
+  [ -x "$root/usr/lib/tb321fu/disable-stock-ksystemstats-gpu" ] || ci_die "GPU stock-plugin disable helper missing"
+  [ -f "$root/usr/share/libalpm/hooks/99-tb321fu-disable-stock-ksystemstats-gpu.hook" ] || ci_die "GPU stock-plugin pacman hook missing"
 }
 
 write_fcitx5_config() {
@@ -906,7 +1291,7 @@ copy_skel_to_user() {
 
 build_package_list() {
   local base_packages=(
-    base bash-completion sudo openssh rsync curl wget ca-certificates gnupg
+    base bash-completion sudo openssh rsync curl wget ca-certificates gnupg fakeroot
     nano vim less which file htop usbutils pciutils iproute2 inetutils
     networkmanager bluez bluez-utils power-profiles-daemon udisks2 upower
     linux-firmware
@@ -975,7 +1360,7 @@ mounted_rootfs=1
 
 rootfs_archive="$work_dir/arch-rootfs.tar.gz"
 ci_log "downloading Arch Linux ARM rootfs: $ARCH_ROOTFS_URL"
-ci_download "$ARCH_ROOTFS_URL" "$rootfs_archive"
+ci_download "$ARCH_ROOTFS_URL" "$rootfs_archive" "$ARCH_ROOTFS_SHA256"
 ci_log "extracting Arch Linux ARM rootfs"
 tar -C "$rootfs_dir" -xpf "$rootfs_archive" --numeric-owner
 
@@ -998,12 +1383,14 @@ mount_chroot_runtime
 ci_log "initializing pacman keyring"
 arch_chroot /usr/bin/pacman-key --init
 arch_chroot /usr/bin/pacman-key --populate archlinuxarm
+assert_arch_remote_signature_policy
 arch_chroot /usr/bin/getent hosts os.archlinuxarm.org >/dev/null
 arch_chroot /usr/bin/pacman -Sy --noconfirm --needed archlinuxarm-keyring
 
 mapfile -t packages < <(build_package_list)
 printf '%s\n' "${packages[@]}" > "$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.packages"
 ci_log "installing Arch packages: ${#packages[@]} packages"
+assert_arch_remote_signature_policy
 arch_chroot /usr/bin/pacman -Syu --noconfirm --needed --disable-download-timeout "${packages[@]}"
 
 ci_log "configuring base system"
@@ -1029,18 +1416,27 @@ cat > "$rootfs_dir/etc/fstab" <<FSTAB
 LABEL=$ROOTFS_LABEL / ext4 rw,relatime 0 1
 FSTAB
 
+if [ "$DEFAULT_USER_NAME" != alarm ] && arch_chroot /usr/bin/id -u alarm >/dev/null 2>&1; then
+  ci_log "removing inherited alarm account before creating $DEFAULT_USER_NAME"
+  arch_chroot /usr/bin/userdel -r alarm
+fi
+
 if ! arch_chroot /usr/bin/id -u "$DEFAULT_USER_NAME" >/dev/null 2>&1; then
   arch_chroot /usr/bin/useradd -m -s /bin/bash -G users,video,audio,input,storage,power "$DEFAULT_USER_NAME"
 fi
-printf '%s:%s\n' "$DEFAULT_USER_NAME" "$DEFAULT_USER_PASSWORD" | arch_chroot /usr/bin/chpasswd
+if [ -n "$DEFAULT_USER_PASSWORD_HASH" ] && [ "$DEFAULT_USER_PASSWORD_HASH" != '!' ]; then
+  printf '%s:%s\n' "$DEFAULT_USER_NAME" "$DEFAULT_USER_PASSWORD_HASH" | arch_chroot /usr/bin/chpasswd -e
+else
+  arch_chroot /usr/bin/passwd -l "$DEFAULT_USER_NAME" || true
+fi
 
 case "$ROOT_PASSWORD_MODE" in
   locked)
     arch_chroot /usr/bin/passwd -l root || true
     ;;
   set)
-    [ -n "$ROOT_PASSWORD" ] || ci_die "ROOT_PASSWORD_MODE=set requires ROOT_PASSWORD"
-    printf 'root:%s\n' "$ROOT_PASSWORD" | arch_chroot /usr/bin/chpasswd
+    [ -n "$ROOT_PASSWORD_HASH" ] || ci_die "ROOT_PASSWORD_MODE=set requires ROOT_PASSWORD_HASH"
+    printf 'root:%s\n' "$ROOT_PASSWORD_HASH" | arch_chroot /usr/bin/chpasswd -e
     ;;
   empty)
     arch_chroot /usr/bin/passwd -d root || true
@@ -1089,6 +1485,7 @@ fi
 
 apply_device_payloads
 apply_tb321fu_deb_payloads
+install_arch_import_package
 apply_tb321fu_camera_stack
 adapt_ubuntu_multilib_paths_for_arch "$rootfs_dir"
 
@@ -1100,7 +1497,7 @@ LDSO
 if [ -n "$OVERLAY_ARCHIVE" ]; then
   tmp_overlay="$work_dir/overlay.archive"
   ci_log "applying overlay archive: $OVERLAY_ARCHIVE"
-  ci_download "$OVERLAY_ARCHIVE" "$tmp_overlay"
+  ci_download "$OVERLAY_ARCHIVE" "$tmp_overlay" "$OVERLAY_ARCHIVE_SHA256"
   ci_extract_archive "$tmp_overlay" "$rootfs_dir"
 fi
 if [ -n "$OVERLAY_DIR" ]; then
@@ -1136,7 +1533,7 @@ rm -f \
 verify_required_y700_payload "$rootfs_dir"
 
 cat > "$build_info" <<INFO
-generated=$(date -u -Iseconds)
+generated=$(ci_iso8601_timestamp)
 distribution=Arch Linux ARM
 arch=aarch64
 arch_rootfs_url=$ARCH_ROOTFS_URL
@@ -1178,7 +1575,7 @@ ci_log "writing rootfs manifest"
 (cd "$rootfs_dir" && find . -xdev -printf '%y\t%u\t%g\t%m\t%s\t%p\n' | sort) > "$manifest"
 
 finalize_rootfs_mount
-e2fsck -f -y "$rootfs_img"
+ci_e2fsck_repair "$rootfs_img"
 
 ci_log "checksumming rootfs image"
 raw_sha_file="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.raw.sha256"
@@ -1206,10 +1603,10 @@ case "$COMPRESS" in
     sevenz_out="$rootfs_img.7z"
     rm -f "$sevenz_out" "$sevenz_out".*
     if [ -n "$CHUNK_SIZE" ]; then
-      7z a "$sevenz_out" "$rootfs_img" -t7z -m0=lzma2 -mx=9 -mmt=on "-v$CHUNK_SIZE" >/dev/null
+      7z a "$sevenz_out" "$rootfs_img" -t7z -m0=lzma2 -mx=9 -mmt=on -mtm=off -mta=off -mtc=off "-v$CHUNK_SIZE" >/dev/null
       (cd "$OUTPUT_DIR" && sha256sum "$(basename "$sevenz_out")".* >> "$(basename "$checksum_file")")
     else
-      7z a "$sevenz_out" "$rootfs_img" -t7z -m0=lzma2 -mx=9 -mmt=on >/dev/null
+      7z a "$sevenz_out" "$rootfs_img" -t7z -m0=lzma2 -mx=9 -mmt=on -mtm=off -mta=off -mtc=off >/dev/null
       (cd "$OUTPUT_DIR" && sha256sum "$(basename "$sevenz_out")" >> "$(basename "$checksum_file")")
     fi
     ;;
