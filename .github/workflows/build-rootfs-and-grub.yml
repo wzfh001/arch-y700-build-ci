@@ -7,6 +7,11 @@ on:
         description: Release tag to create/update. Leave empty to only upload Actions artifacts.
         required: false
         type: string
+      prerelease:
+        description: Publish a non-empty release_tag as a prerelease without making it latest.
+        required: true
+        default: false
+        type: boolean
       output_prefix:
         description: Output file prefix used for rootfs, grub and artifact names.
         required: true
@@ -21,11 +26,6 @@ on:
         description: Required SHA-256 for the selected Arch Linux ARM rootfs tarball.
         required: true
         type: string
-      arch_mirror:
-        description: pacman mirror Server line.
-        required: true
-        default: http://os.archlinuxarm.org/$arch/$repo
-        type: string
       desktop_profile:
         description: Plasma package profile. standard is recommended for first builds.
         required: true
@@ -39,54 +39,6 @@ on:
         description: rootfs ext4 image size.
         required: true
         default: 20G
-        type: string
-      rootfs_label:
-        description: rootfs ext4 label.
-        required: true
-        default: ArchLinux
-        type: string
-      rootfs_partlabel:
-        description: target GPT partition label expected by GRUB/root selector.
-        required: true
-        default: userdata
-        type: string
-      hostname_name:
-        description: hostname written to /etc/hostname.
-        required: true
-        default: GUF296
-        type: string
-      default_user_name:
-        description: normal user to create.
-        required: true
-        default: GUF296
-        type: string
-      root_password_mode:
-        description: Root password handling; set uses repository secret ROOT_PASSWORD_HASH.
-        required: true
-        default: locked
-        type: choice
-        options:
-          - locked
-          - set
-          - empty
-      user_sudo_mode:
-        description: sudo rights for default user.
-        required: true
-        default: password
-        type: choice
-        options:
-          - password
-          - nopasswd
-          - none
-      sddm_autologin:
-        description: enable SDDM autologin for default user.
-        required: true
-        default: true
-        type: boolean
-      boot_image_size:
-        description: GRUB/FAT image size when not using a template.
-        required: true
-        default: 256M
         type: string
       rootfs_config:
         description: Optional advanced rootfs config, one KEY=value per line.
@@ -104,6 +56,10 @@ on:
         default: ""
         type: string
 
+concurrency:
+  group: release-${{ github.repository }}-${{ inputs.release_tag != '' && inputs.release_tag || github.run_id }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-24.04-arm
@@ -112,7 +68,43 @@ jobs:
     timeout-minutes: 240
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Validate workflow input boundaries
+        run: |
+          bash scripts/ci/run-actionlint.sh .github/workflows/build-rootfs-and-grub.yml
+          python3 scripts/ci/test-workflow-semantics.py --self-test
+          python3 scripts/ci/test-workflow-semantics.py \
+            .github/workflows/build-rootfs-and-grub.yml \
+            scripts/ci/build-arch-rootfs-image.sh \
+            scripts/ci/apply-workflow-config.sh
+          python3 scripts/ci/check-workflow-input-boundaries.py --self-test
+          python3 scripts/ci/check-workflow-input-boundaries.py .github/workflows/build-rootfs-and-grub.yml
+          python3 scripts/ci/check-action-pins.py --self-test
+          python3 scripts/ci/check-action-pins.py .github/workflows/build-rootfs-and-grub.yml
+          python3 scripts/ci/check-service-enable-policy.py --self-test
+          python3 scripts/ci/check-service-enable-policy.py scripts/ci/build-arch-rootfs-image.sh
+          python3 scripts/ci/test-safe-extract-archive.py
+          bash scripts/ci/test-input-and-path-boundaries.sh
+          bash scripts/ci/test-system-payload-policy.sh
+          bash scripts/ci/test-audio-route-reconciliation.sh
+          bash scripts/ci/test-native-package-lifecycle.sh
+          bash scripts/ci/test-openpgp-pin.sh
+          bash scripts/ci/test-rootfs-overlay-boundary.sh
+          bash scripts/ci/test-release-publication.sh
+
+      - name: Validate release mode
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          PRERELEASE: ${{ inputs.prerelease && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          if [ -n "$RELEASE_TAG" ] && [ "$PRERELEASE" != 1 ]; then
+            echo 'Remediation releases must set prerelease=true.' >&2
+            exit 1
+          fi
 
       - name: Install dependencies
         run: |
@@ -124,24 +116,18 @@ jobs:
 
       - name: Apply workflow configuration
         env:
+          INPUT_OUTPUT_PREFIX: ${{ inputs.output_prefix }}
           INPUT_ARCH_ROOTFS_URL: ${{ inputs.arch_rootfs_url }}
           INPUT_ARCH_ROOTFS_SHA256: ${{ inputs.arch_rootfs_sha256 }}
-          INPUT_ARCH_MIRROR: ${{ inputs.arch_mirror }}
           INPUT_DESKTOP_PROFILE: ${{ inputs.desktop_profile }}
           INPUT_ROOTFS_IMAGE_SIZE: ${{ inputs.rootfs_image_size }}
-          INPUT_ROOTFS_LABEL: ${{ inputs.rootfs_label }}
-          INPUT_ROOTFS_PARTLABEL: ${{ inputs.rootfs_partlabel }}
-          INPUT_HOSTNAME_NAME: ${{ inputs.hostname_name }}
-          INPUT_DEFAULT_USER_NAME: ${{ inputs.default_user_name }}
-          INPUT_ROOT_PASSWORD_MODE: ${{ inputs.root_password_mode }}
-          INPUT_USER_SUDO_MODE: ${{ inputs.user_sudo_mode }}
-          INPUT_SDDM_AUTOLOGIN: ${{ inputs.sddm_autologin }}
-          INPUT_BOOT_IMAGE_SIZE: ${{ inputs.boot_image_size }}
           INPUT_ROOTFS_CONFIG: ${{ inputs.rootfs_config }}
           INPUT_BOOT_CONFIG: ${{ inputs.boot_config }}
           INPUT_SOURCE_CONFIG: ${{ inputs.source_config }}
         run: |
           set -euo pipefail
+          . scripts/ci/common.sh
+          ci_validate_output_prefix "$INPUT_OUTPUT_PREFIX"
           mkdir -p "$RUNNER_TEMP/build-config-notes"
 
           cat > "$RUNNER_TEMP/rootfs.env" <<'CONFIG_EOF'
@@ -241,21 +227,8 @@ jobs:
           cat >> "$RUNNER_TEMP/rootfs.env" <<CONFIG_EOF
           ARCH_ROOTFS_URL=$INPUT_ARCH_ROOTFS_URL
           ARCH_ROOTFS_SHA256=$INPUT_ARCH_ROOTFS_SHA256
-          ARCH_MIRROR=$INPUT_ARCH_MIRROR
           DESKTOP_PROFILE=$INPUT_DESKTOP_PROFILE
           ROOTFS_IMAGE_SIZE=$INPUT_ROOTFS_IMAGE_SIZE
-          ROOTFS_LABEL=$INPUT_ROOTFS_LABEL
-          ROOTFS_PARTLABEL=$INPUT_ROOTFS_PARTLABEL
-          HOSTNAME_NAME=$INPUT_HOSTNAME_NAME
-          DEFAULT_USER_NAME=$INPUT_DEFAULT_USER_NAME
-          ROOT_PASSWORD_MODE=$INPUT_ROOT_PASSWORD_MODE
-          USER_SUDO_MODE=$INPUT_USER_SUDO_MODE
-          SDDM_AUTOLOGIN=$INPUT_SDDM_AUTOLOGIN
-          CONFIG_EOF
-
-          cat >> "$RUNNER_TEMP/boot.env" <<CONFIG_EOF
-          BOOT_IMAGE_SIZE=$INPUT_BOOT_IMAGE_SIZE
-          ROOT_PARTLABEL=$INPUT_ROOTFS_PARTLABEL
           CONFIG_EOF
 
           bash scripts/ci/apply-workflow-config.sh "$RUNNER_TEMP/rootfs.env"
@@ -266,7 +239,7 @@ jobs:
           cp "$RUNNER_TEMP/boot.env" "$RUNNER_TEMP/build-config-notes/boot.env"
           cp "$RUNNER_TEMP/source.env" "$RUNNER_TEMP/build-config-notes/source.env"
           echo "BUILD_CONFIG_NOTES_DIR=$RUNNER_TEMP/build-config-notes" >> "$GITHUB_ENV"
-          echo "OUTPUT_PREFIX=${{ inputs.output_prefix }}" >> "$GITHUB_ENV"
+          printf 'OUTPUT_PREFIX=%s\n' "$INPUT_OUTPUT_PREFIX" >> "$GITHUB_ENV"
           echo "OUTPUT_DIR_ROOTFS=out/ci-rootfs" >> "$GITHUB_ENV"
           echo "OUTPUT_DIR_GRUB=out/ci-grub" >> "$GITHUB_ENV"
 
@@ -297,7 +270,7 @@ jobs:
             "$OUTPUT_DIR_ROOTFS" "$OUTPUT_DIR_GRUB" out/ci-release/boot.img.7z
 
       - name: Upload workflow artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ inputs.output_prefix }}-rootfs-grub
           path: |
@@ -307,7 +280,7 @@ jobs:
             out/ci-release/SHA256SUMS.txt
 
       - name: Upload metadata artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ inputs.output_prefix }}-metadata
           path: |
@@ -327,6 +300,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           RELEASE_TAG: ${{ inputs.release_tag }}
+          PRERELEASE: ${{ inputs.prerelease && '1' || '0' }}
         run: |
           set -euo pipefail
           release_dir=out/ci-release/assets

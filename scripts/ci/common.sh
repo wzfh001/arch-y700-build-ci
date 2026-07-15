@@ -34,6 +34,53 @@ ci_validate_output_prefix() {
     ci_die "invalid OUTPUT_PREFIX (1-64 characters; letters, digits, dot, underscore and hyphen only): $value"
 }
 
+ci_normalize_package_list() {
+  local raw=${1-} line token
+  local -a line_tokens=()
+  while IFS= read -r line || [ -n "$line" ]; do
+    line_tokens=()
+    read -r -a line_tokens <<< "$line"
+    for token in "${line_tokens[@]}"; do
+      [[ ${#token} -le 128 && $token =~ ^[A-Za-z0-9][A-Za-z0-9+.:_@=-]*$ ]] ||
+        ci_die "invalid package token: $token"
+      printf '%s\n' "$token"
+    done
+  done <<< "$raw"
+}
+
+ci_resolve_path_for_comparison() {
+  local path=$1 parent
+  if [ -e "$path" ] || [ -L "$path" ]; then
+    realpath -e -- "$path"
+    return
+  fi
+  parent=$(realpath -e -- "$(dirname -- "$path")")
+  printf '%s/%s\n' "$parent" "$(basename -- "$path")"
+}
+
+ci_require_distinct_paths() {
+  local -a labels=() paths=() resolved=()
+  local label path i j
+  [ "$#" -ge 4 ] && [ $(( $# % 2 )) -eq 0 ] ||
+    ci_die "ci_require_distinct_paths expects LABEL PATH pairs"
+  while [ "$#" -gt 0 ]; do
+    label=$1
+    path=$2
+    labels+=("$label")
+    paths+=("$path")
+    resolved+=("$(ci_resolve_path_for_comparison "$path")")
+    shift 2
+  done
+  for ((i = 0; i < ${#paths[@]}; i++)); do
+    for ((j = i + 1; j < ${#paths[@]}; j++)); do
+      if [ "${resolved[i]}" = "${resolved[j]}" ] ||
+         { [ -e "${paths[i]}" ] && [ -e "${paths[j]}" ] && [ "${paths[i]}" -ef "${paths[j]}" ]; }; then
+        ci_die "${labels[i]} and ${labels[j]} must refer to distinct paths"
+      fi
+    done
+  done
+}
+
 ci_source_date_epoch() {
   local epoch=${SOURCE_DATE_EPOCH:-0}
   [[ $epoch =~ ^[0-9]{1,10}$ ]] ||
@@ -95,6 +142,16 @@ ci_unmount_tree() {
   }
 }
 
+ci_validate_rootfs_overlay_tree() {
+  local root=$1 relative
+  [ -d "$root" ] || ci_die "rootfs overlay is not a directory: $root"
+  for relative in dev proc sys run; do
+    if [ -e "$root/$relative" ] || [ -L "$root/$relative" ]; then
+      ci_die "rootfs overlay must not contain runtime path: $relative"
+    fi
+  done
+}
+
 ci_safe_rmtree() {
   local candidate=$1 parent=$2 prefix=$3 resolved resolved_parent
   [ -e "$candidate" ] || return 0
@@ -120,6 +177,7 @@ ci_safe_rmtree() {
 
 ci_verify_download() {
   local file=$1 verifier=$2 expected actual
+  local -a primary_fingerprints=()
   case $verifier in
     sha256:*) expected=${verifier#sha256:} ;;
     [[:xdigit:]][[:xdigit:]][[:xdigit:]][[:xdigit:]]*) expected=$verifier ;;
@@ -127,9 +185,18 @@ ci_verify_download() {
       expected=${verifier#openpgp-fpr:}
       [[ $expected =~ ^[A-Fa-f0-9]{40}$ ]] || ci_die "invalid OpenPGP fingerprint: $expected"
       ci_require_cmd gpg
-      gpg --batch --quiet --show-keys --with-colons "$file" 2>/dev/null |
-        awk -F: '$1 == "fpr" { print toupper($10) }' |
-        grep -Fxq "${expected^^}" || ci_die "OpenPGP fingerprint mismatch for $file"
+      mapfile -t primary_fingerprints < <(
+        gpg --batch --quiet --show-keys --with-colons "$file" 2>/dev/null |
+          awk -F: '
+            $1 == "pub" { want_primary_fpr=1; next }
+            $1 == "sub" { want_primary_fpr=0; next }
+            $1 == "fpr" && want_primary_fpr { print toupper($10); want_primary_fpr=0 }
+          '
+      )
+      [ "${#primary_fingerprints[@]}" -eq 1 ] ||
+        ci_die "OpenPGP input must contain exactly one primary key: $file"
+      [ "${primary_fingerprints[0]}" = "${expected^^}" ] ||
+        ci_die "OpenPGP fingerprint mismatch for $file"
       return
       ;;
     *) ci_die "unsupported or missing download verifier for $file" ;;
