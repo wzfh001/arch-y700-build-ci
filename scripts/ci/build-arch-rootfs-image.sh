@@ -148,6 +148,8 @@ bind_mounts=()
 cleanup() {
   set +e
   if [ "$mounted_rootfs" = 1 ]; then
+    stop_chroot_background_services
+    terminate_rootfs_processes "$rootfs_dir"
     ci_unmount_tree "$rootfs_dir" ||
       ci_log "cleanup preserved mounted work tree for manual recovery: $work_dir"
   fi
@@ -722,26 +724,6 @@ sanitize_arch_import_stage() {
   ci_assert_normalized_system_payload_modes "$stage"
 }
 
-prepare_arch_import_module_dependencies() {
-  local stage=$1
-  local kernel_version=$2
-  local added_lib_link=0
-
-  [ -d "$stage/usr/lib/modules/$kernel_version" ] || return 0
-  if [ ! -e "$stage/lib" ] && [ ! -L "$stage/lib" ]; then
-    ln -s usr/lib "$stage/lib"
-    added_lib_link=1
-  else
-    [ -L "$stage/lib" ] && [ "$(readlink "$stage/lib")" = usr/lib ] || \
-      ci_die "Arch import /lib must be absent or link to usr/lib before depmod"
-  fi
-  if ! depmod -b "$stage" "$kernel_version"; then
-    [ "$added_lib_link" = 0 ] || rm -f -- "$stage/lib"
-    return 1
-  fi
-  [ "$added_lib_link" = 0 ] || rm -f -- "$stage/lib"
-}
-
 remove_generated_module_dependency_files() {
   local stage=$1
   local kernel_version=$2
@@ -792,6 +774,20 @@ remove_existing_identical_arch_import_members() {
     rm -f -- "$path"
   done < <(find "$stage" -mindepth 1 \( -type f -o -type l \) -print0 | sort -z)
   find "$stage" -depth -mindepth 1 -type d -empty -delete
+}
+
+run_arch_makepkg() {
+  local build_user=$1
+  local build_dir=$2
+
+  arch_chroot /usr/bin/runuser -u "$build_user" -- /usr/bin/env \
+    HOME="$build_dir" \
+    PKGDEST="$build_dir" \
+    SRCDEST="$build_dir/srcdest" \
+    BUILDDIR="$build_dir/build" \
+    SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-0}" \
+    /usr/bin/bash -c 'cd -- "$1" && shift && exec "$@"' bash "$build_dir" \
+    /usr/bin/makepkg --noconfirm --nodeps --cleanbuild --clean --force
 }
 
 discard_arch_import_source_stage() {
@@ -921,14 +917,7 @@ PKGBUILD
   chown "$(arch_chroot /usr/bin/id -u "$build_user")":"$(arch_chroot /usr/bin/id -g "$build_user")" \
     "$host_build_dir/PKGBUILD"
 
-  arch_chroot /usr/bin/runuser -u "$build_user" -- /usr/bin/env \
-    HOME="$build_dir" \
-    PKGDEST="$build_dir" \
-    SRCDEST="$build_dir/srcdest" \
-    BUILDDIR="$build_dir/build" \
-    SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-0}" \
-    /usr/bin/bash -c 'cd -- "$1" && shift && exec "$@"' bash "$build_dir" \
-    /usr/bin/makepkg --noconfirm --nodeps --cleanbuild --clean --force
+  run_arch_makepkg "$build_user" "$build_dir"
 
   while IFS= read -r -d '' package_file; do
     built_packages+=("$package_file")
@@ -1056,13 +1045,7 @@ install_arch_native_stage_package() {
   chown -R "$(arch_chroot /usr/bin/id -u "$build_user")":"$(arch_chroot /usr/bin/id -g "$build_user")" \
     "$host_build_dir"
 
-  arch_chroot /usr/bin/runuser -u "$build_user" -- /usr/bin/env \
-    HOME="$build_dir" \
-    PKGDEST="$build_dir" \
-    SRCDEST="$build_dir/srcdest" \
-    BUILDDIR="$build_dir/build" \
-    SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-0}" \
-    /usr/bin/makepkg --noconfirm --nodeps --cleanbuild --clean --force
+  run_arch_makepkg "$build_user" "$build_dir"
 
   while IFS= read -r -d '' package_file; do
     built_packages+=("$package_file")

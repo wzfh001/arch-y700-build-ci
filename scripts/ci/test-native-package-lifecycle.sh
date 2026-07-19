@@ -66,8 +66,16 @@ grep -Fq '/usr/lib/tb321fu/disable-stock-ksystemstats-gpu restore' "$install_scr
 if grep -Fq TB321FU_ROOT "$install_script"; then
   fail "production pacman callbacks accept ambient root redirection"
 fi
-grep -Fq "/usr/bin/bash -c 'cd -- \"\$1\" && shift && exec \"\$@\"' bash \"\$build_dir\"" \
-  "$BUILD_SCRIPT" || fail "native package build does not enter its PKGBUILD directory"
+grep -Fq 'run_arch_makepkg "$build_user" "$build_dir"' "$BUILD_SCRIPT" || \
+  fail "native packages do not use the common makepkg runner"
+[ "$(grep -Fc 'run_arch_makepkg "$build_user" "$build_dir"' "$BUILD_SCRIPT")" -eq 2 ] || \
+  fail "not every native package path uses the common makepkg runner"
+[ "$(grep -Fc '/usr/bin/makepkg --noconfirm --nodeps --cleanbuild --clean --force' "$BUILD_SCRIPT")" -eq 1 ] || \
+  fail "makepkg invocation is duplicated outside the common runner"
+grep -A8 '^cleanup() {' "$BUILD_SCRIPT" | grep -Fq 'stop_chroot_background_services' || \
+  fail "failure cleanup does not stop chroot background services"
+grep -A8 '^cleanup() {' "$BUILD_SCRIPT" | grep -Fq 'terminate_rootfs_processes "$rootfs_dir"' || \
+  fail "failure cleanup does not terminate rootfs users"
 
 # Execute the camera staging helpers directly from the build script. Imported
 # Ubuntu camera files are excluded from the generic package, while libaperture
@@ -84,20 +92,12 @@ ci_die() { fail "$*"; }
 eval "$(extract_shell_function stage_arch_camera_supplement)"
 eval "$(extract_shell_function remove_arch_native_camera_package_paths)"
 eval "$(extract_shell_function adapt_ubuntu_multilib_paths_for_arch)"
-eval "$(extract_shell_function prepare_arch_import_module_dependencies)"
 eval "$(extract_shell_function remove_generated_module_dependency_files)"
 eval "$(extract_shell_function remove_existing_identical_arch_import_members)"
 
 module_stage="$tmp/module-stage"
 kernel_version=7.1.1-test
 mkdir -p "$module_stage/usr/lib/modules/$kernel_version"
-depmod_args=
-depmod() { printf -v depmod_args '%q ' "$@"; }
-prepare_arch_import_module_dependencies "$module_stage" "$kernel_version"
-[ "$depmod_args" = "-b $module_stage $kernel_version " ] || \
-  fail "Arch import depmod arguments are wrong: $depmod_args"
-[ ! -e "$module_stage/lib" ] && [ ! -L "$module_stage/lib" ] || \
-  fail "temporary Arch import /lib compatibility link remained"
 touch \
   "$module_stage/usr/lib/modules/$kernel_version/modules.dep" \
   "$module_stage/usr/lib/modules/$kernel_version/modules.dep.bin" \
