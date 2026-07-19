@@ -37,8 +37,8 @@ esac
 [ -f "$rootfs_script" ]
 
 ! grep -Fq 'ci_extract_archive "$tmp_overlay" "$rootfs_dir"' "$rootfs_script"
-unmount_line=$(grep -n '^unmount_chroot_runtime$' "$rootfs_script" | tail -n1 | cut -d: -f1)
+suspend_line=$(grep -n '^suspend_chroot_runtime$' "$rootfs_script" | tail -n1 | cut -d: -f1)
 apply_line=$(grep -n 'applying staged overlay archive' "$rootfs_script" | tail -n1 | cut -d: -f1)
-[ -n "$unmount_line" ] && [ -n "$apply_line" ] && [ "$unmount_line" -lt "$apply_line" ]
+[ -n "$suspend_line" ] && [ -n "$apply_line" ] && [ "$suspend_line" -lt "$apply_line" ]
 
 printf 'rootfs overlay mount boundary: PASS\n'
