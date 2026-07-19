@@ -83,6 +83,9 @@ payload_root="$tmp/payload"
 for path in \
   usr/share/applications/org.kde.plasma.keyboard.desktop \
   etc/xdg/kwinrc \
+  etc/skel/.config/kwinrc \
+  etc/skel/.config/plasmakeyboardrc \
+  etc/skel/.config/kwinoutputconfig.json \
   home/fuhao/.config/kwinrc \
   home/fuhao/.config/plasmakeyboardrc \
   home/fuhao/.config/kwinoutputconfig.json; do

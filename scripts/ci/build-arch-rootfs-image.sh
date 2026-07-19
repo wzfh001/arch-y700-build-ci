@@ -532,6 +532,9 @@ verify_required_y700_payload() {
     forbidden+=(
       usr/share/applications/org.kde.plasma.keyboard.desktop
       etc/xdg/kwinrc
+      etc/skel/.config/kwinrc
+      etc/skel/.config/plasmakeyboardrc
+      etc/skel/.config/kwinoutputconfig.json
       home/$DEFAULT_USER_NAME/.config/kwinrc
       home/$DEFAULT_USER_NAME/.config/plasmakeyboardrc
       home/$DEFAULT_USER_NAME/.config/kwinoutputconfig.json
@@ -653,6 +656,9 @@ remove_tablet_niri_desktop_payload() {
   rm -f \
     "$root/usr/share/applications/org.kde.plasma.keyboard.desktop" \
     "$root/etc/xdg/kwinrc" \
+    "$root/etc/skel/.config/kwinrc" \
+    "$root/etc/skel/.config/plasmakeyboardrc" \
+    "$root/etc/skel/.config/kwinoutputconfig.json" \
     "$root/home/$DEFAULT_USER_NAME/.config/kwinrc" \
     "$root/home/$DEFAULT_USER_NAME/.config/plasmakeyboardrc" \
     "$root/home/$DEFAULT_USER_NAME/.config/kwinoutputconfig.json"
