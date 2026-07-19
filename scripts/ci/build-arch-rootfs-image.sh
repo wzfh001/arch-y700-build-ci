@@ -306,19 +306,20 @@ assert_pacman_local_policy_tokens() {
 }
 
 assert_arch_remote_signature_policy() {
-  local policy repo
+  local global_policy policy repo repo_policy
   local -a repos=()
 
-  policy=$(arch_chroot /usr/bin/pacman-conf SigLevel) ||
+  global_policy=$(arch_chroot /usr/bin/pacman-conf SigLevel) ||
     ci_die "failed to resolve global pacman signature policy"
-  assert_pacman_remote_policy_tokens "global pacman policy" "$policy"
+  assert_pacman_remote_policy_tokens "global pacman policy" "$global_policy"
 
   mapfile -t repos < <(arch_chroot /usr/bin/pacman-conf --repo-list)
   [ "${#repos[@]}" -gt 0 ] || ci_die "pacman has no configured repositories"
   for repo in "${repos[@]}"; do
     [ -n "$repo" ] || ci_die "pacman returned an empty repository name"
-    policy=$(arch_chroot /usr/bin/pacman-conf -r "$repo" SigLevel) ||
+    repo_policy=$(arch_chroot /usr/bin/pacman-conf -r "$repo" SigLevel) ||
       ci_die "failed to resolve pacman signature policy for repository: $repo"
+    policy=${repo_policy:-$global_policy}
     assert_pacman_remote_policy_tokens "pacman repository $repo" "$policy"
   done
 }

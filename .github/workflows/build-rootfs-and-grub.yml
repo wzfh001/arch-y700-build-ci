@@ -93,6 +93,7 @@ jobs:
           bash scripts/ci/test-audio-route-reconciliation.sh
           bash scripts/ci/test-native-package-lifecycle.sh
           bash scripts/ci/test-openpgp-pin.sh
+          bash scripts/ci/test-pacman-signature-policy.sh
           bash scripts/ci/test-rootfs-overlay-boundary.sh
           bash scripts/ci/test-release-publication.sh
 
