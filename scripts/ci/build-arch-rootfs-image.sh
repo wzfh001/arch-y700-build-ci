@@ -790,6 +790,19 @@ run_arch_makepkg() {
     /usr/bin/makepkg --noconfirm --nodeps --cleanbuild --clean --force
 }
 
+install_arch_local_package() {
+  local package_path=$1
+  local replace_conflicts=${2:-0}
+  local -a pacman_args=(-U --noconfirm)
+
+  if [ "$replace_conflicts" = 1 ]; then
+    pacman_args+=(--ask=4)
+  else
+    [ "$replace_conflicts" = 0 ] || ci_die "invalid local package conflict policy: $replace_conflicts"
+  fi
+  arch_chroot /usr/bin/pacman "${pacman_args[@]}" "$package_path"
+}
+
 discard_arch_import_source_stage() {
   local stage=$1
   local stage_real work_real
@@ -926,7 +939,7 @@ PKGBUILD
     ci_die "expected one native Arch import package, found ${#built_packages[@]}"
   package_file=${built_packages[0]}
   assert_arch_local_signature_policy
-  arch_chroot /usr/bin/pacman -U --noconfirm "$build_dir/$(basename "$package_file")"
+  install_arch_local_package "$build_dir/$(basename "$package_file")"
   arch_chroot /usr/bin/pacman -Q "$package_name" | \
     grep -Fx "$package_name $package_version-1" >/dev/null || \
     ci_die "native Arch import package identity mismatch"
@@ -1054,7 +1067,11 @@ install_arch_native_stage_package() {
     ci_die "expected one native Arch package for $package_name, found ${#built_packages[@]}"
   package_file=${built_packages[0]}
   assert_arch_local_signature_policy
-  arch_chroot /usr/bin/pacman -U --noconfirm "$build_dir/$(basename "$package_file")"
+  if [ "${#conflicts[@]}" -gt 0 ]; then
+    install_arch_local_package "$build_dir/$(basename "$package_file")" 1
+  else
+    install_arch_local_package "$build_dir/$(basename "$package_file")"
+  fi
   arch_chroot /usr/bin/pacman -Q "$package_name" | \
     grep -Fx "$package_name $package_version-1" >/dev/null || \
     ci_die "native Arch package identity mismatch: $package_name"

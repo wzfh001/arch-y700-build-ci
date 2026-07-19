@@ -94,6 +94,19 @@ eval "$(extract_shell_function remove_arch_native_camera_package_paths)"
 eval "$(extract_shell_function adapt_ubuntu_multilib_paths_for_arch)"
 eval "$(extract_shell_function remove_generated_module_dependency_files)"
 eval "$(extract_shell_function remove_existing_identical_arch_import_members)"
+eval "$(extract_shell_function install_arch_local_package)"
+
+captured_pacman_args=
+arch_chroot() { printf -v captured_pacman_args '%q ' "$@"; }
+install_arch_local_package /run/package.pkg.tar.zst
+[ "$captured_pacman_args" = '/usr/bin/pacman -U --noconfirm /run/package.pkg.tar.zst ' ] || \
+  fail "ordinary local package install arguments are wrong: $captured_pacman_args"
+install_arch_local_package /run/replacing.pkg.tar.zst 1
+[ "$captured_pacman_args" = '/usr/bin/pacman -U --noconfirm --ask=4 /run/replacing.pkg.tar.zst ' ] || \
+  fail "conflicting local package install is not transactionally replacing: $captured_pacman_args"
+if (install_arch_local_package /run/package.pkg.tar.zst unsafe) >/dev/null 2>&1; then
+  fail "invalid local package conflict policy was accepted"
+fi
 
 module_stage="$tmp/module-stage"
 kernel_version=7.1.1-test
