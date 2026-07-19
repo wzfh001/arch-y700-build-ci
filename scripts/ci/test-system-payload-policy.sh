@@ -56,6 +56,9 @@ chmod 0644 "$root/usr/libexec/tb321fu-haptics/bind-aw86937" \
 
 ci_normalize_system_payload_modes "$root"
 ci_assert_normalized_system_payload_modes "$root"
+install -D -m 0664 /dev/stdin "$root/usr/share/licenses/fixture/LICENSE" <<'ROOT_OWNED_DATA'
+license fixture
+ROOT_OWNED_DATA
 ci_assert_privileged_payload_security "$root" \
   usr/libexec/tb321fu-haptics/bind-aw86937 \
   opt/libcamera-y700/bin/cam \
@@ -71,6 +74,7 @@ ci_assert_privileged_payload_security "$root" \
 [ "$(stat -c '%a' "$root/usr/lib/tb321fu/refresh-camera-compat-paths")" = 755 ]
 [ "$(stat -c '%a' "$root/usr/lib/tb321fu/disable-stock-ksystemstats-gpu")" = 755 ]
 [ "$(stat -c '%a' "$root/opt/libcamera-y700/bin/cam")" = 755 ]
+[ "$(stat -c '%a' "$root/usr/share/licenses/fixture/LICENSE")" = 664 ]
 [ "$(stat -c '%a' "$outside/world-writable")" = 777 ]
 
 chmod 0777 "$root/usr/lib/firmware/fixture.bin"

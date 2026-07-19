@@ -63,14 +63,22 @@ ci_secure_preserved_payload_modes() {
 }
 
 ci_assert_privileged_payload_security() {
-  local root=$1 required path writable
+  local root=$1 required path writable trusted_uid trusted_gid
   shift
 
   [ -d "$root" ] || ci_die "rootfs tree not found: $root"
+  trusted_uid=$(stat -c '%u' "$root")
+  trusted_gid=$(stat -c '%g' "$root")
+  [ "$trusted_uid" = "$(id -u)" ] && [ "$trusted_gid" = "$(id -g)" ] || \
+    ci_die "rootfs trust anchor is not owned by the build identity: $root"
   for path in "$root/etc" "$root/usr" "$root/opt" "$root/bin" "$root/sbin" "$root/lib"; do
     [ -e "$path" ] || continue
-    writable=$(find "$path" -xdev \( -type f -o -type d \) -perm /0022 -print -quit)
-    [ -z "$writable" ] || ci_die "group/world-writable privileged payload member: $writable"
+    writable=$(find "$path" -xdev \( -type f -o -type d \) \
+      \( -perm /0002 -o \
+        \( -perm /0020 \( ! -uid "$trusted_uid" -o ! -gid "$trusted_gid" \) \) \
+      \) -print -quit)
+    [ -z "$writable" ] || \
+      ci_die "unprivileged group/world-writable privileged payload member: $writable"
   done
 
   for required in "$@"; do
