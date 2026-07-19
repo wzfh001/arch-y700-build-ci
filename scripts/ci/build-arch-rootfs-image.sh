@@ -1358,20 +1358,32 @@ multiarch=$root/usr/lib/aarch64-linux-gnu
 source_multiarch=$source_root/usr/lib/aarch64-linux-gnu
 
 if [ -f "$source_multiarch/libaperture-0.so.0" ]; then
-  ln -sfn /usr/lib/aarch64-linux-gnu/libaperture-0.so.0 "$root/usr/lib/libaperture-0.so.0"
+  if [ ! -L "$root/usr/lib/libaperture-0.so.0" ] ||
+     [ "$(readlink "$root/usr/lib/libaperture-0.so.0")" != /usr/lib/aarch64-linux-gnu/libaperture-0.so.0 ]; then
+    ln -sfn /usr/lib/aarch64-linux-gnu/libaperture-0.so.0 "$root/usr/lib/libaperture-0.so.0"
+  fi
 fi
 if [ -L "$source_multiarch/libaperture-0.so" ]; then
   target=$(readlink "$source_multiarch/libaperture-0.so")
   [ "$target" = libaperture-0.so.0 ] || { echo "unsafe libaperture symlink target: $target" >&2; exit 1; }
-  ln -sfn "$target" "$root/usr/lib/libaperture-0.so"
+  if [ ! -L "$root/usr/lib/libaperture-0.so" ] ||
+     [ "$(readlink "$root/usr/lib/libaperture-0.so")" != "$target" ]; then
+    ln -sfn "$target" "$root/usr/lib/libaperture-0.so"
+  fi
 fi
 
 spa=$multiarch/spa-0.2/libcamera/libspa-libcamera.so
 [ -f "$spa" ] || { echo "missing TB321FU camera SPA source: $spa" >&2; exit 1; }
 install -d -m 0755 "$root/usr/lib/spa-0.2/libcamera" "$root/usr/lib/gstreamer-1.0"
-install -m 0644 "$spa" "$root/usr/lib/spa-0.2/libcamera/libspa-libcamera.so"
-ln -sfn /opt/libcamera-y700/lib/aarch64-linux-gnu/gstreamer-1.0/libgstlibcamera.so \
-  "$root/usr/lib/gstreamer-1.0/libgstlibcamera.so"
+spa_target=$root/usr/lib/spa-0.2/libcamera/libspa-libcamera.so
+if [ ! -f "$spa_target" ] || ! cmp -s "$spa" "$spa_target"; then
+  install -m 0644 "$spa" "$spa_target"
+fi
+gst_target=$root/usr/lib/gstreamer-1.0/libgstlibcamera.so
+gst_source=/opt/libcamera-y700/lib/aarch64-linux-gnu/gstreamer-1.0/libgstlibcamera.so
+if [ ! -L "$gst_target" ] || [ "$(readlink "$gst_target")" != "$gst_source" ]; then
+  ln -sfn "$gst_source" "$gst_target"
+fi
 CAMERA_COMPAT
   chmod 0755 "$root/usr/lib/tb321fu/refresh-camera-compat-paths"
   cat > "$root/usr/share/libalpm/hooks/98-tb321fu-camera-compat.hook" <<'CAMERA_HOOK'

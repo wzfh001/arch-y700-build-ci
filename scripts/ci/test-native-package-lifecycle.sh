@@ -198,6 +198,20 @@ adapt_ubuntu_multilib_paths_for_arch "$camera_stage"
   fail "camera package GStreamer symlink is wrong"
 [ -x "$camera_stage/usr/lib/tb321fu/refresh-camera-compat-paths" ] || \
   fail "camera compatibility helper is not executable"
+camera_compat_before=$(stat -c '%Y:%i' \
+  "$camera_stage/usr/lib/spa-0.2/libcamera/libspa-libcamera.so" \
+  "$camera_stage/usr/lib/gstreamer-1.0/libgstlibcamera.so" \
+  "$camera_stage/usr/lib/libaperture-0.so.0" \
+  "$camera_stage/usr/lib/libaperture-0.so")
+TB321FU_ROOT="$camera_stage" TB321FU_CAMERA_COMPAT_SOURCE_ROOT="$camera_stage" \
+  "$camera_stage/usr/lib/tb321fu/refresh-camera-compat-paths"
+camera_compat_after=$(stat -c '%Y:%i' \
+  "$camera_stage/usr/lib/spa-0.2/libcamera/libspa-libcamera.so" \
+  "$camera_stage/usr/lib/gstreamer-1.0/libgstlibcamera.so" \
+  "$camera_stage/usr/lib/libaperture-0.so.0" \
+  "$camera_stage/usr/lib/libaperture-0.so")
+[ "$camera_compat_before" = "$camera_compat_after" ] || \
+  fail "camera compatibility hook mutates already-correct package files"
 
 # Checksums are rooted at the package payload, never at a host build path.
 stage="$tmp/package-stage"
