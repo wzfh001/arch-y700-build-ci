@@ -175,6 +175,12 @@ ci_safe_rmtree() {
   rm -rf -- "$resolved"
 }
 
+ci_prepare_output_dir() {
+  local output_dir=$1
+  mkdir -p -- "$output_dir"
+  (cd -- "$output_dir" && pwd -P)
+}
+
 ci_verify_download() {
   local file=$1 verifier=$2 expected actual
   local -a primary_fingerprints=()

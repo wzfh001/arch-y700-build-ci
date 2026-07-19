@@ -84,7 +84,7 @@ OUTPUT_PREFIX=${OUTPUT_PREFIX:-y700-archlinuxarm}
 ci_validate_output_prefix "$OUTPUT_PREFIX"
 ARCH_ROOTFS_URL=${ARCH_ROOTFS_URL:-https://de3.mirror.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz}
 ARCH_ROOTFS_SHA256=${ARCH_ROOTFS_SHA256:-}
-ARCH_MIRROR=${ARCH_MIRROR:-'http://os.archlinuxarm.org/$arch/$repo'}
+ARCH_MIRROR=${ARCH_MIRROR:-'https://de3.mirror.archlinuxarm.org/$arch/$repo'}
 ROOTFS_IMAGE_SIZE=${ROOTFS_IMAGE_SIZE:-20G}
 ROOTFS_LABEL=${ROOTFS_LABEL:-ArchLinux}
 ROOTFS_PARTLABEL=${ROOTFS_PARTLABEL:-userdata}
@@ -133,7 +133,7 @@ COMPRESS=${COMPRESS:-7z}
 CHUNK_SIZE=${CHUNK_SIZE:-}
 KEEP_RAW_IMAGE=${KEEP_RAW_IMAGE:-0}
 
-mkdir -p "$OUTPUT_DIR"
+OUTPUT_DIR=$(ci_prepare_output_dir "$OUTPUT_DIR")
 work_dir=$(mktemp -d "$OUTPUT_DIR/.arch-rootfs-build.XXXXXX")
 rootfs_dir="$work_dir/rootfs"
 arch_import_stage="$work_dir/arch-import-stage"

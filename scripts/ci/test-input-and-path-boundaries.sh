@@ -29,6 +29,18 @@ if (ci_require_distinct_paths BOOT "$scratch/boot.img" OUTPUT "$scratch/boot-har
   exit 1
 fi
 
+mkdir -p "$scratch/workspace"
+output_dir=$(cd -- "$scratch/workspace" && ci_prepare_output_dir out/ci-rootfs)
+[ "$output_dir" = "$scratch/workspace/out/ci-rootfs" ]
+[ -d "$output_dir" ]
+case $output_dir in
+  /*) ;;
+  *)
+    echo 'output directory was not normalized to an absolute path' >&2
+    exit 1
+    ;;
+esac
+
 mkdir -p "$scratch/cleanup/.arch-rootfs-build.target/child"
 cleanup_target=$(realpath -e "$scratch/cleanup/.arch-rootfs-build.target")
 FAKE_MOUNTS=$cleanup_target
