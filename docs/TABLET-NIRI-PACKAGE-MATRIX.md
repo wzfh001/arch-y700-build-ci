@@ -124,7 +124,17 @@ it does not execute an unpinned `paru` command during the image build.
 | --- | --- | --- | --- |
 | `noctalia` | `5.0.0_beta.3-2` | GitHub tag `v5.0.0-beta.3`; SHA-256 `0cd9d718acb95eec8500e6159c2981de46070f13f0fdacf7cb1e51cb2cbddb5e` | Native Noctalia v5 shell; AUR declares `aarch64` |
 | `wvkbd` | `0.19.4-1` | Source tarball; SHA-512 `e9a877eac4913375a3ea160966d0822ed15be540234148ba2638e5b7c19cfa885b962eba260a0f782a762324732454cf48668d85307a748decb198abeb009784` | Manual touch keyboard |
-| `paru` | `2.1.0-2` | GitHub tag `v2.1.0`; SHA-256 `eea4dbb524db765d5316f540f9ee670c0bf81aae4827b5417eebb4c9b5651727` | Post-boot AUR helper; aarch64 recipe |
+| `paru` | `2.1.0-2` | GitHub tag `v2.1.0`; SHA-256 `eea4dbb524db765d5316f540f9ee670c0bf81aae4827b5417eebb4c9b5651727` | Post-boot AUR helper; aarch64 recipe with a pinned libalpm 16 compatibility update |
+
+Paru's upstream lock file predates libalpm 16. The recipe applies only four
+exact Cargo updates: `alpm 4.0.4`, `alpm-sys 4.0.5`, `alpm-utils 4.0.3`, and
+`pacmanconf 3.1.0`. Their crates.io SHA-256 checksums are respectively
+`119e8b82e2473323f2fe4ee81599286430bc9a64b31f5e67eb6dec806858c9cd`,
+`4071fa385bbb17c2a6eceb65b9a52e8f5c9f97800b1c125ac09a0f160f36b076`,
+`ca8f443e4db722be178e03d5f5047b5fff8234f7e2b684746f3a123315871c07`,
+and `1087f8994e545eed9f7453376282f2964f18ca4b739e42f0dc7f2fed246d76c3`.
+`alpm-sys 4.0.5` is required because it recognizes patch releases such as the
+target rootfs's libalpm `16.0.1`, rather than only the exact `16.0.0` string.
 
 Noctalia's runtime dependencies are official ARM packages, including
 `meson`, `ninja`, `sdbus-cpp`, `tomlplusplus`, `nlohmann-json`, `stb`, PipeWire,

@@ -5,6 +5,7 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 REPO_ROOT=$(cd -- "$SCRIPT_DIR/../.." && pwd -P)
 BUILD_SCRIPT="$SCRIPT_DIR/build-arch-rootfs-image.sh"
 PROFILE="$REPO_ROOT/profiles/tablet-niri/rootfs-overlay"
+PARU_PKGBUILD="$REPO_ROOT/packages/tablet-niri/paru/PKGBUILD"
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/tb321fu-tablet-niri-test.XXXXXX")
 trap 'rm -rf -- "$tmp"' EXIT
 
@@ -118,6 +119,17 @@ grep -Fq 'DEFAULT_USER_AUTHORIZED_KEYS' "$BUILD_SCRIPT" || fail "SSH key secret 
 grep -Fq 'unshare --net -- chroot' "$BUILD_SCRIPT" || fail "isolated nftables validation is missing"
 grep -Fq 'tb321fu-mihomo-party' "$BUILD_SCRIPT" || fail "Mihomo native package is missing"
 grep -Fq "privilege_mode=unprivileged" "$BUILD_SCRIPT" || fail "Mihomo privilege policy is missing"
+for update in \
+  'cargo update -p alpm-sys --precise 4.0.5' \
+  'cargo update -p alpm --precise 4.0.4' \
+  'cargo update -p pacmanconf --precise 3.1.0' \
+  'cargo update -p alpm-utils --precise 4.0.3'; do
+  grep -Fqx "  $update" "$PARU_PKGBUILD" || \
+    fail "Paru compatibility update is missing or unpinned: $update"
+done
+if grep -E '^[[:space:]]*cargo update' "$PARU_PKGBUILD" | grep -Evq -- '--precise [0-9]+(\.[0-9]+)+$'; then
+  fail "Paru recipe contains an unpinned cargo update"
+fi
 camera_install_line=$(grep -n '^apply_tb321fu_camera_stack$' "$BUILD_SCRIPT" | cut -d: -f1)
 freeze_line=$(grep -n '^  freeze_tablet_niri_custom_packages ' "$BUILD_SCRIPT" | cut -d: -f1)
 [[ $camera_install_line =~ ^[0-9]+$ && $freeze_line =~ ^[0-9]+$ ]] || \

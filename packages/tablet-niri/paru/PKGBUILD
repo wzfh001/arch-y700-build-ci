@@ -18,6 +18,10 @@ sha256sums=('eea4dbb524db765d5316f540f9ee670c0bf81aae4827b5417eebb4c9b5651727')
 
 prepare() {
   cd "$pkgname-$pkgver"
+  cargo update -p alpm-sys --precise 4.0.5
+  cargo update -p alpm --precise 4.0.4
+  cargo update -p pacmanconf --precise 3.1.0
+  cargo update -p alpm-utils --precise 4.0.3
   cargo fetch --locked --target "$(rustc -vV | sed -n 's|host: ||p')"
 }
 
