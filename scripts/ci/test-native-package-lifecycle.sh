@@ -80,6 +80,9 @@ grep -A5 '^suspend_chroot_runtime() {' "$BUILD_SCRIPT" | grep -Fq 'terminate_roo
   fail "planned chroot suspension does not terminate rootfs users"
 grep -Fq 'suspend_chroot_runtime' "$BUILD_SCRIPT" || \
   fail "mid-build chroot suspension helper is unused"
+if grep -Fq "grep -q '^Restart=on-failure$'" "$BUILD_SCRIPT"; then
+  fail "verified oneshot audio guard is incorrectly required to restart"
+fi
 
 # Execute the camera staging helpers directly from the build script. Imported
 # Ubuntu camera files are excluded from the generic package, while libaperture

@@ -1109,8 +1109,6 @@ enable_y700_device_services() {
   install -d -m 0755 "$root/etc/systemd/system/multi-user.target.wants"
   for service in y700-audio-card-guard.service; do
     if [ -f "$root/etc/systemd/system/$service" ]; then
-      grep -q '^Restart=on-failure$' "$root/etc/systemd/system/$service" || \
-        ci_die "audio card guard does not retry asynchronously"
       ln -sfn "/etc/systemd/system/$service" \
         "$root/etc/systemd/system/multi-user.target.wants/$service"
     fi
