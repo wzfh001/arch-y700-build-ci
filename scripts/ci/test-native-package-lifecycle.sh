@@ -80,6 +80,9 @@ grep -A5 '^suspend_chroot_runtime() {' "$BUILD_SCRIPT" | grep -Fq 'terminate_roo
   fail "planned chroot suspension does not terminate rootfs users"
 grep -Fq 'suspend_chroot_runtime' "$BUILD_SCRIPT" || \
   fail "mid-build chroot suspension helper is unused"
+grep -A12 '^merge_stage_to_arch_import() {' "$BUILD_SCRIPT" | \
+  grep -Fq 'remove_legacy_y700_payload "$stage"' || \
+  fail "legacy Y700 files are not removed before native package creation"
 if grep -Fq "grep -q '^Restart=on-failure$'" "$BUILD_SCRIPT"; then
   fail "verified oneshot audio guard is incorrectly required to restart"
 fi

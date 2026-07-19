@@ -831,6 +831,7 @@ merge_stage_to_arch_import() {
   [[ $source_id =~ ^[A-Za-z0-9._:+-]+$ ]] || ci_die "unsafe Arch import source id: $source_id"
   stage_arch_camera_supplement "$stage"
   remove_arch_native_camera_package_paths "$stage"
+  remove_legacy_y700_payload "$stage"
   sanitize_arch_import_stage "$stage"
   special=$(find "$stage" -mindepth 1 ! -type d ! -type f ! -type l -print -quit)
   [ -z "$special" ] || ci_die "unsupported special member in Arch import: $special"
