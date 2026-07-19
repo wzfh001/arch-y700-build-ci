@@ -239,10 +239,12 @@ jobs:
           cp "$RUNNER_TEMP/rootfs.env" "$RUNNER_TEMP/build-config-notes/rootfs.env"
           cp "$RUNNER_TEMP/boot.env" "$RUNNER_TEMP/build-config-notes/boot.env"
           cp "$RUNNER_TEMP/source.env" "$RUNNER_TEMP/build-config-notes/source.env"
-          echo "BUILD_CONFIG_NOTES_DIR=$RUNNER_TEMP/build-config-notes" >> "$GITHUB_ENV"
-          printf 'OUTPUT_PREFIX=%s\n' "$INPUT_OUTPUT_PREFIX" >> "$GITHUB_ENV"
-          echo "OUTPUT_DIR_ROOTFS=out/ci-rootfs" >> "$GITHUB_ENV"
-          echo "OUTPUT_DIR_GRUB=out/ci-grub" >> "$GITHUB_ENV"
+          {
+            echo "BUILD_CONFIG_NOTES_DIR=$RUNNER_TEMP/build-config-notes"
+            printf 'OUTPUT_PREFIX=%s\n' "$INPUT_OUTPUT_PREFIX"
+            echo "OUTPUT_DIR_ROOTFS=out/ci-rootfs"
+            echo "OUTPUT_DIR_GRUB=out/ci-grub"
+          } >> "$GITHUB_ENV"
 
       - name: Build rootfs image
         env:
@@ -359,7 +361,7 @@ jobs:
           }
 
           split_large_release_assets
-          (cd "$release_dir" && sha256sum * > SHA256SUMS.txt)
+          (cd "$release_dir" && sha256sum -- * > SHA256SUMS.txt)
 
           notes=out/ci-release/BUILD-PARAMETERS.md
           {
@@ -372,9 +374,9 @@ jobs:
             echo 'This release contains Arch Linux ARM Plasma assets for Lenovo Y700 / TB321FU.'
             echo 'Password hashes are supplied only through step-scoped secrets and are never serialized into build configuration or release notes.'
             echo
-            echo 'The release asset names are intentionally short: `boot.img.7z`, `grub.img.7z`, and split rootfs parts such as `rootfs.img.7z.000` / `rootfs.img.7z.001`.'
+            echo "The release asset names are intentionally short: \`boot.img.7z\`, \`grub.img.7z\`, and split rootfs parts such as \`rootfs.img.7z.000\` / \`rootfs.img.7z.001\`."
             echo
-            echo 'Assets ending in `.NNN` are split only to satisfy the GitHub Release 2GB per-asset limit. Recombine them in lexical order before extraction, for example: `cat rootfs.img.7z.* > rootfs.img.7z`.'
+            echo "Assets ending in \`.NNN\` are split only to satisfy the GitHub Release 2GB per-asset limit. Recombine them in lexical order before extraction, for example: \`cat rootfs.img.7z.* > rootfs.img.7z\`."
             echo
             echo '## RootFS Config'
             echo '```text'
