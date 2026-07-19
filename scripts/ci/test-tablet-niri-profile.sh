@@ -78,6 +78,7 @@ extract_shell_function() {
   ' "$BUILD_SCRIPT"
 }
 eval "$(extract_shell_function remove_tablet_niri_desktop_payload)"
+eval "$(extract_shell_function freeze_tablet_niri_custom_packages)"
 
 payload_root="$tmp/payload"
 for path in \
@@ -104,6 +105,15 @@ DESKTOP_PROFILE=standard
 remove_tablet_niri_desktop_payload "$standard_root"
 [ -f "$standard_root/etc/xdg/kwinrc" ] || fail "legacy Plasma profile lost its KWin payload"
 DESKTOP_PROFILE=tablet-niri
+
+freeze_root="$tmp/freeze"
+install -D -m 0644 /dev/stdin "$freeze_root/etc/pacman.conf" <<'PACMAN_CONF'
+[options]
+PACMAN_CONF
+freeze_tablet_niri_custom_packages "$freeze_root"
+expected_ignore='IgnorePkg = noctalia wvkbd paru tb321fu-imported-release-payload tb321fu-camera-stack tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli'
+grep -Fxq "$expected_ignore" "$freeze_root/etc/pacman.conf" || \
+  fail "custom package freeze policy is incomplete"
 
 package_block=$(sed -n '/local tablet_niri=(/,/^  )/p' "$BUILD_SCRIPT")
 for package in niri greetd foot nftables zram-generator dolphin mpv vlc nodejs rust; do

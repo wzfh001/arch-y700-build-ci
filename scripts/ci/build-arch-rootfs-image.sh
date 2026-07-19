@@ -1445,7 +1445,7 @@ apply_tablet_niri_profile() {
 
 freeze_tablet_niri_custom_packages() {
   local root=$1
-  local ignore_packages='tb321fu-imported-release-payload tb321fu-camera-stack tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli'
+  local ignore_packages='noctalia wvkbd paru tb321fu-imported-release-payload tb321fu-camera-stack tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli'
 
   if grep -Eq '^[[:space:]]*IgnorePkg[[:space:]]*=' "$root/etc/pacman.conf"; then
     ci_die "tablet-niri refuses to merge an existing IgnorePkg policy"
