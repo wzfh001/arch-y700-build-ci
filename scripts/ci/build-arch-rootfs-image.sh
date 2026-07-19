@@ -742,6 +742,26 @@ prepare_arch_import_module_dependencies() {
   [ "$added_lib_link" = 0 ] || rm -f -- "$stage/lib"
 }
 
+remove_generated_module_dependency_files() {
+  local stage=$1
+  local kernel_version=$2
+  local module_dir="$stage/usr/lib/modules/$kernel_version"
+
+  [ -d "$module_dir" ] || return 0
+  rm -f -- \
+    "$module_dir/modules.alias" \
+    "$module_dir/modules.alias.bin" \
+    "$module_dir/modules.builtin.alias.bin" \
+    "$module_dir/modules.builtin.bin" \
+    "$module_dir/modules.dep" \
+    "$module_dir/modules.dep.bin" \
+    "$module_dir/modules.devname" \
+    "$module_dir/modules.softdep" \
+    "$module_dir/modules.symbols" \
+    "$module_dir/modules.symbols.bin" \
+    "$module_dir/modules.weakdep"
+}
+
 remove_existing_identical_arch_import_members() {
   local stage=$1
   local root=$2
@@ -852,7 +872,7 @@ install_arch_import_package() {
   [ -d "$arch_import_stage" ] || return 0
   [ -n "$(find "$arch_import_stage" -mindepth 1 -print -quit)" ] || return 0
 
-  prepare_arch_import_module_dependencies "$arch_import_stage" "$KERNEL_VERSION"
+  remove_generated_module_dependency_files "$arch_import_stage" "$KERNEL_VERSION"
   remove_existing_identical_arch_import_members "$arch_import_stage" "$rootfs_dir"
 
   (cd "$arch_import_stage" && find . -type f -print0 | sort -z | xargs -0 -r sha256sum) > "$payload_manifest"

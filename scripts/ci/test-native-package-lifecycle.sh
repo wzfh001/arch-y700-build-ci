@@ -85,6 +85,7 @@ eval "$(extract_shell_function stage_arch_camera_supplement)"
 eval "$(extract_shell_function remove_arch_native_camera_package_paths)"
 eval "$(extract_shell_function adapt_ubuntu_multilib_paths_for_arch)"
 eval "$(extract_shell_function prepare_arch_import_module_dependencies)"
+eval "$(extract_shell_function remove_generated_module_dependency_files)"
 eval "$(extract_shell_function remove_existing_identical_arch_import_members)"
 
 module_stage="$tmp/module-stage"
@@ -97,6 +98,20 @@ prepare_arch_import_module_dependencies "$module_stage" "$kernel_version"
   fail "Arch import depmod arguments are wrong: $depmod_args"
 [ ! -e "$module_stage/lib" ] && [ ! -L "$module_stage/lib" ] || \
   fail "temporary Arch import /lib compatibility link remained"
+touch \
+  "$module_stage/usr/lib/modules/$kernel_version/modules.dep" \
+  "$module_stage/usr/lib/modules/$kernel_version/modules.dep.bin" \
+  "$module_stage/usr/lib/modules/$kernel_version/modules.builtin" \
+  "$module_stage/usr/lib/modules/$kernel_version/modules.order"
+remove_generated_module_dependency_files "$module_stage" "$kernel_version"
+[ ! -e "$module_stage/usr/lib/modules/$kernel_version/modules.dep" ] || \
+  fail "generated modules.dep remained in imported package"
+[ ! -e "$module_stage/usr/lib/modules/$kernel_version/modules.dep.bin" ] || \
+  fail "generated modules.dep.bin remained in imported package"
+[ -e "$module_stage/usr/lib/modules/$kernel_version/modules.builtin" ] || \
+  fail "static modules.builtin was removed from imported package"
+[ -e "$module_stage/usr/lib/modules/$kernel_version/modules.order" ] || \
+  fail "static modules.order was removed from imported package"
 
 dedupe_stage="$tmp/dedupe-stage"
 dedupe_root="$tmp/dedupe-root"
