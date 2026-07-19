@@ -82,6 +82,16 @@ ci_die() { fail "$*"; }
 eval "$(extract_shell_function stage_arch_camera_supplement)"
 eval "$(extract_shell_function remove_arch_native_camera_package_paths)"
 eval "$(extract_shell_function adapt_ubuntu_multilib_paths_for_arch)"
+eval "$(extract_shell_function prepare_arch_import_module_dependencies)"
+
+module_stage="$tmp/module-stage"
+kernel_version=7.1.1-test
+mkdir -p "$module_stage/usr/lib/modules/$kernel_version"
+depmod_args=
+depmod() { printf -v depmod_args '%q ' "$@"; }
+prepare_arch_import_module_dependencies "$module_stage" "$kernel_version"
+[ "$depmod_args" = "-b $module_stage -m /usr/lib/modules $kernel_version " ] || \
+  fail "Arch import depmod did not use /usr/lib/modules: $depmod_args"
 
 import_stage="$tmp/import-stage"
 arch_camera_supplement_stage="$tmp/camera-supplement-stage"

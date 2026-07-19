@@ -722,6 +722,15 @@ sanitize_arch_import_stage() {
   ci_assert_normalized_system_payload_modes "$stage"
 }
 
+prepare_arch_import_module_dependencies() {
+  local stage=$1
+  local kernel_version=$2
+
+  if [ -d "$stage/usr/lib/modules/$kernel_version" ]; then
+    depmod -b "$stage" -m /usr/lib/modules "$kernel_version"
+  fi
+}
+
 discard_arch_import_source_stage() {
   local stage=$1
   local stage_real work_real
@@ -800,9 +809,7 @@ install_arch_import_package() {
   [ -d "$arch_import_stage" ] || return 0
   [ -n "$(find "$arch_import_stage" -mindepth 1 -print -quit)" ] || return 0
 
-  if [ -d "$arch_import_stage/usr/lib/modules/$KERNEL_VERSION" ]; then
-    depmod -b "$arch_import_stage" "$KERNEL_VERSION"
-  fi
+  prepare_arch_import_module_dependencies "$arch_import_stage" "$KERNEL_VERSION"
 
   (cd "$arch_import_stage" && find . -type f -print0 | sort -z | xargs -0 -r sha256sum) > "$payload_manifest"
   package_hash=$(
