@@ -5,6 +5,8 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 REPO_ROOT=$(cd -- "$SCRIPT_DIR/../.." && pwd -P)
 BUILD_SCRIPT="$SCRIPT_DIR/build-arch-rootfs-image.sh"
 PROFILE="$REPO_ROOT/profiles/tablet-niri/rootfs-overlay"
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/tb321fu-tablet-niri-test.XXXXXX")
+trap 'rm -rf -- "$tmp"' EXIT
 
 fail() {
   printf 'tablet-niri profile test failure: %s\n' "$*" >&2
@@ -65,6 +67,39 @@ grep -Fq 'XF86PowerOff { power-off-monitors; }' "$niri_config" || \
 if grep -Eqi 'swaylock|noctalia msg session lock' "$niri_config"; then
   fail "niri config exposes a lock-screen shortcut"
 fi
+
+extract_shell_function() {
+  local name=$1
+  awk -v signature="$name() {" '
+    $0 == signature { copying = 1 }
+    copying { print }
+    copying && $0 == "}" { exit }
+  ' "$BUILD_SCRIPT"
+}
+eval "$(extract_shell_function remove_tablet_niri_desktop_payload)"
+
+payload_root="$tmp/payload"
+for path in \
+  usr/share/applications/org.kde.plasma.keyboard.desktop \
+  etc/xdg/kwinrc \
+  home/fuhao/.config/kwinrc \
+  home/fuhao/.config/plasmakeyboardrc \
+  home/fuhao/.config/kwinoutputconfig.json; do
+  install -D -m 0644 /dev/null "$payload_root/$path"
+done
+DESKTOP_PROFILE=tablet-niri
+DEFAULT_USER_NAME=fuhao
+remove_tablet_niri_desktop_payload "$payload_root"
+if find "$payload_root" -type f -print -quit | grep -q .; then
+  fail "tablet profile retained a Plasma/KWin payload"
+fi
+
+standard_root="$tmp/standard"
+install -D -m 0644 /dev/null "$standard_root/etc/xdg/kwinrc"
+DESKTOP_PROFILE=standard
+remove_tablet_niri_desktop_payload "$standard_root"
+[ -f "$standard_root/etc/xdg/kwinrc" ] || fail "legacy Plasma profile lost its KWin payload"
+DESKTOP_PROFILE=tablet-niri
 
 package_block=$(sed -n '/local tablet_niri=(/,/^  )/p' "$BUILD_SCRIPT")
 for package in niri greetd foot nftables zram-generator dolphin mpv vlc nodejs rust; do

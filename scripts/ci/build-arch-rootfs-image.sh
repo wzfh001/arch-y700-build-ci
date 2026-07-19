@@ -450,11 +450,27 @@ verify_required_y700_payload() {
     etc/systemd/user/pipewire.service.d/60-y700-libcamera-paths.conf
     etc/systemd/user/wireplumber.service.d/60-y700-libcamera-paths.conf
     etc/udev/rules.d/70-y700-camera-dma-heap.rules
-    usr/share/applications/org.kde.plasma.keyboard.desktop
-    etc/xdg/kwinrc
-    home/$DEFAULT_USER_NAME/.config/kwinrc
-    home/$DEFAULT_USER_NAME/.config/plasmakeyboardrc
   )
+  if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
+    required+=(
+      usr/bin/niri
+      usr/bin/noctalia
+      etc/greetd/config.toml
+      etc/nftables.conf
+      etc/systemd/user/noctalia.service
+      etc/systemd/user/fcitx5-tablet.service
+      etc/systemd/system/tb321fu-grow-rootfs.service
+      home/$DEFAULT_USER_NAME/.config/niri/config.kdl
+      home/$DEFAULT_USER_NAME/.config/noctalia/config.toml
+    )
+  else
+    required+=(
+      usr/share/applications/org.kde.plasma.keyboard.desktop
+      etc/xdg/kwinrc
+      home/$DEFAULT_USER_NAME/.config/kwinrc
+      home/$DEFAULT_USER_NAME/.config/plasmakeyboardrc
+    )
+  fi
   if ci_bool "$INSTALL_FCITX5_CHINESE"; then
     required+=(home/$DEFAULT_USER_NAME/.config/fcitx5/profile)
   fi
@@ -512,6 +528,15 @@ verify_required_y700_payload() {
     usr/local/libexec/y700-display-rotation-dbus
     usr/local/bin/y700-display-rotation-sync
   )
+  if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
+    forbidden+=(
+      usr/share/applications/org.kde.plasma.keyboard.desktop
+      etc/xdg/kwinrc
+      home/$DEFAULT_USER_NAME/.config/kwinrc
+      home/$DEFAULT_USER_NAME/.config/plasmakeyboardrc
+      home/$DEFAULT_USER_NAME/.config/kwinoutputconfig.json
+    )
+  fi
   for rel in "${forbidden[@]}"; do
     [ ! -e "$root/$rel" ] && [ ! -L "$root/$rel" ] || ci_die "legacy Y700 payload must not be present: /$rel"
   done
@@ -619,6 +644,22 @@ remove_legacy_y700_payload() {
       "$root/etc/systemd/system/multi-user.target.wants/y700-sns-init.service" \
       "$root/etc/systemd/system/multi-user.target.wants/y700-aw86937-haptics.service"
   fi
+}
+
+remove_tablet_niri_desktop_payload() {
+  local root=$1
+
+  [ "$DESKTOP_PROFILE" = tablet-niri ] || return 0
+  rm -f \
+    "$root/usr/share/applications/org.kde.plasma.keyboard.desktop" \
+    "$root/etc/xdg/kwinrc" \
+    "$root/home/$DEFAULT_USER_NAME/.config/kwinrc" \
+    "$root/home/$DEFAULT_USER_NAME/.config/plasmakeyboardrc" \
+    "$root/home/$DEFAULT_USER_NAME/.config/kwinoutputconfig.json"
+  rmdir --ignore-fail-on-non-empty \
+    "$root/home/$DEFAULT_USER_NAME/.config" \
+    "$root/home/$DEFAULT_USER_NAME" \
+    "$root/home" 2>/dev/null || true
 }
 
 validate_tb321fu_compat_firmware_stage() {
@@ -861,6 +902,7 @@ merge_stage_to_arch_import() {
   stage_arch_camera_supplement "$stage"
   remove_arch_native_camera_package_paths "$stage"
   remove_legacy_y700_payload "$stage"
+  remove_tablet_niri_desktop_payload "$stage"
   remove_legacy_y700_audio_policy "$stage"
   sanitize_arch_import_stage "$stage"
   special=$(find "$stage" -mindepth 1 ! -type d ! -type f ! -type l -print -quit)
@@ -2431,6 +2473,7 @@ fi
 mount_chroot_runtime
 
 remove_legacy_y700_payload "$rootfs_dir"
+remove_tablet_niri_desktop_payload "$rootfs_dir"
 remove_legacy_camera_payload "$rootfs_dir"
 
 enable_y700_device_services "$rootfs_dir"
