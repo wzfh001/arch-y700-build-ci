@@ -82,7 +82,7 @@ REPO_ROOT=$(cd -- "$SCRIPT_DIR/../.." && pwd -P)
 OUTPUT_DIR=${OUTPUT_DIR:-out/ci-rootfs}
 OUTPUT_PREFIX=${OUTPUT_PREFIX:-y700-archlinuxarm}
 ci_validate_output_prefix "$OUTPUT_PREFIX"
-ARCH_ROOTFS_URL=${ARCH_ROOTFS_URL:-https://os.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz}
+ARCH_ROOTFS_URL=${ARCH_ROOTFS_URL:-https://de3.mirror.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz}
 ARCH_ROOTFS_SHA256=${ARCH_ROOTFS_SHA256:-}
 ARCH_MIRROR=${ARCH_MIRROR:-'http://os.archlinuxarm.org/$arch/$repo'}
 ROOTFS_IMAGE_SIZE=${ROOTFS_IMAGE_SIZE:-20G}

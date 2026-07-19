@@ -20,11 +20,12 @@ on:
       arch_rootfs_url:
         description: Arch Linux ARM aarch64 rootfs tarball URL.
         required: true
-        default: https://os.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz
+        default: https://de3.mirror.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz
         type: string
       arch_rootfs_sha256:
         description: Required SHA-256 for the selected Arch Linux ARM rootfs tarball.
         required: true
+        default: 3cf5764fb6fec7bffdff98787e52ccd15d5d6390a2496c7028d7c4950404c56a
         type: string
       desktop_profile:
         description: Plasma package profile. standard is recommended for first builds.
@@ -131,9 +132,9 @@ jobs:
           mkdir -p "$RUNNER_TEMP/build-config-notes"
 
           cat > "$RUNNER_TEMP/rootfs.env" <<'CONFIG_EOF'
-          ARCH_ROOTFS_URL=https://os.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz
-          ARCH_ROOTFS_SHA256=
-          ARCH_MIRROR=http://os.archlinuxarm.org/$arch/$repo
+          ARCH_ROOTFS_URL=https://de3.mirror.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz
+          ARCH_ROOTFS_SHA256=3cf5764fb6fec7bffdff98787e52ccd15d5d6390a2496c7028d7c4950404c56a
+          ARCH_MIRROR=https://de3.mirror.archlinuxarm.org/$arch/$repo
           ROOTFS_IMAGE_SIZE=20G
           ROOTFS_LABEL=ArchLinux
           ROOTFS_PARTLABEL=userdata

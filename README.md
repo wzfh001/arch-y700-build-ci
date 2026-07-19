@@ -76,15 +76,40 @@ cat rootfs.img.7z.* > rootfs.img.7z
 Common workflow inputs:
 
 - `release_tag`: leave empty to only produce Actions artifacts
+- `prerelease`: must remain enabled when publishing a remediation release
+- `output_prefix`: artifact and image filename prefix
+- `arch_rootfs_url`: defaults to the verified `de3` Arch Linux ARM HTTPS mirror
+- `arch_rootfs_sha256`: required and pinned to the selected rootfs bytes
 - `desktop_profile`: `minimal`, `standard`, or `full`
-- `arch_mirror`: default `http://os.archlinuxarm.org/$arch/$repo`
 - `rootfs_image_size`: default `20G`
-- `hostname_name`: default `GUF296`
-- `default_user_name`: default `GUF296`
-- `default_user_password`: default `1234`
-- `sddm_autologin`: default enabled
+- `rootfs_config`, `boot_config`, `source_config`: advanced `KEY=value` overrides
 
-Advanced overrides are available through `rootfs_config` and `boot_config` as `KEY=value` lines.
+The default rootfs configuration uses hostname/user `GUF296`, password-based sudo,
+and SDDM autologin. Passwords are never workflow inputs. Supply an encrypted
+SHA-512 password hash through the repository secret `DEFAULT_USER_PASSWORD_HASH`.
+If `ROOT_PASSWORD_MODE=set` is selected, supply `ROOT_PASSWORD_HASH` the same way.
+The hashes are exposed only to the rootfs build step and are not written to the
+metadata artifact or release notes.
+
+Current pinned Arch Linux ARM rootfs baseline:
+
+```text
+URL=https://de3.mirror.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz
+Last-Modified=2026-06-06T03:25:25Z
+Size=818293654
+SHA256=3cf5764fb6fec7bffdff98787e52ccd15d5d6390a2496c7028d7c4950404c56a
+OpenPGP signer=68B3537F39A313B3E574D06777193F152BDBE6A6
+```
+
+The archive SHA-256 was calculated from the `de3` official HTTPS mirror. Its
+MD5 and detached signature bytes were cross-checked against the official
+`ca.us` mirror, and the signer fingerprint matches the Arch Linux ARM package
+signing page. Because the upstream filename is rolling, a changed archive will
+fail closed until the URL/hash pin is deliberately reviewed and updated.
+
+For the first validation build, leave `release_tag` empty. Do not flash an
+artifact until its metadata, checksums, filesystem contents and the current
+Kubuntu rollback path have been reviewed.
 
 ## First Validation Targets
 
