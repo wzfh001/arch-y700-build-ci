@@ -9,6 +9,8 @@ ci_payload_file_mode() {
     /DEBIAN/preinst|/DEBIAN/postinst|/DEBIAN/prerm|/DEBIAN/postrm|/DEBIAN/config|\
     /bin/*|/sbin/*|/usr/bin/*|/usr/sbin/*|/usr/libexec/*|\
     /usr/local/bin/*|/usr/local/sbin/*|/usr/local/libexec/*|\
+    /usr/lib/tb321fu/refresh-camera-compat-paths|\
+    /usr/lib/tb321fu/disable-stock-ksystemstats-gpu|\
     /opt/libcamera-y700/bin/*|/opt/libcamera-y700/libexec/*)
       printf '0755\n'
       ;;

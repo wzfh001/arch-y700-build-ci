@@ -253,6 +253,12 @@ stop_chroot_background_services() {
   arch_chroot /usr/bin/env GNUPGHOME=/etc/pacman.d/gnupg /usr/bin/gpgconf --kill all || true
 }
 
+suspend_chroot_runtime() {
+  stop_chroot_background_services
+  terminate_rootfs_processes "$rootfs_dir"
+  unmount_chroot_runtime
+}
+
 finalize_rootfs_mount() {
   stop_chroot_background_services
   unmount_chroot_runtime
@@ -1942,7 +1948,7 @@ if [ -n "$OVERLAY_DIR" ]; then
   ci_validate_rootfs_overlay_tree "$OVERLAY_DIR"
 fi
 
-unmount_chroot_runtime
+suspend_chroot_runtime
 
 if [ -n "$overlay_stage" ]; then
   ci_log "applying staged overlay archive: $OVERLAY_ARCHIVE"

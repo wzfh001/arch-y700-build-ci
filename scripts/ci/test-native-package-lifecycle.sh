@@ -76,6 +76,10 @@ grep -A8 '^cleanup() {' "$BUILD_SCRIPT" | grep -Fq 'stop_chroot_background_servi
   fail "failure cleanup does not stop chroot background services"
 grep -A8 '^cleanup() {' "$BUILD_SCRIPT" | grep -Fq 'terminate_rootfs_processes "$rootfs_dir"' || \
   fail "failure cleanup does not terminate rootfs users"
+grep -A5 '^suspend_chroot_runtime() {' "$BUILD_SCRIPT" | grep -Fq 'terminate_rootfs_processes "$rootfs_dir"' || \
+  fail "planned chroot suspension does not terminate rootfs users"
+grep -Fq 'suspend_chroot_runtime' "$BUILD_SCRIPT" || \
+  fail "mid-build chroot suspension helper is unused"
 
 # Execute the camera staging helpers directly from the build script. Imported
 # Ubuntu camera files are excluded from the generic package, while libaperture

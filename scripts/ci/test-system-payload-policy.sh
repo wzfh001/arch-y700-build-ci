@@ -20,6 +20,7 @@ install -d -m 0777 \
   "$root/etc/systemd/system" \
   "$root/usr/lib/firmware" \
   "$root/usr/lib/aarch64-linux-gnu" \
+  "$root/usr/lib/tb321fu" \
   "$root/usr/libexec/tb321fu-haptics" \
   "$root/usr/local/bin" \
   "$root/opt/libcamera-y700/bin" \
@@ -29,6 +30,8 @@ printf 'unit\n' > "$root/etc/systemd/system/fixture.service"
 printf 'firmware\n' > "$root/usr/lib/firmware/fixture.bin"
 printf 'library\n' > "$root/usr/lib/aarch64-linux-gnu/libfixture.so"
 printf '#!/bin/sh\nexit 0\n' > "$root/usr/libexec/tb321fu-haptics/bind-aw86937"
+printf '#!/bin/sh\nexit 0\n' > "$root/usr/lib/tb321fu/refresh-camera-compat-paths"
+printf '#!/bin/sh\nexit 0\n' > "$root/usr/lib/tb321fu/disable-stock-ksystemstats-gpu"
 for executable in \
   "$root/opt/libcamera-y700/bin/cam" \
   "$root/opt/libcamera-y700/bin/libcamera-bug-report" \
@@ -42,6 +45,8 @@ chmod 0777 "$root/etc/systemd/system/fixture.service" \
   "$root/usr/lib/firmware/fixture.bin" \
   "$root/usr/lib/aarch64-linux-gnu/libfixture.so"
 chmod 0644 "$root/usr/libexec/tb321fu-haptics/bind-aw86937" \
+  "$root/usr/lib/tb321fu/refresh-camera-compat-paths" \
+  "$root/usr/lib/tb321fu/disable-stock-ksystemstats-gpu" \
   "$root/opt/libcamera-y700/bin/cam" \
   "$root/opt/libcamera-y700/bin/libcamera-bug-report" \
   "$root/opt/libcamera-y700/libexec/libcamera/soft_ipa_proxy" \
@@ -63,6 +68,8 @@ ci_assert_privileged_payload_security "$root" \
 [ "$(stat -c '%a' "$root/usr/lib/firmware/fixture.bin")" = 644 ]
 [ "$(stat -c '%a' "$root/usr/lib/aarch64-linux-gnu/libfixture.so")" = 644 ]
 [ "$(stat -c '%a' "$root/usr/libexec/tb321fu-haptics/bind-aw86937")" = 755 ]
+[ "$(stat -c '%a' "$root/usr/lib/tb321fu/refresh-camera-compat-paths")" = 755 ]
+[ "$(stat -c '%a' "$root/usr/lib/tb321fu/disable-stock-ksystemstats-gpu")" = 755 ]
 [ "$(stat -c '%a' "$root/opt/libcamera-y700/bin/cam")" = 755 ]
 [ "$(stat -c '%a' "$outside/world-writable")" = 777 ]
 
