@@ -66,6 +66,8 @@ grep -Fq '/usr/lib/tb321fu/disable-stock-ksystemstats-gpu restore' "$install_scr
 if grep -Fq TB321FU_ROOT "$install_script"; then
   fail "production pacman callbacks accept ambient root redirection"
 fi
+grep -Fq "/usr/bin/bash -c 'cd -- \"\$1\" && shift && exec \"\$@\"' bash \"\$build_dir\"" \
+  "$BUILD_SCRIPT" || fail "native package build does not enter its PKGBUILD directory"
 
 # Execute the camera staging helpers directly from the build script. Imported
 # Ubuntu camera files are excluded from the generic package, while libaperture

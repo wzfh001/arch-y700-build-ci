@@ -874,6 +874,7 @@ PKGBUILD
     SRCDEST="$build_dir/srcdest" \
     BUILDDIR="$build_dir/build" \
     SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-0}" \
+    /usr/bin/bash -c 'cd -- "$1" && shift && exec "$@"' bash "$build_dir" \
     /usr/bin/makepkg --noconfirm --nodeps --cleanbuild --clean --force
 
   while IFS= read -r -d '' package_file; do
