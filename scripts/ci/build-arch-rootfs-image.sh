@@ -496,6 +496,29 @@ verify_required_y700_payload() {
   done
 }
 
+remove_legacy_y700_audio_policy() {
+  local root=$1
+  local old_conf="$root/etc/wireplumber/wireplumber.conf.d/52-y700-headset-cleanup.conf"
+  local old_script="$root/usr/share/wireplumber/scripts/y700/headset-cleanup.lua"
+  local old_conf_sha old_script_sha
+
+  if [ -e "$old_conf" ] || [ -L "$old_conf" ] ||
+     [ -e "$old_script" ] || [ -L "$old_script" ]; then
+    [ -f "$old_conf" ] && [ ! -L "$old_conf" ] ||
+      ci_die "tested WirePlumber headset cleanup config is missing or unsafe"
+    [ -f "$old_script" ] && [ ! -L "$old_script" ] ||
+      ci_die "tested WirePlumber headset cleanup script is missing or unsafe"
+    old_conf_sha=$(sha256sum "$old_conf" | awk '{print $1}')
+    [ "$old_conf_sha" = 5ea413266962a5bec45b6e287dc7e5bd6ab45112f4c2fd23810004e32b6328b2 ] ||
+      ci_die "unrecognized tested WirePlumber headset cleanup config: $old_conf_sha"
+    old_script_sha=$(sha256sum "$old_script" | awk '{print $1}')
+    [ "$old_script_sha" = 6da046508f8965e05d9ec2d2b9e8b7bb7d556924f21f671b41b2451714f988c9 ] ||
+      ci_die "unrecognized tested WirePlumber headset cleanup script: $old_script_sha"
+    rm -f -- "$old_conf" "$old_script"
+    rmdir --ignore-fail-on-non-empty "$(dirname "$old_script")" 2>/dev/null || true
+  fi
+}
+
 apply_y700_audio_policy_fixes() {
   local root=$1
   local conf_dir="$root/etc/wireplumber/wireplumber.conf.d"
@@ -504,7 +527,6 @@ apply_y700_audio_policy_fixes() {
   local old_script="$root/usr/share/wireplumber/scripts/y700/headset-cleanup.lua"
   local route_conf="$conf_dir/52-tb321fu-headset-route-reconcile.conf"
   local route_script="$root/usr/share/wireplumber/scripts/tb321fu/headset-route-reconcile.lua"
-  local old_conf_sha old_script_sha
 
   ci_log "installing Y700 WirePlumber ALSA policy fix"
   install -d -m 0755 "$conf_dir"
@@ -530,21 +552,7 @@ monitor.alsa.rules = [
 CONF
   chmod 0644 "$conf"
 
-  if [ -e "$old_conf" ] || [ -L "$old_conf" ] ||
-     [ -e "$old_script" ] || [ -L "$old_script" ]; then
-    [ -f "$old_conf" ] && [ ! -L "$old_conf" ] ||
-      ci_die "tested WirePlumber headset cleanup config is missing or unsafe"
-    [ -f "$old_script" ] && [ ! -L "$old_script" ] ||
-      ci_die "tested WirePlumber headset cleanup script is missing or unsafe"
-    old_conf_sha=$(sha256sum "$old_conf" | awk '{print $1}')
-    [ "$old_conf_sha" = 5ea413266962a5bec45b6e287dc7e5bd6ab45112f4c2fd23810004e32b6328b2 ] ||
-      ci_die "unrecognized tested WirePlumber headset cleanup config: $old_conf_sha"
-    old_script_sha=$(sha256sum "$old_script" | awk '{print $1}')
-    [ "$old_script_sha" = 6da046508f8965e05d9ec2d2b9e8b7bb7d556924f21f671b41b2451714f988c9 ] ||
-      ci_die "unrecognized tested WirePlumber headset cleanup script: $old_script_sha"
-    rm -f -- "$old_conf" "$old_script"
-    rmdir --ignore-fail-on-non-empty "$(dirname "$old_script")" 2>/dev/null || true
-  fi
+  remove_legacy_y700_audio_policy "$root"
 
   [ ! -L "$route_conf" ] || ci_die "TB321FU route reconcile config must not be a symlink"
   [ ! -L "$route_script" ] || ci_die "TB321FU route reconcile script must not be a symlink"
@@ -832,6 +840,7 @@ merge_stage_to_arch_import() {
   stage_arch_camera_supplement "$stage"
   remove_arch_native_camera_package_paths "$stage"
   remove_legacy_y700_payload "$stage"
+  remove_legacy_y700_audio_policy "$stage"
   sanitize_arch_import_stage "$stage"
   special=$(find "$stage" -mindepth 1 ! -type d ! -type f ! -type l -print -quit)
   [ -z "$special" ] || ci_die "unsupported special member in Arch import: $special"

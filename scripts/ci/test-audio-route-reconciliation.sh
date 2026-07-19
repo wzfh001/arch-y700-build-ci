@@ -31,6 +31,7 @@ extract_shell_function() {
 }
 ci_log() { :; }
 ci_die() { printf '%s\n' "$*" >&2; exit 1; }
+eval "$(extract_shell_function remove_legacy_y700_audio_policy)"
 eval "$(extract_shell_function apply_y700_audio_policy_fixes)"
 
 install -D -m 0644 "$tested_audio_conf" \

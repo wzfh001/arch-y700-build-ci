@@ -83,6 +83,9 @@ grep -Fq 'suspend_chroot_runtime' "$BUILD_SCRIPT" || \
 grep -A12 '^merge_stage_to_arch_import() {' "$BUILD_SCRIPT" | \
   grep -Fq 'remove_legacy_y700_payload "$stage"' || \
   fail "legacy Y700 files are not removed before native package creation"
+grep -A14 '^merge_stage_to_arch_import() {' "$BUILD_SCRIPT" | \
+  grep -Fq 'remove_legacy_y700_audio_policy "$stage"' || \
+  fail "legacy WirePlumber policy is not removed before native package creation"
 if grep -Fq "grep -q '^Restart=on-failure$'" "$BUILD_SCRIPT"; then
   fail "verified oneshot audio guard is incorrectly required to restart"
 fi
@@ -105,6 +108,25 @@ eval "$(extract_shell_function adapt_ubuntu_multilib_paths_for_arch)"
 eval "$(extract_shell_function remove_generated_module_dependency_files)"
 eval "$(extract_shell_function remove_existing_identical_arch_import_members)"
 eval "$(extract_shell_function install_arch_local_package)"
+eval "$(extract_shell_function remove_legacy_y700_audio_policy)"
+
+audio_stage="$tmp/audio-stage"
+remove_legacy_y700_audio_policy "$audio_stage"
+install -D -m 0644 /dev/stdin \
+  "$audio_stage/etc/wireplumber/wireplumber.conf.d/52-y700-headset-cleanup.conf" <<'UNKNOWN_AUDIO_POLICY'
+unknown-policy
+UNKNOWN_AUDIO_POLICY
+install -D -m 0644 /dev/stdin \
+  "$audio_stage/usr/share/wireplumber/scripts/y700/headset-cleanup.lua" <<'UNKNOWN_AUDIO_SCRIPT'
+unknown-script
+UNKNOWN_AUDIO_SCRIPT
+if (remove_legacy_y700_audio_policy "$audio_stage") >/dev/null 2>&1; then
+  fail "unknown legacy WirePlumber policy was removed"
+fi
+[ -f "$audio_stage/etc/wireplumber/wireplumber.conf.d/52-y700-headset-cleanup.conf" ] || \
+  fail "failed legacy policy validation removed the config"
+[ -f "$audio_stage/usr/share/wireplumber/scripts/y700/headset-cleanup.lua" ] || \
+  fail "failed legacy policy validation removed the script"
 
 captured_pacman_args=
 arch_chroot() { printf -v captured_pacman_args '%q ' "$@"; }
