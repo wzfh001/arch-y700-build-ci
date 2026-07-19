@@ -90,8 +90,10 @@ mkdir -p "$module_stage/usr/lib/modules/$kernel_version"
 depmod_args=
 depmod() { printf -v depmod_args '%q ' "$@"; }
 prepare_arch_import_module_dependencies "$module_stage" "$kernel_version"
-[ "$depmod_args" = "-b $module_stage -m /usr/lib/modules $kernel_version " ] || \
-  fail "Arch import depmod did not use /usr/lib/modules: $depmod_args"
+[ "$depmod_args" = "-b $module_stage $kernel_version " ] || \
+  fail "Arch import depmod arguments are wrong: $depmod_args"
+[ ! -e "$module_stage/lib" ] && [ ! -L "$module_stage/lib" ] || \
+  fail "temporary Arch import /lib compatibility link remained"
 
 import_stage="$tmp/import-stage"
 arch_camera_supplement_stage="$tmp/camera-supplement-stage"

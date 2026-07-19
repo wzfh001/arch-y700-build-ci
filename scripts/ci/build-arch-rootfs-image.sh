@@ -725,10 +725,21 @@ sanitize_arch_import_stage() {
 prepare_arch_import_module_dependencies() {
   local stage=$1
   local kernel_version=$2
+  local added_lib_link=0
 
-  if [ -d "$stage/usr/lib/modules/$kernel_version" ]; then
-    depmod -b "$stage" -m /usr/lib/modules "$kernel_version"
+  [ -d "$stage/usr/lib/modules/$kernel_version" ] || return 0
+  if [ ! -e "$stage/lib" ] && [ ! -L "$stage/lib" ]; then
+    ln -s usr/lib "$stage/lib"
+    added_lib_link=1
+  else
+    [ -L "$stage/lib" ] && [ "$(readlink "$stage/lib")" = usr/lib ] || \
+      ci_die "Arch import /lib must be absent or link to usr/lib before depmod"
   fi
+  if ! depmod -b "$stage" "$kernel_version"; then
+    [ "$added_lib_link" = 0 ] || rm -f -- "$stage/lib"
+    return 1
+  fi
+  [ "$added_lib_link" = 0 ] || rm -f -- "$stage/lib"
 }
 
 discard_arch_import_source_stage() {
