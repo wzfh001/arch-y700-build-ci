@@ -100,6 +100,13 @@ prepare_arch_import_module_dependencies "$module_stage" "$kernel_version"
 
 dedupe_stage="$tmp/dedupe-stage"
 dedupe_root="$tmp/dedupe-root"
+arch_owner=
+arch_chroot() {
+  [ "$1 $2" = '/usr/bin/pacman -Qoq' ] || return 1
+  [ -n "$arch_owner" ] || return 1
+  printf '%s\n' "$arch_owner"
+}
+ci_log() { :; }
 install -D -m 0644 /dev/stdin "$dedupe_stage/usr/share/test/identical" <<'IDENTICAL'
 same bytes
 IDENTICAL
@@ -108,6 +115,12 @@ install -D -m 0644 "$dedupe_stage/usr/share/test/identical" \
 remove_existing_identical_arch_import_members "$dedupe_stage" "$dedupe_root"
 [ ! -e "$dedupe_stage/usr/share/test/identical" ] || \
   fail "identical rootfs file remained in imported package"
+arch_owner=iio-sensor-proxy
+printf 'Ubuntu monitor-sensor\n' > "$dedupe_stage/owned"
+printf 'Arch monitor-sensor\n' > "$dedupe_root/owned"
+remove_existing_identical_arch_import_members "$dedupe_stage" "$dedupe_root"
+[ ! -e "$dedupe_stage/owned" ] || fail "Arch-owned collision remained in imported package"
+arch_owner=
 printf 'different bytes\n' > "$dedupe_stage/different"
 printf 'existing bytes\n' > "$dedupe_root/different"
 if (remove_existing_identical_arch_import_members "$dedupe_stage" "$dedupe_root") >/dev/null 2>&1; then

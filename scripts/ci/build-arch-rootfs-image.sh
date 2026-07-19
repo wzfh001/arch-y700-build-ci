@@ -745,12 +745,18 @@ prepare_arch_import_module_dependencies() {
 remove_existing_identical_arch_import_members() {
   local stage=$1
   local root=$2
-  local path relative target source_meta target_meta
+  local path relative target source_meta target_meta owner
 
   while IFS= read -r -d '' path; do
     relative=${path#"$stage"/}
     target="$root/$relative"
     [ -e "$target" ] || [ -L "$target" ] || continue
+    owner=$(arch_chroot /usr/bin/pacman -Qoq "/$relative" 2>/dev/null || true)
+    if [ -n "$owner" ]; then
+      ci_log "excluding imported path already owned by native Arch package $owner: /$relative"
+      rm -f -- "$path"
+      continue
+    fi
     if [ -L "$path" ] && [ -L "$target" ]; then
       [ "$(readlink "$path")" = "$(readlink "$target")" ] || \
         ci_die "Arch import differs from existing symlink: /$relative"
