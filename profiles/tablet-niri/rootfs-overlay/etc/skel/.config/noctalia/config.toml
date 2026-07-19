@@ -132,11 +132,6 @@ type = "notification"
 type = "session"
 
 [[shell.session.actions]]
-action = "logout"
-enabled = true
-glyph = "logout"
-
-[[shell.session.actions]]
 action = "suspend"
 enabled = true
 label = "Suspend (experimental)"

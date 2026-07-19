@@ -50,6 +50,7 @@ for required in (
 actions = noctalia["shell"]["session"]["actions"]
 assert "lock" not in {item["action"] for item in actions}
 assert "lock_and_suspend" not in {item["action"] for item in actions}
+assert "logout" not in {item["action"] for item in actions}
 assert noctalia["shell"]["session"]["power"]["suspend"] == "/usr/local/bin/tb321fu-suspend"
 PY
 
@@ -82,6 +83,12 @@ grep -Fq 'DEFAULT_USER_AUTHORIZED_KEYS' "$BUILD_SCRIPT" || fail "SSH key secret 
 grep -Fq 'unshare --net -- chroot' "$BUILD_SCRIPT" || fail "isolated nftables validation is missing"
 grep -Fq 'tb321fu-mihomo-party' "$BUILD_SCRIPT" || fail "Mihomo native package is missing"
 grep -Fq "privilege_mode=unprivileged" "$BUILD_SCRIPT" || fail "Mihomo privilege policy is missing"
+camera_install_line=$(grep -n '^apply_tb321fu_camera_stack$' "$BUILD_SCRIPT" | cut -d: -f1)
+freeze_line=$(grep -n '^  freeze_tablet_niri_custom_packages ' "$BUILD_SCRIPT" | cut -d: -f1)
+[[ $camera_install_line =~ ^[0-9]+$ && $freeze_line =~ ^[0-9]+$ ]] || \
+  fail "custom package freeze ordering markers are missing"
+((freeze_line > camera_install_line)) || \
+  fail "custom packages are frozen before the final device packages are installed"
 
 if find "$PROFILE" -type f -perm /6000 -print -quit | grep -q .; then
   fail "profile overlay contains a setuid/setgid file"

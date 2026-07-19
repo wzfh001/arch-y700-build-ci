@@ -176,9 +176,11 @@ The short physical power key is handled by niri and runs
 off on the short key, so the key remains a display toggle. Long-press behavior
 is left as an explicit emergency power-off policy.
 
-The Noctalia session menu contains logout, reboot, shutdown, and a separately
-labeled diagnostic suspend action. Its suspend command is overridden with
-`tb321fu-suspend`, which displays a warning and then calls `systemctl suspend`.
+The Noctalia session menu contains reboot, shutdown, and a separately labeled
+diagnostic suspend action. Logout is intentionally omitted because it would
+drop a touch-only user into the text greetd fallback. The suspend command is
+overridden with `tb321fu-suspend`, which displays a warning and then calls
+`systemctl suspend`.
 The image does not mask suspend targets and does not force either `deep` or
 `s2idle`; the active kernel default is recorded before each manual test.
 

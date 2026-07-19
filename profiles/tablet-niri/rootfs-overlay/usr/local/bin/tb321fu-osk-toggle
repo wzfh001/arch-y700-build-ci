@@ -14,6 +14,6 @@ fi
 systemctl --user reset-failed "$unit" 2>/dev/null || true
 systemd-run --user --quiet --collect \
   --unit=tb321fu-osk \
-  --property=Restart=on-failure \
-  --property=RestartSec=1s \
+  --property=PartOf=graphical-session.target \
+  --property=Restart=no \
   /usr/bin/wvkbd-mobintl -l simple,special,emoji

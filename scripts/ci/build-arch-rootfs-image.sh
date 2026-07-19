@@ -1367,7 +1367,6 @@ EOF
 apply_tablet_niri_profile() {
   local root=$1
   local overlay="$REPO_ROOT/profiles/tablet-niri/rootfs-overlay"
-  local ignore_packages='tb321fu-imported-release-payload tb321fu-camera-stack tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli'
 
   [ -d "$overlay" ] || ci_die "tablet-niri rootfs overlay is missing"
   ci_validate_rootfs_overlay_tree "$overlay"
@@ -1384,7 +1383,6 @@ apply_tablet_niri_profile() {
     "$root/etc/systemd/user/fcitx5-tablet.service" \
     "$root/etc/systemd/system/tb321fu-grow-rootfs.service"
 
-  sed -i "/^\[options\]$/a IgnorePkg = $ignore_packages" "$root/etc/pacman.conf"
   rm -f "$root"/etc/ssh/ssh_host_*
   : > "$root/etc/machine-id"
   rm -f "$root/var/lib/dbus/machine-id"
@@ -1395,6 +1393,18 @@ apply_tablet_niri_profile() {
 
   arch_chroot /usr/bin/niri validate -c /etc/skel/.config/niri/config.kdl
   arch_chroot /usr/bin/noctalia config validate /etc/skel/.config/noctalia/config.toml
+}
+
+freeze_tablet_niri_custom_packages() {
+  local root=$1
+  local ignore_packages='tb321fu-imported-release-payload tb321fu-camera-stack tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli'
+
+  if grep -Eq '^[[:space:]]*IgnorePkg[[:space:]]*=' "$root/etc/pacman.conf"; then
+    ci_die "tablet-niri refuses to merge an existing IgnorePkg policy"
+  fi
+  sed -i "/^\[options\]$/a IgnorePkg = $ignore_packages" "$root/etc/pacman.conf"
+  grep -Fx "IgnorePkg = $ignore_packages" "$root/etc/pacman.conf" >/dev/null || \
+    ci_die "tablet-niri custom package freeze policy was not installed"
 }
 
 install_tablet_niri_authorized_keys() {
@@ -2432,6 +2442,9 @@ if ci_bool "$APPLY_Y700_AUDIO_POLICY_FIXES"; then
 fi
 if ci_bool "$BUILD_TB321FU_GPU_SENSOR"; then
   apply_tb321fu_gpu_sensor "$rootfs_dir"
+fi
+if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
+  freeze_tablet_niri_custom_packages "$rootfs_dir"
 fi
 
 ci_log "generating module dependency files for $KERNEL_VERSION"
