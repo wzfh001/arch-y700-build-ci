@@ -85,6 +85,7 @@ eval "$(extract_shell_function stage_arch_camera_supplement)"
 eval "$(extract_shell_function remove_arch_native_camera_package_paths)"
 eval "$(extract_shell_function adapt_ubuntu_multilib_paths_for_arch)"
 eval "$(extract_shell_function prepare_arch_import_module_dependencies)"
+eval "$(extract_shell_function remove_existing_identical_arch_import_members)"
 
 module_stage="$tmp/module-stage"
 kernel_version=7.1.1-test
@@ -96,6 +97,22 @@ prepare_arch_import_module_dependencies "$module_stage" "$kernel_version"
   fail "Arch import depmod arguments are wrong: $depmod_args"
 [ ! -e "$module_stage/lib" ] && [ ! -L "$module_stage/lib" ] || \
   fail "temporary Arch import /lib compatibility link remained"
+
+dedupe_stage="$tmp/dedupe-stage"
+dedupe_root="$tmp/dedupe-root"
+install -D -m 0644 /dev/stdin "$dedupe_stage/usr/share/test/identical" <<'IDENTICAL'
+same bytes
+IDENTICAL
+install -D -m 0644 "$dedupe_stage/usr/share/test/identical" \
+  "$dedupe_root/usr/share/test/identical"
+remove_existing_identical_arch_import_members "$dedupe_stage" "$dedupe_root"
+[ ! -e "$dedupe_stage/usr/share/test/identical" ] || \
+  fail "identical rootfs file remained in imported package"
+printf 'different bytes\n' > "$dedupe_stage/different"
+printf 'existing bytes\n' > "$dedupe_root/different"
+if (remove_existing_identical_arch_import_members "$dedupe_stage" "$dedupe_root") >/dev/null 2>&1; then
+  fail "differing rootfs collision was silently removed"
+fi
 
 import_stage="$tmp/import-stage"
 arch_camera_supplement_stage="$tmp/camera-supplement-stage"

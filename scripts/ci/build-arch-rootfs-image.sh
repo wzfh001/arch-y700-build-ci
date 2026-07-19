@@ -742,6 +742,32 @@ prepare_arch_import_module_dependencies() {
   [ "$added_lib_link" = 0 ] || rm -f -- "$stage/lib"
 }
 
+remove_existing_identical_arch_import_members() {
+  local stage=$1
+  local root=$2
+  local path relative target source_meta target_meta
+
+  while IFS= read -r -d '' path; do
+    relative=${path#"$stage"/}
+    target="$root/$relative"
+    [ -e "$target" ] || [ -L "$target" ] || continue
+    if [ -L "$path" ] && [ -L "$target" ]; then
+      [ "$(readlink "$path")" = "$(readlink "$target")" ] || \
+        ci_die "Arch import differs from existing symlink: /$relative"
+    elif [ -f "$path" ] && [ -f "$target" ] && [ ! -L "$target" ]; then
+      cmp -s "$path" "$target" || ci_die "Arch import differs from existing file: /$relative"
+      source_meta=$(stat -c '%u:%g:%a' "$path")
+      target_meta=$(stat -c '%u:%g:%a' "$target")
+      [ "$source_meta" = "$target_meta" ] || \
+        ci_die "Arch import metadata differs from existing file: /$relative"
+    else
+      ci_die "Arch import type differs from existing member: /$relative"
+    fi
+    rm -f -- "$path"
+  done < <(find "$stage" -mindepth 1 \( -type f -o -type l \) -print0 | sort -z)
+  find "$stage" -depth -mindepth 1 -type d -empty -delete
+}
+
 discard_arch_import_source_stage() {
   local stage=$1
   local stage_real work_real
@@ -821,6 +847,7 @@ install_arch_import_package() {
   [ -n "$(find "$arch_import_stage" -mindepth 1 -print -quit)" ] || return 0
 
   prepare_arch_import_module_dependencies "$arch_import_stage" "$KERNEL_VERSION"
+  remove_existing_identical_arch_import_members "$arch_import_stage" "$rootfs_dir"
 
   (cd "$arch_import_stage" && find . -type f -print0 | sort -z | xargs -0 -r sha256sum) > "$payload_manifest"
   package_hash=$(
