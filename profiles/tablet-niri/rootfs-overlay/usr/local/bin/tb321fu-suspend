@@ -1,0 +1,20 @@
+#!/usr/bin/bash
+set -euo pipefail
+
+exec 9>"${XDG_RUNTIME_DIR:-/tmp}/tb321fu-suspend.lock"
+flock -n 9 || exit 0
+
+warning='Suspend is experimental on TB321FU and may resume to a backlit black screen. Save your work and keep SSH or forced-reboot recovery available.'
+if command -v zenity >/dev/null 2>&1; then
+  zenity --question \
+    --title='TB321FU suspend warning' \
+    --text="$warning" \
+    --ok-label='Suspend now' \
+    --cancel-label='Cancel' || exit 0
+else
+  notify-send --urgency=critical 'TB321FU suspend warning' "$warning"
+  exit 1
+fi
+
+logger --tag tb321fu-suspend -- 'manual suspend confirmed from graphical session'
+systemctl suspend

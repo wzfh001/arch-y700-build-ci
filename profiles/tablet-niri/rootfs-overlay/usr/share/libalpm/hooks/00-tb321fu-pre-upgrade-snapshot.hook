@@ -1,0 +1,10 @@
+[Trigger]
+Operation = Upgrade
+Type = Package
+Target = *
+
+[Action]
+Description = Saving TB321FU package and configuration snapshot...
+When = PreTransaction
+Exec = /usr/local/libexec/tb321fu-pre-upgrade-snapshot
+AbortOnFail

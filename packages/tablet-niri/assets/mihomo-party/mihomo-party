@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /opt/clash-party/mihomo-party "$@"

@@ -1,0 +1,14 @@
+[Unit]
+Description=Fcitx 5 input method for tablet-niri
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/fcitx5 --replace
+Restart=on-failure
+RestartSec=2s
+
+[Install]
+WantedBy=niri.service

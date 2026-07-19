@@ -68,7 +68,7 @@ if grep -Fq TB321FU_ROOT "$install_script"; then
 fi
 grep -Fq 'run_arch_makepkg "$build_user" "$build_dir"' "$BUILD_SCRIPT" || \
   fail "native packages do not use the common makepkg runner"
-[ "$(grep -Fc 'run_arch_makepkg "$build_user" "$build_dir"' "$BUILD_SCRIPT")" -eq 2 ] || \
+[ "$(grep -Fc 'run_arch_makepkg "$build_user" "$build_dir"' "$BUILD_SCRIPT")" -eq 3 ] || \
   fail "not every native package path uses the common makepkg runner"
 [ "$(grep -Fc '/usr/bin/makepkg --noconfirm --nodeps --cleanbuild --clean --force' "$BUILD_SCRIPT")" -eq 1 ] || \
   fail "makepkg invocation is duplicated outside the common runner"

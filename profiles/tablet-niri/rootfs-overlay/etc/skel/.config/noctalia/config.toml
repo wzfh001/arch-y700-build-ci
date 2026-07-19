@@ -1,0 +1,181 @@
+[accessibility]
+ui_scale = 1.05
+
+[shell]
+font_family = "JetBrains Mono"
+lang = "zh-Hans"
+telemetry_enabled = false
+polkit_agent = true
+shared_gl_context = false
+show_location = false
+
+[shell.panel]
+transparency_mode = "soft"
+borders = true
+shadow = true
+launcher_placement = "centered"
+clipboard_placement = "centered"
+control_center_placement = "attached"
+session_placement = "attached"
+open_near_click_control_center = true
+open_near_click_session = true
+
+[shell.launcher]
+app_grid = true
+categories = true
+compact = false
+show_icons = true
+sort_by_usage = true
+
+[wallpaper]
+enabled = false
+
+[theme]
+mode = "dark"
+source = "builtin"
+builtin = "Noctalia"
+pure_black_dark = false
+
+[backdrop]
+enabled = false
+
+[lockscreen]
+enabled = false
+
+[notification]
+enable_daemon = true
+show_app_name = true
+show_actions = true
+scale = 1.05
+background_opacity = 0.97
+offset_x = 8
+offset_y = 8
+
+[system.monitor]
+enabled = true
+cpu_poll_seconds = 3.0
+gpu_poll_seconds = 8.0
+memory_poll_seconds = 3.0
+network_poll_seconds = 4.0
+disk_poll_seconds = 15.0
+
+[brightness]
+enable_ddcutil = false
+minimum_brightness = 0.03
+
+[idle]
+pre_action_fade_seconds = 0.5
+
+[idle.behavior.lock]
+timeout = 600
+action = "lock"
+enabled = false
+
+[idle.behavior.screen-off]
+timeout = 600
+action = "screen_off"
+enabled = true
+
+[bar.default]
+position = "top"
+thickness = 40
+background_opacity = 0.0
+radius = 18
+margin_h = 8
+margin_v = 5
+padding = 10
+widget_spacing = 5
+scale = 1.0
+shadow = false
+auto_hide = false
+reserve_space = true
+capsule = true
+capsule_radius = 80.0
+capsule_opacity = 0.79
+capsule_border = "outline"
+start = ["launcher", "workspaces", "active_window"]
+end = ["media", "tray", "network", "bluetooth", "proxy", "brightness", "volume", "battery", "osk", "notifications", "session"]
+
+[dock]
+enabled = true
+position = "bottom"
+icon_size = 48
+main_axis_padding = 14
+cross_axis_padding = 7
+item_spacing = 6
+background_opacity = 0.88
+radius = 18
+margin_v = 7
+shadow = true
+show_running = true
+auto_hide = true
+reserve_space = false
+magnification = true
+magnification_scale = 1.25
+launcher_position = "start"
+launcher_icon = "grid-dots"
+pinned = []
+
+[[control_center.shortcuts]]
+type = "wifi"
+
+[[control_center.shortcuts]]
+type = "bluetooth"
+
+[[control_center.shortcuts]]
+type = "nightlight"
+
+[[control_center.shortcuts]]
+type = "notification"
+
+[[control_center.shortcuts]]
+type = "session"
+
+[[shell.session.actions]]
+action = "logout"
+enabled = true
+glyph = "logout"
+
+[[shell.session.actions]]
+action = "suspend"
+enabled = true
+label = "Suspend (experimental)"
+glyph = "zzz"
+variant = "outline"
+countdown_seconds = 3.0
+
+[[shell.session.actions]]
+action = "reboot"
+enabled = true
+glyph = "refresh"
+
+[[shell.session.actions]]
+action = "shutdown"
+enabled = true
+glyph = "power"
+variant = "destructive"
+
+[shell.session]
+grid = true
+grid_columns = 2
+
+[shell.session.power]
+suspend = "/usr/local/bin/tb321fu-suspend"
+
+[widget.proxy]
+type = "custom_button"
+glyph = "route"
+tooltip = "Proxy"
+command = "/usr/bin/mihomo-party"
+
+[widget.osk]
+type = "custom_button"
+glyph = "keyboard"
+tooltip = "On-screen keyboard"
+command = "/usr/local/bin/tb321fu-osk-toggle"
+
+[widget.tray]
+drawer = true
+drawer_columns = 3
+drawer_item_size = 28
+pinned = []

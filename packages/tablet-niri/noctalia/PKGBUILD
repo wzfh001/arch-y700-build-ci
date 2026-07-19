@@ -1,0 +1,61 @@
+pkgname=noctalia
+pkgver=5.0.0_beta.3
+pkgrel=2
+pkgdesc='Native Wayland desktop shell'
+arch=('aarch64')
+url='https://github.com/noctalia-dev/noctalia'
+license=('MIT')
+options=('!debug' '!lto')
+depends=(
+  'cairo'
+  'curl'
+  'fontconfig'
+  'freetype2'
+  'gcc-libs'
+  'git'
+  'glib2'
+  'glibc'
+  'jemalloc'
+  'libglvnd'
+  'libpipewire'
+  'libqalculate'
+  'librsvg'
+  'libwebp'
+  'libwireplumber'
+  'libxkbcommon'
+  'libxml2'
+  'md4c'
+  'pam'
+  'polkit'
+  'pango'
+  'sdbus-cpp'
+  'tomlplusplus'
+  'wayland'
+)
+makedepends=(
+  'meson'
+  'ninja'
+  'nlohmann-json'
+  'pkgconf'
+  'stb'
+  'wayland-protocols'
+)
+_tagver=${pkgver//_/-}
+source=("${pkgname}-${_tagver}.tar.gz::${url}/archive/refs/tags/v${_tagver}.tar.gz")
+sha256sums=('0cd9d718acb95eec8500e6159c2981de46070f13f0fdacf7cb1e51cb2cbddb5e')
+
+build() {
+  CXXFLAGS+=" -Wno-unused-result"
+  arch-meson "${pkgname}-${_tagver}" build-release \
+    -Db_ndebug=true \
+    -Dtests=disabled
+  meson compile -C build-release
+}
+
+package() {
+  meson install -C build-release --destdir "$pkgdir"
+  install -Dm644 "${pkgname}-${_tagver}/LICENSE" \
+    "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 "${pkgname}-${_tagver}/README.md" \
+    "$pkgdir/usr/share/doc/$pkgname/README.md"
+}

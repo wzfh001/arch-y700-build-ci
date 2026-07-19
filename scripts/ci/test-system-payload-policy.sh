@@ -84,6 +84,19 @@ if (ci_assert_privileged_payload_security "$root" etc/systemd/system/fixture.ser
   exit 1
 fi
 
+preserved="$tmp/preserved"
+install -D -m 6755 /dev/stdin "$preserved/opt/application/bin/app" <<'PRESERVED_APP'
+#!/bin/sh
+exit 0
+PRESERVED_APP
+install -D -m 0666 /dev/stdin "$preserved/opt/application/config.json" <<'PRESERVED_CONFIG'
+{}
+PRESERVED_CONFIG
+ci_secure_preserved_payload_modes "$preserved"
+[ "$(stat -c '%a' "$preserved/opt/application/bin/app")" = 755 ]
+[ "$(stat -c '%a' "$preserved/opt/application/config.json")" = 644 ]
+[ -z "$(find "$preserved" -type f -perm /6000 -print -quit)" ]
+
 grep -F 'ci_normalize_system_payload_modes "$stage"' \
   "$SCRIPT_DIR/build-arch-rootfs-image.sh" >/dev/null
 grep -F 'ci_assert_privileged_payload_security "$rootfs_dir"' \

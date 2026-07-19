@@ -120,7 +120,11 @@ def validate_structure(workflow: pathlib.Path, data: dict) -> None:
         secret_paths.append((path, match.group(1)))
 
     rootfs_env = require_mapping(rootfs_step.get("env"), "rootfs build step env")
-    required = {"DEFAULT_USER_PASSWORD_HASH", "ROOT_PASSWORD_HASH"}
+    required = {
+        "DEFAULT_USER_PASSWORD_HASH",
+        "DEFAULT_USER_AUTHORIZED_KEYS",
+        "ROOT_PASSWORD_HASH",
+    }
     if not required.issubset(rootfs_env):
         fail(f"rootfs step is missing secret env keys: {sorted(required - rootfs_env.keys())}")
     for key in required:
@@ -144,6 +148,7 @@ def validate_rootfs_contract(rootfs: pathlib.Path) -> None:
     text = rootfs.read_text(encoding="utf-8")
     required = (
         "DEFAULT_USER_PASSWORD_HASH=${DEFAULT_USER_PASSWORD_HASH:-!}",
+        "DEFAULT_USER_AUTHORIZED_KEYS=${DEFAULT_USER_AUTHORIZED_KEYS:-}",
         "ROOT_PASSWORD_MODE=${ROOT_PASSWORD_MODE:-locked}",
         "ROOT_PASSWORD_HASH=${ROOT_PASSWORD_HASH:-}",
     )

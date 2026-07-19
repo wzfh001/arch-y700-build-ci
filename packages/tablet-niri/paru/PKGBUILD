@@ -1,0 +1,41 @@
+pkgname=paru
+pkgver=2.1.0
+pkgrel=2
+pkgdesc='Feature packed AUR helper'
+arch=('aarch64')
+url='https://github.com/Morganamilo/paru'
+license=('GPL-3.0-or-later')
+options=('!debug' '!lto')
+depends=('git' 'pacman' 'libalpm.so>=14')
+makedepends=('cargo')
+optdepends=(
+  'bat: colored PKGBUILD printing'
+  'devtools: build in chroot and download PKGBUILDs'
+)
+backup=('etc/paru.conf')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('eea4dbb524db765d5316f540f9ee670c0bf81aae4827b5417eebb4c9b5651727')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's|host: ||p')"
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  export CARGO_PROFILE_RELEASE_LTO=off
+  cargo build --frozen --release --target-dir target
+  ./scripts/mkmo locale/
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  install -Dm755 target/release/paru "$pkgdir/usr/bin/paru"
+  install -Dm644 paru.conf "$pkgdir/etc/paru.conf"
+  install -Dm644 man/paru.8 "$pkgdir/usr/share/man/man8/paru.8"
+  install -Dm644 man/paru.conf.5 "$pkgdir/usr/share/man/man5/paru.conf.5"
+  install -Dm644 completions/bash \
+    "$pkgdir/usr/share/bash-completion/completions/paru.bash"
+  install -d "$pkgdir/usr/share"
+  cp -r locale "$pkgdir/usr/share/"
+}

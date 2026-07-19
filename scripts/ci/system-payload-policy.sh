@@ -49,6 +49,19 @@ ci_assert_normalized_system_payload_modes() {
   done < <(find "$root" -xdev -type f -print0)
 }
 
+ci_secure_preserved_payload_modes() {
+  local root=$1 special writable
+
+  [ -d "$root" ] || ci_die "system payload tree not found: $root"
+  find "$root" -xdev -type d -exec chmod u=rwx,go=rx {} +
+  find "$root" -xdev -type f -exec chmod u-s,g-s,go-w {} +
+
+  special=$(find "$root" -xdev -type f -perm /6000 -print -quit)
+  [ -z "$special" ] || ci_die "special privilege bit remained in preserved payload: $special"
+  writable=$(find "$root" -xdev \( -type f -o -type d \) -perm /0022 -print -quit)
+  [ -z "$writable" ] || ci_die "group/world-writable preserved payload member: $writable"
+}
+
 ci_assert_privileged_payload_security() {
   local root=$1 required path writable
   shift

@@ -45,8 +45,8 @@ while IFS= read -r line || [ -n "$line" ]; do
     *[!A-Z0-9_]*) echo "invalid config key: $key" >&2; exit 1 ;;
   esac
   case "$key" in
-    DEFAULT_USER_PASSWORD|ROOT_PASSWORD|DEFAULT_USER_PASSWORD_HASH|ROOT_PASSWORD_HASH)
-      echo "password values/hashes must come from repository secrets, not config files: $key" >&2
+    DEFAULT_USER_PASSWORD|ROOT_PASSWORD|DEFAULT_USER_PASSWORD_HASH|DEFAULT_USER_AUTHORIZED_KEYS|ROOT_PASSWORD_HASH)
+      echo "credential values must come from repository secrets, not config files: $key" >&2
       exit 1
       ;;
   esac

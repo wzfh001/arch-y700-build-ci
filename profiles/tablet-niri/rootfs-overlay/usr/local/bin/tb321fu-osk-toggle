@@ -1,0 +1,19 @@
+#!/usr/bin/bash
+set -euo pipefail
+
+unit=tb321fu-osk.service
+if systemctl --user is-active --quiet "$unit"; then
+  main_pid=$(systemctl --user show --property=MainPID --value "$unit")
+  if [[ $main_pid =~ ^[1-9][0-9]*$ ]]; then
+    kill -s RTMIN "$main_pid"
+    exit 0
+  fi
+  systemctl --user stop "$unit"
+fi
+
+systemctl --user reset-failed "$unit" 2>/dev/null || true
+systemd-run --user --quiet --collect \
+  --unit=tb321fu-osk \
+  --property=Restart=on-failure \
+  --property=RestartSec=1s \
+  /usr/bin/wvkbd-mobintl -l simple,special,emoji

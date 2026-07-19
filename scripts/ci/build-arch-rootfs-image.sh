@@ -22,6 +22,7 @@ Environment inputs:
   HOSTNAME_NAME               default: y700
   DEFAULT_USER_NAME           default: y700
   DEFAULT_USER_PASSWORD_HASH  crypt(3) hash supplied via secret; default: locked
+  DEFAULT_USER_AUTHORIZED_KEYS public SSH keys supplied via secret; default: empty
   ROOT_PASSWORD_MODE          locked|set|empty, default: locked
   ROOT_PASSWORD_HASH          crypt(3) hash used when ROOT_PASSWORD_MODE=set
   USER_SUDO_MODE              password|nopasswd|none, default: password
@@ -30,7 +31,7 @@ Environment inputs:
   TZ_REGION                   default: Asia/Shanghai
   LANG_NAME                   default: zh_CN.UTF-8
   LOCALES                     whitespace list, default: en_US.UTF-8 zh_CN.UTF-8
-  DESKTOP_PROFILE             minimal|standard|full, default: standard
+  DESKTOP_PROFILE             minimal|standard|full|tablet-niri, default: standard
   PACKAGE_LIST                additional pacman packages
   INSTALL_FCITX5_CHINESE      default: 1
   INSTALL_FIREFOX             default: 1
@@ -76,6 +77,8 @@ ci_require_cmd chroot
 ci_require_cmd dpkg-deb
 ci_require_cmd depmod
 ci_require_cmd rsync
+ci_require_cmd readelf
+ci_require_cmd unshare
 
 REPO_ROOT=$(cd -- "$SCRIPT_DIR/../.." && pwd -P)
 
@@ -91,6 +94,7 @@ ROOTFS_PARTLABEL=${ROOTFS_PARTLABEL:-userdata}
 HOSTNAME_NAME=${HOSTNAME_NAME:-y700}
 DEFAULT_USER_NAME=${DEFAULT_USER_NAME:-y700}
 DEFAULT_USER_PASSWORD_HASH=${DEFAULT_USER_PASSWORD_HASH:-!}
+DEFAULT_USER_AUTHORIZED_KEYS=${DEFAULT_USER_AUTHORIZED_KEYS:-}
 ROOT_PASSWORD_MODE=${ROOT_PASSWORD_MODE:-locked}
 ROOT_PASSWORD_HASH=${ROOT_PASSWORD_HASH:-}
 USER_SUDO_MODE=${USER_SUDO_MODE:-password}
@@ -133,6 +137,22 @@ COMPRESS=${COMPRESS:-7z}
 CHUNK_SIZE=${CHUNK_SIZE:-}
 KEEP_RAW_IMAGE=${KEEP_RAW_IMAGE:-0}
 
+if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
+  [ "$HOSTNAME_NAME" = fuhao ] || ci_die "tablet-niri requires HOSTNAME_NAME=fuhao"
+  [ "$DEFAULT_USER_NAME" = fuhao ] || ci_die "tablet-niri requires DEFAULT_USER_NAME=fuhao"
+  [ "$ROOTFS_PARTLABEL" = userdata ] || ci_die "tablet-niri requires ROOTFS_PARTLABEL=userdata"
+  [[ $DEFAULT_USER_PASSWORD_HASH == \$6\$* ]] || \
+    ci_die "tablet-niri requires a SHA-512 user password hash from a repository secret"
+  [ -n "$DEFAULT_USER_AUTHORIZED_KEYS" ] || \
+    ci_die "tablet-niri requires authorized SSH keys from a repository secret"
+  [ "$ROOT_PASSWORD_MODE" = locked ] || ci_die "tablet-niri requires a locked root password"
+  [ "$USER_SUDO_MODE" = password ] || ci_die "tablet-niri requires password-based sudo"
+  INSTALL_FCITX5_CHINESE=1
+  INSTALL_FIREFOX=1
+  INSTALL_CAMERA_APPS=0
+  BUILD_TB321FU_GPU_SENSOR=0
+fi
+
 OUTPUT_DIR=$(ci_prepare_output_dir "$OUTPUT_DIR")
 work_dir=$(mktemp -d "$OUTPUT_DIR/.arch-rootfs-build.XXXXXX")
 rootfs_dir="$work_dir/rootfs"
@@ -142,6 +162,7 @@ arch_camera_supplement_stage="$work_dir/arch-camera-supplement-stage"
 rootfs_img="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.img"
 build_info="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.BUILD-INFO.txt"
 manifest="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.manifest"
+third_party_manifest="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.third-party-assets.manifest"
 mounted_rootfs=0
 bind_mounts=()
 
@@ -990,6 +1011,7 @@ install_arch_native_stage_package() {
   local conflicts_name=$6
   local replaces_name=$7
   local install_script=${8:-}
+  local mode_policy=${9:-normalize}
   local package_hash package_version package_file build_user=tb321fu-pkgbuild
   local build_dir="/run/${package_name}-build"
   local bind_path="/run/${package_name}-stage"
@@ -1020,8 +1042,17 @@ install_arch_native_stage_package() {
     [ -f "$install_script" ] || ci_die "native Arch install script is missing: $install_script"
   fi
 
-  ci_normalize_system_payload_modes "$stage"
-  ci_assert_normalized_system_payload_modes "$stage"
+  case "$mode_policy" in
+    normalize)
+      ci_normalize_system_payload_modes "$stage"
+      ci_assert_normalized_system_payload_modes "$stage"
+      ;;
+    preserve)
+      ci_secure_preserved_payload_modes "$stage"
+      ;;
+    *) ci_die "unsupported native Arch package mode policy for $package_name: $mode_policy" ;;
+  esac
+  chown -R 0:0 "$stage"
   package_hash=$(
     {
       (cd "$stage" && find . -xdev -printf '%y\t%U\t%G\t%m\t%s\t%p\t%l\0' | sort -z)
@@ -1111,6 +1142,355 @@ install_arch_native_stage_package() {
   rmdir "$host_bind_path" "$host_build_bind"
   rm -rf --one-file-system -- "$host_build_dir" "$stage"
   ci_log "installed native Arch package: $package_name $package_version-1"
+}
+
+build_and_install_tablet_niri_source_package() {
+  local package_name=$1
+  local recipe_dir="$REPO_ROOT/packages/tablet-niri/$package_name"
+  local build_user=tb321fu-pkgbuild
+  local build_dir="/run/tablet-niri-${package_name}-build"
+  local host_build_dir="$work_dir/tablet-niri-${package_name}-build"
+  local host_build_bind="$rootfs_dir$build_dir"
+  local package_file target
+  local -a built_packages=() remaining_binds=()
+
+  [[ $package_name =~ ^[a-z0-9][a-z0-9+._-]*$ ]] || \
+    ci_die "unsafe tablet-niri source package name: $package_name"
+  [ -f "$recipe_dir/PKGBUILD" ] || \
+    ci_die "tablet-niri source package recipe is missing: $package_name"
+  if arch_chroot /usr/bin/id -u "$build_user" >/dev/null 2>&1; then
+    ci_die "reserved Arch package-build account already exists: $build_user"
+  fi
+
+  install -d -m 0755 "$host_build_dir" "$host_build_bind"
+  mount_bind "$host_build_dir" "$host_build_bind"
+  rsync -aH --delete "$recipe_dir"/ "$host_build_dir"/
+  arch_chroot /usr/bin/useradd --system --no-create-home --home-dir "$build_dir" \
+    --shell /usr/bin/nologin "$build_user"
+  chown -R "$(arch_chroot /usr/bin/id -u "$build_user")":"$(arch_chroot /usr/bin/id -g "$build_user")" \
+    "$host_build_dir"
+
+  run_arch_makepkg "$build_user" "$build_dir"
+  while IFS= read -r -d '' package_file; do
+    built_packages+=("$package_file")
+  done < <(find "$host_build_dir" -maxdepth 1 -type f \
+    -name "$package_name-*.pkg.tar.*" ! -name '*.sig' -print0 | sort -z)
+  [ "${#built_packages[@]}" -eq 1 ] || \
+    ci_die "expected one tablet-niri source package for $package_name, found ${#built_packages[@]}"
+  package_file=${built_packages[0]}
+
+  assert_arch_local_signature_policy
+  install_arch_local_package "$build_dir/$(basename "$package_file")"
+  arch_chroot /usr/bin/pacman -Q "$package_name" >/dev/null || \
+    ci_die "tablet-niri source package identity is missing: $package_name"
+  arch_chroot /usr/bin/pacman -Qkk "$package_name" >/dev/null || \
+    ci_die "tablet-niri source package failed its file check: $package_name"
+
+  arch_chroot /usr/bin/userdel "$build_user"
+  umount -- "$host_build_bind" || \
+    ci_die "failed to unmount tablet-niri source package build bind: $package_name"
+  for target in "${bind_mounts[@]}"; do
+    case "$target" in
+      "$host_build_bind") ;;
+      *) remaining_binds+=("$target") ;;
+    esac
+  done
+  bind_mounts=("${remaining_binds[@]}")
+  rmdir "$host_build_bind"
+  rm -rf --one-file-system -- "$host_build_dir"
+  ci_log "installed tablet-niri source package: $package_name"
+}
+
+assert_aarch64_elf() {
+  local path=$1
+
+  [ -f "$path" ] || ci_die "expected AArch64 ELF is missing: $path"
+  readelf -h "$path" 2>/dev/null | grep -Eq 'Machine:[[:space:]]+AArch64$' || \
+    ci_die "file is not an AArch64 ELF: $path"
+}
+
+record_tablet_niri_asset() {
+  local package_name=$1
+  local version=$2
+  local url=$3
+  local sha256=$4
+
+  [[ $package_name != *$'\t'* && $version != *$'\t'* && $url != *$'\t'* ]] || \
+    ci_die "invalid tablet-niri asset metadata"
+  printf '%s\t%s\t%s\t%s\n' "$package_name" "$version" "$sha256" "$url" >> \
+    "$third_party_manifest"
+}
+
+discard_exported_native_package() {
+  local package_name=$1
+
+  find "$OUTPUT_DIR" -maxdepth 1 -type f \
+    -name "${OUTPUT_PREFIX}-${package_name}-*.pkg.tar.*" -delete
+}
+
+install_tablet_niri_binary_packages() {
+  local asset_root="$REPO_ROOT/packages/tablet-niri/assets"
+  local archive extract stage source_dir source_icon size special
+  local zen_url='https://github.com/zen-browser/desktop/releases/download/1.21.8b/zen.linux-aarch64.tar.xz'
+  local zen_sha256='0586ff279d7a1f93207fdb195c5586ef0d6813bd4f4318badcd0984adc39db39'
+  local cc_url='https://github.com/farion1231/cc-switch/releases/download/v3.17.0/CC-Switch-v3.17.0-Linux-arm64.deb'
+  local cc_sha256='8b1b2ba9cca007d0b5070670b7d8904d45789402f5ab915ba9d619cad3621052'
+  local mihomo_url='https://github.com/mihomo-party-org/clash-party/releases/download/v2.0.0/mihomo-party-linux-2.0.0-arm64.deb'
+  local mihomo_sha256='bfa25f96e27982d87232e017e6ee0f3f9ab7aa8d2d69a8f06e418b38ac3ab690'
+  local codex_url='https://github.com/openai/codex/releases/download/rust-v0.144.6/codex-aarch64-unknown-linux-musl.tar.gz'
+  local codex_sha256='8eddae5e6c009dff9ba51ae1bfe3bdd9ff4c1ccc93a48cc6860db1cd9fdf11be'
+  local -a zen_dependencies=(gtk3 libxt mailcap shared-mime-info dbus-glib nss ffmpeg4.4)
+  local -a zen_provides=('zen-browser=1.21.8b')
+  local -a zen_conflicts=(zen-browser zen-browser-bin)
+  local -a zen_replaces=()
+  local -a cc_dependencies=(gtk3 libayatana-appindicator webkit2gtk-4.1)
+  local -a cc_provides=('cc-switch=3.17.0')
+  local -a cc_conflicts=(cc-switch cc-switch-bin)
+  local -a cc_replaces=()
+  local -a mihomo_dependencies=(
+    gtk3 libnotify nss libxss libxtst xdg-utils at-spi2-core util-linux-libs
+    libsecret libayatana-appindicator
+  )
+  local -a mihomo_provides=('mihomo-party=2.0.0')
+  local -a mihomo_conflicts=(mihomo-party mihomo-party-bin)
+  local -a mihomo_replaces=()
+  local -a codex_dependencies=(ca-certificates git)
+  local -a codex_provides=('codex-cli=0.144.6')
+  local -a codex_conflicts=(codex-cli)
+  local -a codex_replaces=()
+
+  printf 'package\tupstream_version\tsha256\turl\n' > "$third_party_manifest"
+
+  archive="$work_dir/zen-browser-aarch64.tar.xz"
+  extract="$work_dir/zen-browser-extract"
+  stage="$work_dir/tb321fu-zen-browser-stage"
+  install -d -m 0755 "$extract" "$stage/opt"
+  ci_download "$zen_url" "$archive" "$zen_sha256"
+  ci_extract_archive "$archive" "$extract"
+  source_dir="$extract/zen"
+  [ -f "$source_dir/zen" ] || ci_die "Zen ARM64 archive has an unexpected layout"
+  cp -a "$source_dir" "$stage/opt/zen-browser"
+  install -D -m 0755 "$asset_root/zen-browser/zen-browser" "$stage/usr/bin/zen-browser"
+  install -D -m 0644 "$asset_root/zen-browser/zen-browser.desktop" \
+    "$stage/usr/share/applications/zen-browser.desktop"
+  install -D -m 0644 "$asset_root/zen-browser/policies.json" \
+    "$stage/opt/zen-browser/distribution/policies.json"
+  for size in 16 32 48 64 128; do
+    source_icon="$source_dir/browser/chrome/icons/default/default${size}.png"
+    [ -f "$source_icon" ] || ci_die "Zen icon is missing: $size"
+    install -D -m 0644 "$source_icon" \
+      "$stage/usr/share/icons/hicolor/${size}x${size}/apps/zen-browser.png"
+  done
+  install -D -m 0644 /dev/stdin \
+    "$stage/usr/share/tb321fu-third-party/zen-browser.source" <<EOF
+version=1.21.8b
+url=$zen_url
+sha256=$zen_sha256
+EOF
+  assert_aarch64_elf "$stage/opt/zen-browser/zen"
+  ci_validate_rootfs_overlay_tree "$stage"
+  install_arch_native_stage_package \
+    tb321fu-zen-browser 'Pinned ARM64 Zen Browser for TB321FU' "$stage" \
+    zen_dependencies zen_provides zen_conflicts zen_replaces '' preserve
+  discard_exported_native_package tb321fu-zen-browser
+  record_tablet_niri_asset tb321fu-zen-browser 1.21.8b "$zen_url" "$zen_sha256"
+
+  archive="$work_dir/cc-switch-arm64.deb"
+  stage="$work_dir/tb321fu-cc-switch-stage"
+  install -d -m 0755 "$stage"
+  ci_download "$cc_url" "$archive" "$cc_sha256"
+  dpkg-deb -x "$archive" "$stage"
+  assert_aarch64_elf "$stage/usr/bin/cc-switch"
+  install -D -m 0644 /dev/stdin \
+    "$stage/usr/share/tb321fu-third-party/cc-switch.source" <<EOF
+version=3.17.0
+url=$cc_url
+sha256=$cc_sha256
+EOF
+  ci_validate_rootfs_overlay_tree "$stage"
+  install_arch_native_stage_package \
+    tb321fu-cc-switch 'Pinned ARM64 CC Switch for TB321FU' "$stage" \
+    cc_dependencies cc_provides cc_conflicts cc_replaces '' preserve
+  discard_exported_native_package tb321fu-cc-switch
+  record_tablet_niri_asset tb321fu-cc-switch 3.17.0 "$cc_url" "$cc_sha256"
+
+  archive="$work_dir/mihomo-party-arm64.deb"
+  stage="$work_dir/tb321fu-mihomo-party-stage"
+  install -d -m 0755 "$stage"
+  ci_download "$mihomo_url" "$archive" "$mihomo_sha256"
+  dpkg-deb -x "$archive" "$stage"
+  install -D -m 0755 "$asset_root/mihomo-party/mihomo-party" \
+    "$stage/usr/bin/mihomo-party"
+  special=$(find "$stage" -xdev -type f -perm /6000 -print -quit)
+  [ -z "$special" ] || ci_die "Mihomo Party archive contains a privilege bit: $special"
+  assert_aarch64_elf "$stage/opt/clash-party/mihomo-party"
+  assert_aarch64_elf "$stage/opt/clash-party/resources/sidecar/mihomo"
+  assert_aarch64_elf "$stage/opt/clash-party/resources/sidecar/mihomo-alpha"
+  assert_aarch64_elf "$stage/opt/clash-party/resources/sidecar/mihomo-smart"
+  install -D -m 0644 /dev/stdin \
+    "$stage/usr/share/tb321fu-third-party/mihomo-party.source" <<EOF
+version=2.0.0
+url=$mihomo_url
+sha256=$mihomo_sha256
+privilege_mode=unprivileged
+EOF
+  ci_validate_rootfs_overlay_tree "$stage"
+  install_arch_native_stage_package \
+    tb321fu-mihomo-party 'Pinned unprivileged ARM64 Mihomo Party for TB321FU' "$stage" \
+    mihomo_dependencies mihomo_provides mihomo_conflicts mihomo_replaces '' preserve
+  discard_exported_native_package tb321fu-mihomo-party
+  record_tablet_niri_asset tb321fu-mihomo-party 2.0.0 "$mihomo_url" "$mihomo_sha256"
+
+  archive="$work_dir/codex-aarch64.tar.gz"
+  extract="$work_dir/codex-aarch64-extract"
+  stage="$work_dir/tb321fu-codex-cli-stage"
+  install -d -m 0755 "$extract" "$stage"
+  ci_download "$codex_url" "$archive" "$codex_sha256"
+  ci_extract_archive "$archive" "$extract"
+  source_dir="$extract/codex-aarch64-unknown-linux-musl"
+  assert_aarch64_elf "$source_dir"
+  install -D -m 0755 "$source_dir" "$stage/usr/bin/codex"
+  install -D -m 0644 /dev/stdin \
+    "$stage/usr/share/tb321fu-third-party/codex-cli.source" <<EOF
+version=0.144.6
+url=$codex_url
+sha256=$codex_sha256
+EOF
+  ci_validate_rootfs_overlay_tree "$stage"
+  install_arch_native_stage_package \
+    tb321fu-codex-cli 'Pinned official ARM64 Codex CLI for TB321FU' "$stage" \
+    codex_dependencies codex_provides codex_conflicts codex_replaces '' preserve
+  discard_exported_native_package tb321fu-codex-cli
+  record_tablet_niri_asset tb321fu-codex-cli 0.144.6 "$codex_url" "$codex_sha256"
+}
+
+apply_tablet_niri_profile() {
+  local root=$1
+  local overlay="$REPO_ROOT/profiles/tablet-niri/rootfs-overlay"
+  local ignore_packages='tb321fu-imported-release-payload tb321fu-camera-stack tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli'
+
+  [ -d "$overlay" ] || ci_die "tablet-niri rootfs overlay is missing"
+  ci_validate_rootfs_overlay_tree "$overlay"
+  rsync -aH --chown=0:0 "$overlay"/ "$root"/
+
+  chmod 0755 \
+    "$root/usr/local/bin/tb321fu-osk-toggle" \
+    "$root/usr/local/bin/tb321fu-suspend" \
+    "$root/usr/local/libexec/tb321fu-grow-rootfs" \
+    "$root/usr/local/libexec/tb321fu-pre-upgrade-snapshot" \
+    "$root/usr/lib/systemd/system-sleep/tb321fu-suspend-log"
+  chmod 0644 \
+    "$root/etc/systemd/user/noctalia.service" \
+    "$root/etc/systemd/user/fcitx5-tablet.service" \
+    "$root/etc/systemd/system/tb321fu-grow-rootfs.service"
+
+  sed -i "/^\[options\]$/a IgnorePkg = $ignore_packages" "$root/etc/pacman.conf"
+  rm -f "$root"/etc/ssh/ssh_host_*
+  : > "$root/etc/machine-id"
+  rm -f "$root/var/lib/dbus/machine-id"
+  install -d -m 0755 "$root/var/lib/dbus"
+  ln -s /etc/machine-id "$root/var/lib/dbus/machine-id"
+  install -d -m 2755 "$root/var/log/journal"
+  arch_chroot /usr/bin/chown root:systemd-journal /var/log/journal
+
+  arch_chroot /usr/bin/niri validate -c /etc/skel/.config/niri/config.kdl
+  arch_chroot /usr/bin/noctalia config validate /etc/skel/.config/noctalia/config.toml
+}
+
+install_tablet_niri_authorized_keys() {
+  local root=$1
+  local user_home="$root/home/$DEFAULT_USER_NAME"
+  local group_name line
+
+  [ -n "$DEFAULT_USER_AUTHORIZED_KEYS" ] || \
+    ci_die "tablet-niri requires DEFAULT_USER_AUTHORIZED_KEYS from a repository secret"
+  while IFS= read -r line || [ -n "$line" ]; do
+    line=${line%$'\r'}
+    [ -n "$line" ] || continue
+    [[ $line =~ ^(ssh-ed25519|sk-ssh-ed25519@openssh.com|ecdsa-sha2-nistp256|sk-ecdsa-sha2-nistp256@openssh.com|ssh-rsa)[[:space:]]+[A-Za-z0-9+/=]+([[:space:]].*)?$ ]] || \
+      ci_die "DEFAULT_USER_AUTHORIZED_KEYS contains an unsupported public-key line"
+  done <<< "$DEFAULT_USER_AUTHORIZED_KEYS"
+
+  group_name=$(arch_chroot id -gn "$DEFAULT_USER_NAME")
+  install -d -m 0700 "$user_home/.ssh"
+  printf '%s\n' "$DEFAULT_USER_AUTHORIZED_KEYS" | sed '/^[[:space:]]*$/d' > \
+    "$user_home/.ssh/authorized_keys"
+  chmod 0600 "$user_home/.ssh/authorized_keys"
+  chroot "$root" chown -R "$DEFAULT_USER_NAME:$group_name" "/home/$DEFAULT_USER_NAME/.ssh"
+}
+
+verify_tablet_niri_profile() {
+  local root=$1
+  local package path mode hash_field target
+  local -a required_packages=(
+    noctalia wvkbd paru
+    tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli
+  )
+  local -a forbidden_packages=(
+    plasma-meta plasma-desktop plasma-workspace sddm plasma-keyboard
+  )
+  local -a custom_executables=(
+    /opt/zen-browser/zen
+    /usr/bin/cc-switch
+    /opt/clash-party/mihomo-party
+    /opt/clash-party/resources/sidecar/mihomo
+    /opt/clash-party/resources/sidecar/mihomo-alpha
+    /opt/clash-party/resources/sidecar/mihomo-smart
+    /usr/bin/codex
+  )
+
+  for package in "${required_packages[@]}"; do
+    arch_chroot /usr/bin/pacman -Q "$package" >/dev/null || \
+      ci_die "required tablet-niri package is missing: $package"
+    arch_chroot /usr/bin/pacman -Qkk "$package" >/dev/null || \
+      ci_die "required tablet-niri package failed its file check: $package"
+  done
+  for package in "${forbidden_packages[@]}"; do
+    if arch_chroot /usr/bin/pacman -Q "$package" >/dev/null 2>&1; then
+      ci_die "forbidden Plasma package is installed in tablet-niri: $package"
+    fi
+  done
+
+  for path in "${custom_executables[@]}"; do
+    [ -x "$root$path" ] || ci_die "required tablet-niri executable is missing: $path"
+    mode=$(stat -c '%a' "$root$path")
+    case "$mode" in
+      4???|2???|6???|7???) ci_die "tablet-niri executable has a privilege bit: $path ($mode)" ;;
+    esac
+  done
+
+  hash_field=$(arch_chroot /usr/bin/awk -F: -v user="$DEFAULT_USER_NAME" \
+    '$1 == user { print substr($2, 1, 3); exit }' /etc/shadow)
+  [ "$hash_field" = '$6$' ] || ci_die "tablet-niri user password is not a SHA-512 hash"
+  target=$(arch_chroot /usr/bin/awk -F: '$1 == "root" { print $2; exit }' /etc/shadow)
+  [[ $target == '!'* ]] || ci_die "tablet-niri root account is not locked"
+
+  path="$root/home/$DEFAULT_USER_NAME/.ssh/authorized_keys"
+  [ -s "$path" ] || ci_die "tablet-niri authorized_keys is missing"
+  [ "$(stat -c '%a' "$path")" = 600 ] || ci_die "tablet-niri authorized_keys mode is not 0600"
+  [ -z "$(find "$root/etc/ssh" -maxdepth 1 -type f -name 'ssh_host_*_key' -print -quit)" ] || \
+    ci_die "private SSH host key leaked into tablet-niri image"
+
+  for path in \
+    "$root/home/$DEFAULT_USER_NAME/.codex" \
+    "$root/home/$DEFAULT_USER_NAME/.cc-switch" \
+    "$root/home/$DEFAULT_USER_NAME/.config/mihomo-party" \
+    "$root/home/$DEFAULT_USER_NAME/.config/clash"; do
+    [ ! -e "$path" ] || ci_die "credential-bearing user config leaked into tablet-niri image: $path"
+  done
+  [ -z "$(find "$root/etc/NetworkManager/system-connections" -maxdepth 1 -type f -print -quit 2>/dev/null)" ] || \
+    ci_die "Wi-Fi profile leaked into tablet-niri image"
+
+  for target in sleep.target suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target; do
+    path="$root/etc/systemd/system/$target"
+    if [ -L "$path" ] && [ "$(readlink "$path")" = /dev/null ]; then
+      ci_die "tablet-niri must not mask manual sleep target: $target"
+    fi
+  done
+
+  arch_chroot /usr/bin/niri validate -c /home/$DEFAULT_USER_NAME/.config/niri/config.kdl
+  arch_chroot /usr/bin/noctalia config validate /home/$DEFAULT_USER_NAME/.config/noctalia/config.toml
+  unshare --net -- chroot "$root" /usr/bin/nft --check --file /etc/nftables.conf
 }
 
 enable_y700_device_services() {
@@ -1764,6 +2144,26 @@ build_package_list() {
     noto-fonts noto-fonts-cjk ttf-dejavu ttf-liberation
   )
   local desktop_full=(kde-applications-meta)
+  local tablet_niri=(
+    niri xwayland-satellite greetd greetd-tuigreet foot fuzzel
+    xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk qt6-wayland
+    wl-clipboard wtype playerctl grim slurp satty zenity brightnessctl
+    nftables zram-generator e2fsprogs wpa_supplicant
+    pavucontrol gvfs kio-extras ffmpegthumbnailer phonon-qt6-vlc
+    dolphin ark mpv vlc elisa gwenview okular
+    noto-fonts noto-fonts-cjk noto-fonts-emoji ttf-jetbrains-mono-nerd
+    base-devel git nodejs npm pnpm python rust ripgrep fd jq tmux neovim
+    7zip zip unzip unrar zstd exfatprogs dosfstools
+    gtk3 libxt mailcap shared-mime-info desktop-file-utils hicolor-icon-theme
+    gtk-update-icon-cache
+    dbus-glib nss ffmpeg4.4 libnotify libxss libxtst
+    xdg-utils at-spi2-core util-linux-libs libsecret libayatana-appindicator
+    webkit2gtk-4.1
+    cairo fontconfig freetype2 gcc-libs glib2 glibc jemalloc libpipewire
+    libqalculate librsvg libwebp libwireplumber libxkbcommon libxml2 md4c pam
+    polkit pango sdbus-cpp tomlplusplus wayland meson ninja nlohmann-json
+    pkgconf stb wayland-protocols scdoc
+  )
   local fcitx_packages=(
     fcitx5 fcitx5-chinese-addons fcitx5-configtool fcitx5-qt fcitx5-gtk fcitx5-material-color
   )
@@ -1781,6 +2181,9 @@ build_package_list() {
       ;;
     full)
       packages+=("${desktop_standard[@]}" "${desktop_full[@]}")
+      ;;
+    tablet-niri)
+      packages+=("${tablet_niri[@]}")
       ;;
     *) ci_die "unsupported DESKTOP_PROFILE=$DESKTOP_PROFILE" ;;
   esac
@@ -1849,6 +2252,16 @@ ci_log "installing Arch packages: ${#packages[@]} packages"
 assert_arch_remote_signature_policy
 arch_chroot /usr/bin/pacman -Syu --noconfirm --needed --disable-download-timeout -- "${packages[@]}"
 
+if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
+  ci_log "building pinned tablet-niri source packages"
+  build_and_install_tablet_niri_source_package noctalia
+  build_and_install_tablet_niri_source_package wvkbd
+  build_and_install_tablet_niri_source_package paru
+  ci_log "packaging pinned tablet-niri ARM64 applications"
+  install_tablet_niri_binary_packages
+  apply_tablet_niri_profile "$rootfs_dir"
+fi
+
 ci_log "configuring base system"
 printf '%s\n' "$HOSTNAME_NAME" > "$rootfs_dir/etc/hostname"
 cat > "$rootfs_dir/etc/hosts" <<HOSTS
@@ -1878,7 +2291,7 @@ if [ "$DEFAULT_USER_NAME" != alarm ] && arch_chroot /usr/bin/id -u alarm >/dev/n
 fi
 
 if ! arch_chroot /usr/bin/id -u "$DEFAULT_USER_NAME" >/dev/null 2>&1; then
-  arch_chroot /usr/bin/useradd -m -s /bin/bash -G users,video,audio,input,storage,power "$DEFAULT_USER_NAME"
+  arch_chroot /usr/bin/useradd -m -s /bin/bash -G users,video,audio,input,storage,power,render "$DEFAULT_USER_NAME"
 fi
 if [ -n "$DEFAULT_USER_PASSWORD_HASH" ] && [ "$DEFAULT_USER_PASSWORD_HASH" != '!' ]; then
   printf '%s:%s\n' "$DEFAULT_USER_NAME" "$DEFAULT_USER_PASSWORD_HASH" | arch_chroot /usr/bin/chpasswd -e
@@ -1918,17 +2331,43 @@ case "$USER_SUDO_MODE" in
   *) ci_die "unsupported USER_SUDO_MODE=$USER_SUDO_MODE" ;;
 esac
 
-write_plasma_tablet_config "$rootfs_dir"
-if ci_bool "$INSTALL_FCITX5_CHINESE"; then
-  write_fcitx5_config "$rootfs_dir"
+if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
+  install_tablet_niri_authorized_keys "$rootfs_dir"
+  install -d -m 0755 \
+    "$rootfs_dir/home/$DEFAULT_USER_NAME/Pictures" \
+    "$rootfs_dir/home/$DEFAULT_USER_NAME/Pictures/Screenshots"
+  default_user_group=$(arch_chroot id -gn "$DEFAULT_USER_NAME")
+  chroot "$rootfs_dir" chown -R "$DEFAULT_USER_NAME:$default_user_group" \
+    "/home/$DEFAULT_USER_NAME/Pictures"
+else
+  write_plasma_tablet_config "$rootfs_dir"
+  if ci_bool "$INSTALL_FCITX5_CHINESE"; then
+    write_fcitx5_config "$rootfs_dir"
+  fi
+  copy_skel_to_user "$rootfs_dir"
 fi
-copy_skel_to_user "$rootfs_dir"
 
 ci_log "enabling system services"
-required_system_units=(NetworkManager.service sshd.service sddm.service bluetooth.service)
-required_user_units=(pipewire.socket pipewire-pulse.socket wireplumber.service)
+if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
+  required_system_units=(
+    NetworkManager.service sshd.service greetd.service bluetooth.service
+    nftables.service tb321fu-grow-rootfs.service systemd-timesyncd.service
+  )
+  required_user_units=(
+    pipewire.socket pipewire-pulse.socket wireplumber.service
+    noctalia.service fcitx5-tablet.service
+  )
+else
+  required_system_units=(NetworkManager.service sshd.service sddm.service bluetooth.service)
+  required_user_units=(pipewire.socket pipewire-pulse.socket wireplumber.service)
+fi
 systemctl --root="$rootfs_dir" enable "${required_system_units[@]}"
 systemctl --root="$rootfs_dir" --global enable "${required_user_units[@]}"
+if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
+  systemctl --root="$rootfs_dir" set-default graphical.target
+  [ "$(systemctl --root="$rootfs_dir" get-default)" = graphical.target ] || \
+    ci_die "tablet-niri default target is not graphical.target"
+fi
 for required_unit in "${required_system_units[@]}"; do
   systemctl --root="$rootfs_dir" is-enabled --quiet "$required_unit" ||
     ci_die "required system service was not enabled: $required_unit"
@@ -1938,7 +2377,7 @@ for required_unit in "${required_user_units[@]}"; do
     ci_die "required global user service was not enabled: $required_unit"
 done
 
-if ci_bool "$SDDM_AUTOLOGIN"; then
+if [ "$DESKTOP_PROFILE" != tablet-niri ] && ci_bool "$SDDM_AUTOLOGIN"; then
   install -d -m 0755 "$rootfs_dir/etc/sddm.conf.d"
   cat > "$rootfs_dir/etc/sddm.conf.d/zz-tb321fu-autologin.conf" <<CONF
 [Autologin]
@@ -1998,6 +2437,10 @@ fi
 ci_log "generating module dependency files for $KERNEL_VERSION"
 depmod -b "$rootfs_dir" "$KERNEL_VERSION"
 arch_chroot /usr/bin/ldconfig
+if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
+  arch_chroot /usr/bin/update-desktop-database /usr/share/applications
+  arch_chroot /usr/bin/gtk-update-icon-cache --force /usr/share/icons/hicolor
+fi
 
 rm -rf "$rootfs_dir/var/cache/pacman/pkg"/* "$rootfs_dir/tmp"/* "$rootfs_dir/var/tmp"/*
 rm -f \
@@ -2016,6 +2459,9 @@ ci_assert_privileged_payload_security "$rootfs_dir" \
   usr/local/bin/y700-camera-cam \
   usr/local/bin/y700-camera-preview
 verify_tb321fu_native_package_integrity
+if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
+  verify_tablet_niri_profile "$rootfs_dir"
+fi
 arch_chroot /usr/bin/pacman -Q | LC_ALL=C sort > \
   "$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.packages"
 
@@ -2040,6 +2486,7 @@ locales=$LOCALES
 install_fcitx5_chinese=$INSTALL_FCITX5_CHINESE
 install_firefox=$INSTALL_FIREFOX
 install_camera_apps=$INSTALL_CAMERA_APPS
+third_party_asset_manifest=$([ -f "$third_party_manifest" ] && basename "$third_party_manifest" || true)
 device_deb_archive=${DEVICE_DEB_ARCHIVE:-}
 device_deb_dir=${DEVICE_DEB_DIR:-}
 sensor_deb_archive=${SENSOR_DEB_ARCHIVE:-}
@@ -2070,7 +2517,16 @@ raw_sha_file="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.raw.sha256"
 
 checksum_file="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.SHA256SUMS"
 rm -f "$checksum_file"
-(cd "$OUTPUT_DIR" && sha256sum "$(basename "$build_info")" "$(basename "$manifest")" "$(basename "$raw_sha_file")" "$(basename "$OUTPUT_PREFIX")-rootfs.packages" > "$(basename "$checksum_file")")
+checksum_inputs=(
+  "$(basename "$build_info")"
+  "$(basename "$manifest")"
+  "$(basename "$raw_sha_file")"
+  "$(basename "$OUTPUT_PREFIX")-rootfs.packages"
+)
+if [ -f "$third_party_manifest" ]; then
+  checksum_inputs+=("$(basename "$third_party_manifest")")
+fi
+(cd "$OUTPUT_DIR" && sha256sum "${checksum_inputs[@]}" > "$(basename "$checksum_file")")
 
 case "$COMPRESS" in
   none)

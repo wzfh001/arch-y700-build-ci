@@ -1,0 +1,64 @@
+#!/usr/bin/bash
+
+phase=${1:-unknown}
+action=${2:-unknown}
+log_dir=/var/log/tb321fu-suspend
+attempt_file=/run/tb321fu-suspend-attempt
+umask 027
+mkdir -p "$log_dir"
+
+if [[ $phase == pre ]]; then
+  attempt=$(date -u +%Y%m%dT%H%M%SZ)
+  printf '%s\n' "$attempt" > "$attempt_file"
+else
+  attempt=$(cat "$attempt_file" 2>/dev/null || date -u +%Y%m%dT%H%M%SZ)
+fi
+
+log_file="$log_dir/${attempt}-${phase}-${action}.log"
+exec >"$log_file" 2>&1
+
+printf 'timestamp=%s\nphase=%s\naction=%s\n' \
+  "$(date --iso-8601=seconds)" "$phase" "$action"
+printf 'kernel=%s\n' "$(uname -r)"
+printf '\n--- /sys/power/mem_sleep ---\n'
+cat /sys/power/mem_sleep 2>/dev/null || true
+printf '\n--- suspend stats ---\n'
+find /sys/kernel/debug/suspend_stats -maxdepth 1 -type f -print -exec cat {} \; 2>/dev/null || true
+printf '\n--- DRM connectors ---\n'
+for status in /sys/class/drm/card*-*/status; do
+  [[ -e $status ]] || continue
+  printf '%s: ' "$status"
+  cat "$status" 2>/dev/null || true
+done
+printf '\n--- DRM state ---\n'
+cat /sys/kernel/debug/dri/0/state 2>/dev/null || true
+printf '\n--- display modes ---\n'
+for modes in /sys/class/drm/card*-*/modes; do
+  [[ -e $modes ]] || continue
+  echo "# $modes"
+  cat "$modes" 2>/dev/null || true
+done
+printf '\n--- network ---\n'
+ip -brief address 2>/dev/null || true
+iw dev 2>/dev/null || true
+rfkill 2>/dev/null || true
+printf '\n--- audio ---\n'
+if id fuhao >/dev/null 2>&1; then
+  user_id=$(id -u fuhao)
+  runuser -u fuhao -- env \
+    XDG_RUNTIME_DIR="/run/user/$user_id" \
+    DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$user_id/bus" \
+    wpctl status 2>/dev/null || true
+fi
+printf '\n--- relevant services ---\n'
+systemctl --no-pager --full status NetworkManager bluetooth sshd 2>/dev/null || true
+printf '\n--- recent kernel journal ---\n'
+journalctl -b -k --no-pager -n 2000 2>/dev/null || dmesg --ctime 2>/dev/null | tail -2000 || true
+
+if [[ $phase == pre ]]; then
+  sync
+else
+  rm -f "$attempt_file"
+fi
+
+find "$log_dir" -maxdepth 1 -type f -name '*.log' -mtime +30 -delete 2>/dev/null || true

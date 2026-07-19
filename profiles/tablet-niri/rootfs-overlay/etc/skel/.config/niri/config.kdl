@@ -1,0 +1,101 @@
+input {
+    keyboard {
+        xkb {
+            layout "us"
+        }
+        repeat-delay 600
+        repeat-rate 25
+    }
+
+    touch {
+        map-to-output "DSI-1"
+    }
+}
+
+output "DSI-1" {
+    mode "1600x2560@120.000"
+    scale 2.3
+    transform "270"
+}
+
+layout {
+    gaps 8
+    center-focused-column "never"
+    default-column-width { proportion 0.62; }
+    background-color "#11131a"
+
+    focus-ring {
+        width 2
+        active-color "#8aadf4"
+        inactive-color "#363a4f"
+    }
+
+    border {
+        off
+    }
+}
+
+screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
+prefer-no-csd
+
+cursor {
+    xcursor-theme "Adwaita"
+    xcursor-size 28
+}
+
+hotkey-overlay {
+    skip-at-startup
+}
+
+binds {
+    Mod+Shift+Slash { show-hotkey-overlay; }
+    Mod+Return { spawn "foot"; }
+    Ctrl+Alt+T { spawn "foot"; }
+    Mod+D { spawn-sh "noctalia msg panel-toggle launcher"; }
+    Mod+V { spawn-sh "noctalia msg panel-toggle clipboard"; }
+    Mod+B { spawn "zen-browser"; }
+    Mod+E { spawn "dolphin"; }
+
+    Mod+Q { close-window; }
+    Mod+F { maximize-column; }
+    Mod+Shift+F { fullscreen-window; }
+    Mod+R { switch-preset-column-width; }
+    Mod+C { center-column; }
+
+    Mod+Left { focus-column-left; }
+    Mod+Down { focus-window-down; }
+    Mod+Up { focus-window-up; }
+    Mod+Right { focus-column-right; }
+    Mod+H { focus-column-left; }
+    Mod+J { focus-window-down; }
+    Mod+K { focus-window-up; }
+    Mod+L { focus-column-right; }
+
+    Mod+Ctrl+Left { move-column-left; }
+    Mod+Ctrl+Down { move-window-down; }
+    Mod+Ctrl+Up { move-window-up; }
+    Mod+Ctrl+Right { move-column-right; }
+
+    Mod+Page_Down { focus-workspace-down; }
+    Mod+Page_Up { focus-workspace-up; }
+    Mod+Ctrl+Page_Down { move-column-to-workspace-down; }
+    Mod+Ctrl+Page_Up { move-column-to-workspace-up; }
+    Mod+Tab { toggle-overview; }
+
+    Print { screenshot; }
+    Ctrl+Print { screenshot-screen; }
+    Alt+Print { screenshot-window; }
+
+    Ctrl+Alt+Delete { spawn-sh "noctalia msg panel-toggle session"; }
+    Mod+Shift+P { power-off-monitors; }
+    XF86PowerOff { power-off-monitors; }
+
+    XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "noctalia msg volume-up"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn-sh "noctalia msg volume-down"; }
+    XF86AudioMute allow-when-locked=true { spawn-sh "noctalia msg volume-mute"; }
+    XF86AudioPlay allow-when-locked=true { spawn-sh "noctalia msg media toggle"; }
+    XF86AudioNext allow-when-locked=true { spawn-sh "noctalia msg media next"; }
+    XF86AudioPrev allow-when-locked=true { spawn-sh "noctalia msg media previous"; }
+    XF86MonBrightnessUp allow-when-locked=true { spawn-sh "noctalia msg brightness-up"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn-sh "noctalia msg brightness-down"; }
+}
