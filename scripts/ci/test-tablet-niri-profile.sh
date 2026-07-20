@@ -173,6 +173,13 @@ for module in pmic_glink ucsi_glink ath12k_wifi7 bnep; do
 done
 grep -Fq 'for module in pmic_glink ucsi_glink libcomposite usb_f_acm usb_f_ncm; do' \
   "$usb_script" || fail "USB rescue module load sequence is incomplete"
+grep -Fq 'ln -s "$gadget/functions/acm.usb0" "$gadget/configs/c.1/acm.usb0"' \
+  "$usb_script" || fail "USB ACM ConfigFS link does not use an absolute target"
+grep -Fq 'ln -s "$gadget/functions/ncm.usb0" "$gadget/configs/c.1/ncm.usb0"' \
+  "$usb_script" || fail "USB NCM ConfigFS link does not use an absolute target"
+if grep -Fq 'ln -s ../../functions/' "$usb_script"; then
+  fail "USB rescue still uses ConfigFS-incompatible relative link targets"
+fi
 grep -Fq '10.77.0.1/24' "$usb_connection" || fail "USB rescue address is missing"
 grep -Fq 'method=shared' "$usb_connection" || fail "USB rescue DHCP sharing is missing"
 grep -Fq '10.78.0.1/24' "$bt_connection" || fail "Bluetooth rescue address is missing"
