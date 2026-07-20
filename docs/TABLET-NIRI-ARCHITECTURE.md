@@ -4,6 +4,13 @@ Status: design freeze for the first implementation pass
 Date: 2026-07-19
 Base commit: `c36b1275c9016a219c1883c1ecfeb033e1bee2d3`
 
+> Runtime status note (2026-07-21): this document describes the intended
+> architecture, not verified hardware behavior. The flashed rescue image has
+> broken Wi-Fi and no enumerated USB ACM/NCM gadget; Bluetooth NAP is untested.
+> The current `oneshot` USB service and indefinite UDC wait are scheduled for
+> replacement. See `STATUS.md` and `ROADMAP.md` before making implementation or
+> flashing decisions.
+
 This document defines the first Arch Linux ARM image for the Lenovo Y700 2025
 (TB321FU). It is deliberately separate from the existing Plasma profile. The
 first image is an artifact-only CI deliverable until the image, rollback path,

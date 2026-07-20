@@ -1,0 +1,49 @@
+schema: 1
+release: "UNSET"
+status: "UNTESTED"
+device:
+  model: "TB321FU"
+  soc: "SM8650"
+  memory_storage: "16G+512G"
+  identity_suffix: "REDACTED"
+build:
+  branch: "UNSET"
+  commit: "UNSET"
+  workflow_run: "UNSET"
+  profile: "tablet-niri"
+  rootfs_sha256: "UNSET"
+  grub_sha256: "UNSET"
+  boot_sha256: "UNSET"
+  dtb_sha256: "UNSET"
+flash:
+  bundle_id: "UNSET"
+  programmer_sha256: "UNSET"
+  gpt_evidence: "UNSET"
+  active_slot: "UNSET"
+  readback: "NOT_TESTED"
+acceptance:
+  boot: {state: "UNTESTED", evidence: []}
+  support_bundle: {state: "UNTESTED", evidence: []}
+  usb_acm: {state: "UNTESTED", evidence: []}
+  usb_ncm: {state: "UNTESTED", evidence: []}
+  bluetooth_nap: {state: "UNTESTED", evidence: []}
+  wifi: {state: "UNTESTED", evidence: []}
+  bluetooth: {state: "UNTESTED", evidence: []}
+  landscape_touch: {state: "UNTESTED", evidence: []}
+  osk: {state: "UNTESTED", evidence: []}
+  display_120hz: {state: "UNTESTED", evidence: []}
+  speaker: {state: "UNTESTED", evidence: []}
+  headphones: {state: "UNTESTED", evidence: []}
+  microphone: {state: "UNTESTED", evidence: []}
+  haptics: {state: "UNTESTED", evidence: []}
+  brightness: {state: "UNTESTED", evidence: []}
+  battery: {state: "UNTESTED", evidence: []}
+  charging: {state: "UNTESTED", evidence: []}
+  screen_off_wake: {state: "UNTESTED", evidence: []}
+  camera: {state: "OUT_OF_SCOPE", evidence: []}
+  suspend_resume: {state: "OUT_OF_SCOPE", evidence: []}
+system:
+  failed_units: "UNSET"
+  critical_warnings: []
+open_issues: []
+evidence_root: "UNSET"

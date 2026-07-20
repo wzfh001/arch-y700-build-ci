@@ -28,9 +28,9 @@ The `tablet-niri` profile provides:
   `base-devel`, and `paru`
 - official ARM64 builds of CC Switch, Mihomo Party, and OpenAI Codex CLI,
   repackaged as pacman-owned packages
-- LAN-only SSH firewall policy, automatic USB NCM plus ACM serial rescue,
-  automatic Bluetooth NAP rescue, first-boot ext4 growth, zram, persistent
-  journal limits, and pre-upgrade configuration snapshots
+- LAN-only SSH firewall policy, candidate USB NCM/ACM and Bluetooth NAP rescue
+  configuration, first-boot ext4 growth, zram, persistent journal limits, and
+  pre-upgrade configuration snapshots
 
 There is no Plasma session, SDDM, automatic screen lock, automatic suspend,
 Office suite, Docker, Fish, or Starship in this profile. Ghostty is not in the
@@ -41,6 +41,15 @@ The complete design and source matrix are in:
 
 - `docs/TABLET-NIRI-ARCHITECTURE.md`
 - `docs/TABLET-NIRI-PACKAGE-MATRIX.md`
+- `docs/STATUS.md`
+- `docs/ROADMAP.md`
+- `docs/EXPERIMENT-LOG.md`
+- `docs/RISK-REGISTER.md`
+
+The current flashed rescue image does not have working Wi-Fi or USB gadget
+rescue. Bluetooth is only partially observed and Bluetooth NAP is unverified.
+Treat `docs/STATUS.md` as authoritative for implementation/runtime status;
+configuration presence is not hardware acceptance evidence.
 
 ## Desktop profiles
 
