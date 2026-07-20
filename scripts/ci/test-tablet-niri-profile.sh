@@ -19,6 +19,7 @@ fail() {
 for script in \
   "$PROFILE/usr/local/bin/tb321fu-osk-toggle" \
   "$PROFILE/usr/local/bin/tb321fu-suspend" \
+  "$PROFILE/usr/local/bin/tb321fu-support-bundle" \
   "$PROFILE/usr/local/libexec/tb321fu-grow-rootfs" \
   "$PROFILE/usr/local/libexec/tb321fu-usb-rescue" \
   "$PROFILE/usr/local/libexec/tb321fu-pre-upgrade-snapshot" \
@@ -26,6 +27,10 @@ for script in \
   [ -x "$script" ] || fail "profile script is not executable: $script"
   bash -n "$script"
 done
+
+redactor="$PROFILE/usr/local/libexec/tb321fu-redact-support-bundle"
+[ -x "$redactor" ] || fail "profile script is not executable: $redactor"
+PYTHONPYCACHEPREFIX="$tmp/pycache" python3 -m py_compile "$redactor"
 
 python3 - "$PROFILE" <<'PY'
 import pathlib

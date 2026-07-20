@@ -69,3 +69,13 @@ References to earlier experiment IDs:
 - Correction: assert the commit identity and fix boundary independently.
 - Permanent decision: repository validation commands run with fail-fast shell
   behavior so a failed check cannot be hidden by later successful commands.
+
+### DEV-20260721-002 — Profile test assumed every executable was Bash
+
+- Result: `FAIL`, corrected before commit.
+- Primary variable: adding the Python support-bundle redactor to the profile.
+- Observed: the generic executable loop passed the Python file to `bash -n`.
+- Correction: Bash files remain in the shell loop; the redactor is checked with
+  `python3 -m py_compile` and an isolated bytecode cache.
+- Permanent decision: validate overlay programs with their declared
+  interpreter instead of inferring one interpreter from executable mode.

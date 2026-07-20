@@ -1,0 +1,111 @@
+#!/usr/bin/python3
+"""Redact credentials and stable host identifiers from TB321FU support data."""
+
+from __future__ import annotations
+
+import argparse
+import pathlib
+import re
+from collections import Counter
+
+
+PRIVATE_KEY = re.compile(
+    r"-----BEGIN [^-\n]*PRIVATE KEY-----.*?-----END [^-\n]*PRIVATE KEY-----",
+    re.DOTALL,
+)
+BEARER = re.compile(r"(?i)\b(Bearer)[ \t]+[A-Za-z0-9._~+/=-]{12,}")
+KNOWN_TOKEN = re.compile(
+    r"\b(?:sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b"
+)
+URL_USERINFO = re.compile(r"(?i)([a-z][a-z0-9+.-]*://)[^/@\s:]+:[^/@\s]+@")
+SENSITIVE_ASSIGNMENT = re.compile(
+    r"(?im)^(?P<prefix>[ \t]*(?:[^#\n:=]{0,80})?"
+    r"(?:password|passwd|passphrase|psk|secret|token|api[_-]?key|"
+    r"authorization|subscription)[^:=\n]*[=:][ \t]*)(?P<value>.*)$"
+)
+NMCLI_SECRET = re.compile(
+    r"(?im)^(?P<prefix>[ \t]*(?:802-11-wireless-security\.)?"
+    r"(?:psk|wep-key[0-9]?|leap-password):[ \t]*)(?P<value>.*)$"
+)
+
+
+def read_identifier(path: pathlib.Path) -> str | None:
+    try:
+        value = path.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeError):
+        return None
+    if len(value) >= 16 and re.fullmatch(r"[0-9A-Fa-f-]+", value):
+        return value
+    return None
+
+
+def redact_text(text: str, identifiers: set[str], counts: Counter[str]) -> str:
+    for identifier in sorted(identifiers, key=len, reverse=True):
+        occurrences = text.lower().count(identifier.lower())
+        if occurrences:
+            text = re.sub(re.escape(identifier), "<REDACTED-ID>", text, flags=re.I)
+            counts["stable_identifier"] += occurrences
+
+    text, replaced = PRIVATE_KEY.subn("<REDACTED-PRIVATE-KEY>", text)
+    counts["private_key_block"] += replaced
+    text, replaced = BEARER.subn(r"\1 <REDACTED-TOKEN>", text)
+    counts["bearer_token"] += replaced
+    text, replaced = KNOWN_TOKEN.subn("<REDACTED-TOKEN>", text)
+    counts["known_token"] += replaced
+    text, replaced = URL_USERINFO.subn(r"\1<REDACTED-USERINFO>@", text)
+    counts["url_userinfo"] += replaced
+
+    def replace_assignment(match: re.Match[str]) -> str:
+        counts["sensitive_assignment"] += 1
+        return f"{match.group('prefix')}<REDACTED>"
+
+    text = SENSITIVE_ASSIGNMENT.sub(replace_assignment, text)
+    text = NMCLI_SECRET.sub(replace_assignment, text)
+    return text
+
+
+def redact_tree(root: pathlib.Path) -> Counter[str]:
+    identifiers = {
+        value
+        for value in (
+            read_identifier(pathlib.Path("/etc/machine-id")),
+            read_identifier(pathlib.Path("/var/lib/dbus/machine-id")),
+            read_identifier(pathlib.Path("/proc/sys/kernel/random/boot_id")),
+        )
+        if value
+    }
+    counts: Counter[str] = Counter()
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or path.name == "REDACTION-REPORT.txt":
+            continue
+        try:
+            original = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            counts["skipped_non_text"] += 1
+            continue
+        redacted = redact_text(original, identifiers, counts)
+        if redacted != original:
+            path.write_text(redacted, encoding="utf-8")
+            counts["files_changed"] += 1
+
+    report = ["TB321FU support bundle redaction report"]
+    for name in sorted(counts):
+        report.append(f"{name}={counts[name]}")
+    report.append("Private keys and credential stores are never intentionally collected.")
+    (root / "REDACTION-REPORT.txt").write_text("\n".join(report) + "\n", encoding="utf-8")
+    return counts
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--tree", required=True, type=pathlib.Path)
+    args = parser.parse_args()
+    root = args.tree.resolve()
+    if not root.is_dir():
+        parser.error("--tree must name an existing directory")
+    redact_tree(root)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
