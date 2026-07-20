@@ -460,6 +460,18 @@ verify_required_y700_payload() {
       etc/systemd/user/noctalia.service
       etc/systemd/user/fcitx5-tablet.service
       etc/systemd/system/tb321fu-grow-rootfs.service
+      etc/systemd/system/tb321fu-usb-rescue.service
+      etc/modules-load.d/60-tb321fu-rescue.conf
+      etc/NetworkManager/system-connections/tb321fu-rescue-usb.nmconnection
+      etc/NetworkManager/system-connections/tb321fu-rescue-bt.nmconnection
+      usr/local/libexec/tb321fu-usb-rescue
+      usr/lib/modules/$KERNEL_VERSION/kernel/drivers/net/wireless/ath/ath12k/wifi7/ath12k_wifi7.ko
+      usr/lib/modules/$KERNEL_VERSION/kernel/drivers/soc/qcom/pmic_glink.ko
+      usr/lib/modules/$KERNEL_VERSION/kernel/drivers/usb/typec/ucsi/ucsi_glink.ko
+      usr/lib/modules/$KERNEL_VERSION/kernel/drivers/usb/gadget/libcomposite.ko
+      usr/lib/modules/$KERNEL_VERSION/kernel/drivers/usb/gadget/function/usb_f_acm.ko
+      usr/lib/modules/$KERNEL_VERSION/kernel/drivers/usb/gadget/function/usb_f_ncm.ko
+      usr/lib/modules/$KERNEL_VERSION/kernel/net/bluetooth/bnep/bnep.ko
       home/$DEFAULT_USER_NAME/.config/niri/config.kdl
       home/$DEFAULT_USER_NAME/.config/noctalia/config.toml
     )
@@ -1424,12 +1436,18 @@ apply_tablet_niri_profile() {
     "$root/usr/local/bin/tb321fu-osk-toggle" \
     "$root/usr/local/bin/tb321fu-suspend" \
     "$root/usr/local/libexec/tb321fu-grow-rootfs" \
+    "$root/usr/local/libexec/tb321fu-usb-rescue" \
     "$root/usr/local/libexec/tb321fu-pre-upgrade-snapshot" \
     "$root/usr/lib/systemd/system-sleep/tb321fu-suspend-log"
   chmod 0644 \
     "$root/etc/systemd/user/noctalia.service" \
     "$root/etc/systemd/user/fcitx5-tablet.service" \
-    "$root/etc/systemd/system/tb321fu-grow-rootfs.service"
+    "$root/etc/systemd/system/tb321fu-grow-rootfs.service" \
+    "$root/etc/systemd/system/tb321fu-usb-rescue.service" \
+    "$root/etc/modules-load.d/60-tb321fu-rescue.conf"
+  chmod 0600 \
+    "$root/etc/NetworkManager/system-connections/tb321fu-rescue-usb.nmconnection" \
+    "$root/etc/NetworkManager/system-connections/tb321fu-rescue-bt.nmconnection"
 
   rm -f "$root"/etc/ssh/ssh_host_*
   : > "$root/etc/machine-id"
@@ -1481,7 +1499,7 @@ verify_tablet_niri_profile() {
   local root=$1
   local package path mode hash_field target
   local -a required_packages=(
-    noctalia wvkbd paru
+    noctalia wvkbd paru dnsmasq
     tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli
   )
   local -a forbidden_packages=(
@@ -1536,8 +1554,28 @@ verify_tablet_niri_profile() {
     "$root/home/$DEFAULT_USER_NAME/.config/clash"; do
     [ ! -e "$path" ] || ci_die "credential-bearing user config leaked into tablet-niri image: $path"
   done
-  [ -z "$(find "$root/etc/NetworkManager/system-connections" -maxdepth 1 -type f -print -quit 2>/dev/null)" ] || \
-    ci_die "Wi-Fi profile leaked into tablet-niri image"
+  local connection_dir="$root/etc/NetworkManager/system-connections"
+  local unexpected_connection
+  unexpected_connection=$(find "$connection_dir" -maxdepth 1 -type f \
+    ! -name tb321fu-rescue-usb.nmconnection \
+    ! -name tb321fu-rescue-bt.nmconnection -print -quit 2>/dev/null)
+  [ -z "$unexpected_connection" ] || \
+    ci_die "unexpected NetworkManager profile leaked into tablet-niri image: $unexpected_connection"
+  for path in \
+    "$connection_dir/tb321fu-rescue-usb.nmconnection" \
+    "$connection_dir/tb321fu-rescue-bt.nmconnection"; do
+    [ -f "$path" ] || ci_die "required rescue connection is missing: $path"
+    [ "$(stat -c '%a' "$path")" = 600 ] || \
+      ci_die "rescue connection mode is not 0600: $path"
+  done
+  grep -Fxq 'address1=10.77.0.1/24' \
+    "$connection_dir/tb321fu-rescue-usb.nmconnection" || \
+    ci_die "USB rescue address is missing"
+  grep -Fxq 'address1=10.78.0.1/24' \
+    "$connection_dir/tb321fu-rescue-bt.nmconnection" || \
+    ci_die "Bluetooth rescue address is missing"
+  grep -Fxq 'type=nap' "$connection_dir/tb321fu-rescue-bt.nmconnection" || \
+    ci_die "Bluetooth rescue profile is not a NAP"
 
   for target in sleep.target suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target; do
     path="$root/etc/systemd/system/$target"
@@ -2206,7 +2244,7 @@ build_package_list() {
     niri xwayland-satellite greetd greetd-tuigreet foot fuzzel
     xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk qt6-wayland
     wl-clipboard wtype playerctl grim slurp satty zenity brightnessctl
-    nftables zram-generator e2fsprogs wpa_supplicant
+    nftables zram-generator e2fsprogs wpa_supplicant dnsmasq
     pavucontrol gvfs kio-extras ffmpegthumbnailer phonon-qt6-vlc
     dolphin ark mpv vlc elisa gwenview okular
     noto-fonts noto-fonts-cjk noto-fonts-emoji ttf-jetbrains-mono-nerd
@@ -2409,7 +2447,8 @@ ci_log "enabling system services"
 if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
   required_system_units=(
     NetworkManager.service sshd.service greetd.service bluetooth.service
-    nftables.service tb321fu-grow-rootfs.service systemd-timesyncd.service
+    nftables.service tb321fu-grow-rootfs.service tb321fu-usb-rescue.service
+    serial-getty@ttyGS0.service systemd-timesyncd.service
   )
   required_user_units=(
     pipewire.socket pipewire-pulse.socket wireplumber.service
@@ -2566,6 +2605,14 @@ kernel_version=$KERNEL_VERSION
 apply_y700_firmware_fixes=$APPLY_Y700_FIRMWARE_FIXES
 apply_y700_audio_policy_fixes=$APPLY_Y700_AUDIO_POLICY_FIXES
 INFO
+if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
+  cat >> "$build_info" <<'INFO'
+rescue_usb_network=cdc-ncm:10.77.0.1/24:networkmanager-shared
+rescue_usb_console=cdc-acm:ttyGS0:password-login
+rescue_bluetooth_network=nap:10.78.0.1/24:networkmanager-shared
+rescue_module_policy=pmic_glink,ucsi_glink,ath12k_wifi7,bnep,libcomposite,usb_f_acm,usb_f_ncm
+INFO
+fi
 
 ci_log "writing rootfs manifest"
 (cd "$rootfs_dir" && find . -xdev -printf '%y\t%u\t%g\t%m\t%s\t%p\n' | sort) > "$manifest"

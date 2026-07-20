@@ -1,0 +1,17 @@
+[connection]
+id=tb321fu-rescue-usb
+uuid=c1d8c440-3f99-44e4-ae93-eebaeef3714d
+type=ethernet
+interface-name=usb0
+
+[ethernet]
+
+[ipv4]
+address1=10.77.0.1/24
+method=shared
+
+[ipv6]
+addr-gen-mode=default
+method=disabled
+
+[proxy]

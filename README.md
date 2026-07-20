@@ -28,8 +28,9 @@ The `tablet-niri` profile provides:
   `base-devel`, and `paru`
 - official ARM64 builds of CC Switch, Mihomo Party, and OpenAI Codex CLI,
   repackaged as pacman-owned packages
-- LAN-only SSH firewall policy, first-boot ext4 growth, zram, persistent journal
-  limits, and pre-upgrade configuration snapshots
+- LAN-only SSH firewall policy, automatic USB NCM plus ACM serial rescue,
+  automatic Bluetooth NAP rescue, first-boot ext4 growth, zram, persistent
+  journal limits, and pre-upgrade configuration snapshots
 
 There is no Plasma session, SDDM, automatic screen lock, automatic suspend,
 Office suite, Docker, Fish, or Starship in this profile. Ghostty is not in the

@@ -37,6 +37,7 @@ officially available as `1.43.1-5`, but is not selected for the first profile.
 ```text
 networkmanager 1.56.1-2
 wpa_supplicant 2:2.11-5
+dnsmasq
 bluez 5.87-2
 bluez-utils 5.87-2
 upower 1.91.3-1

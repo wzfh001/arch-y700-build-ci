@@ -193,8 +193,26 @@ evidence on disk.
 ## Network, audio, and hardware services
 
 NetworkManager with `wpa_supplicant` handles Wi-Fi. No Wi-Fi credentials are
-preloaded. The first connection is made through Noctalia or `nmtui`; USB-C
-Ethernet and a USB keyboard remain rescue options.
+preloaded. The first connection is made through Noctalia or `nmtui`. The
+custom `ath12k_wifi7` module is explicitly loaded because this device cannot
+depend on generic Arch module-autoload behavior for its only primary network
+interface.
+
+The image has two local-only rescue networks:
+
+- USB-C exposes a composite CDC NCM network device and CDC ACM serial console.
+  NetworkManager serves DHCP from `10.77.0.1/24`; SSH is always reachable at
+  `10.77.0.1`, and `ttyGS0` provides a password-protected serial login.
+- BlueZ and NetworkManager advertise a Bluetooth NAP on `10.78.0.1/24` so a
+  paired computer can initiate the PAN connection without typing commands on
+  the tablet.
+
+The USB service explicitly loads `pmic_glink`, `ucsi_glink`, `libcomposite`,
+`usb_f_acm`, and `usb_f_ncm`, then waits indefinitely for a UDC instead of
+failing when the cable is absent during boot. The normal TB321FU controller is
+`a600000.usb`, but the service discovers it dynamically. Both rescue profiles
+use NetworkManager shared mode with `dnsmasq`; the firewall admits DHCP, DNS,
+ICMP, and private-range SSH while retaining a default-drop input policy.
 
 BlueZ is enabled for Bluetooth. PipeWire/WirePlumber is enabled globally for
 the user session. The existing TB321FU audio route and haptics payloads remain

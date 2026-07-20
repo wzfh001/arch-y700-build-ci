@@ -1,0 +1,15 @@
+[Unit]
+Description=TB321FU USB network and serial rescue gadget
+Wants=NetworkManager.service sys-kernel-config.mount
+After=NetworkManager.service systemd-modules-load.service sys-kernel-config.mount
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/tb321fu-usb-rescue
+RemainAfterExit=yes
+TimeoutStartSec=infinity
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

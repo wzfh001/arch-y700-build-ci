@@ -20,6 +20,7 @@ for script in \
   "$PROFILE/usr/local/bin/tb321fu-osk-toggle" \
   "$PROFILE/usr/local/bin/tb321fu-suspend" \
   "$PROFILE/usr/local/libexec/tb321fu-grow-rootfs" \
+  "$PROFILE/usr/local/libexec/tb321fu-usb-rescue" \
   "$PROFILE/usr/local/libexec/tb321fu-pre-upgrade-snapshot" \
   "$PROFILE/usr/lib/systemd/system-sleep/tb321fu-suspend-log"; do
   [ -x "$script" ] || fail "profile script is not executable: $script"
@@ -116,7 +117,7 @@ grep -Fxq "$expected_ignore" "$freeze_root/etc/pacman.conf" || \
   fail "custom package freeze policy is incomplete"
 
 package_block=$(sed -n '/local tablet_niri=(/,/^  )/p' "$BUILD_SCRIPT")
-for package in niri greetd foot nftables zram-generator dolphin mpv vlc nodejs rust; do
+for package in niri greetd foot nftables zram-generator dnsmasq dolphin mpv vlc nodejs rust; do
   grep -Eq "(^|[[:space:]])${package}([[:space:]]|$)" <<< "$package_block" || \
     fail "tablet package list is missing $package"
 done
@@ -161,5 +162,50 @@ grep -Fq 'PermitRootLogin no' "$PROFILE/etc/ssh/sshd_config.d/60-tablet-niri.con
 grep -Fq 'PasswordAuthentication yes' "$PROFILE/etc/ssh/sshd_config.d/60-tablet-niri.conf"
 grep -Fq 'HandlePowerKey=ignore' "$PROFILE/etc/systemd/logind.conf.d/60-tablet-niri.conf"
 grep -Fq 'IdleAction=ignore' "$PROFILE/etc/systemd/logind.conf.d/60-tablet-niri.conf"
+
+usb_script="$PROFILE/usr/local/libexec/tb321fu-usb-rescue"
+usb_service="$PROFILE/etc/systemd/system/tb321fu-usb-rescue.service"
+module_list="$PROFILE/etc/modules-load.d/60-tb321fu-rescue.conf"
+usb_connection="$PROFILE/etc/NetworkManager/system-connections/tb321fu-rescue-usb.nmconnection"
+bt_connection="$PROFILE/etc/NetworkManager/system-connections/tb321fu-rescue-bt.nmconnection"
+for module in pmic_glink ucsi_glink ath12k_wifi7 bnep; do
+  grep -Fxq "$module" "$module_list" || fail "rescue module list is missing $module"
+done
+grep -Fq 'for module in pmic_glink ucsi_glink libcomposite usb_f_acm usb_f_ncm; do' \
+  "$usb_script" || fail "USB rescue module load sequence is incomplete"
+grep -Fq '10.77.0.1/24' "$usb_connection" || fail "USB rescue address is missing"
+grep -Fq 'method=shared' "$usb_connection" || fail "USB rescue DHCP sharing is missing"
+grep -Fq '10.78.0.1/24' "$bt_connection" || fail "Bluetooth rescue address is missing"
+grep -Fq 'type=nap' "$bt_connection" || fail "Bluetooth rescue NAP is missing"
+[ "$(stat -c '%a' "$usb_connection")" = 600 ] || fail "USB rescue profile mode is not 0600"
+[ "$(stat -c '%a' "$bt_connection")" = 600 ] || fail "Bluetooth rescue profile mode is not 0600"
+grep -Fq 'serial-getty@ttyGS0.service' "$BUILD_SCRIPT" || fail "USB serial getty is not enabled"
+grep -Fq 'TimeoutStartSec=infinity' "$usb_service" || fail "USB rescue does not wait for UDC"
+grep -Fq 'rescue_usb_network=cdc-ncm:10.77.0.1/24:networkmanager-shared' \
+  "$BUILD_SCRIPT" || fail "USB rescue build metadata is missing"
+grep -Fq 'rescue_bluetooth_network=nap:10.78.0.1/24:networkmanager-shared' \
+  "$BUILD_SCRIPT" || fail "Bluetooth rescue build metadata is missing"
+grep -Fq 'iifname { "usb0", "bnep0" } udp sport 68 udp dport 67 accept' \
+  "$PROFILE/etc/nftables.conf" || fail "rescue DHCP firewall rule is missing"
+
+python3 - "$usb_connection" "$bt_connection" <<'PY'
+import configparser
+import pathlib
+import sys
+
+for path_value in sys.argv[1:]:
+    path = pathlib.Path(path_value)
+    parser = configparser.ConfigParser(interpolation=None)
+    parser.read(path)
+    assert parser["ipv4"]["method"] == "shared"
+    assert parser["ipv6"]["method"] == "disabled"
+usb = configparser.ConfigParser(interpolation=None)
+usb.read(sys.argv[1])
+assert usb["connection"]["interface-name"] == "usb0"
+bt = configparser.ConfigParser(interpolation=None)
+bt.read(sys.argv[2])
+assert bt["connection"]["interface-name"] == "bnep0"
+assert bt["bluetooth"]["type"] == "nap"
+PY
 
 printf 'TABLET_NIRI_PROFILE=PASS\n'

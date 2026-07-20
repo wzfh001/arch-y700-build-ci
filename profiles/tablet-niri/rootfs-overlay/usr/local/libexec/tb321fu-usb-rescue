@@ -1,0 +1,74 @@
+#!/usr/bin/bash
+set -euo pipefail
+
+gadget=/sys/kernel/config/usb_gadget/tb321fu-rescue
+udc_class=/sys/class/udc
+connection=tb321fu-rescue-usb
+
+log() {
+  printf 'tb321fu-usb-rescue: %s\n' "$*"
+}
+
+for module in pmic_glink ucsi_glink libcomposite usb_f_acm usb_f_ncm; do
+  modprobe "$module"
+done
+
+if ! mountpoint -q /sys/kernel/config; then
+  mount -t configfs configfs /sys/kernel/config
+fi
+
+mkdir -p \
+  "$gadget/strings/0x409" \
+  "$gadget/configs/c.1/strings/0x409" \
+  "$gadget/functions/acm.usb0" \
+  "$gadget/functions/ncm.usb0"
+
+bound_udc=$(cat "$gadget/UDC" 2>/dev/null || true)
+if [ -z "$bound_udc" ]; then
+  printf '0x1d6b\n' > "$gadget/idVendor"
+  printf '0x0104\n' > "$gadget/idProduct"
+  printf '0xEF\n' > "$gadget/bDeviceClass"
+  printf '0x02\n' > "$gadget/bDeviceSubClass"
+  printf '0x01\n' > "$gadget/bDeviceProtocol"
+  printf 'TB321FU-ARCH-RESCUE\n' > "$gadget/strings/0x409/serialnumber"
+  printf 'TB321FU Linux\n' > "$gadget/strings/0x409/manufacturer"
+  printf 'TB321FU NCM and serial rescue\n' > "$gadget/strings/0x409/product"
+  printf 'NCM network and ACM console\n' > "$gadget/configs/c.1/strings/0x409/configuration"
+  printf '250\n' > "$gadget/configs/c.1/MaxPower"
+  printf '02:54:42:32:1f:01\n' > "$gadget/functions/ncm.usb0/dev_addr"
+  printf '02:54:42:32:1f:02\n' > "$gadget/functions/ncm.usb0/host_addr"
+  [ -L "$gadget/configs/c.1/acm.usb0" ] || \
+    ln -s ../../functions/acm.usb0 "$gadget/configs/c.1/acm.usb0"
+  [ -L "$gadget/configs/c.1/ncm.usb0" ] || \
+    ln -s ../../functions/ncm.usb0 "$gadget/configs/c.1/ncm.usb0"
+
+  wait_seconds=0
+  while ! compgen -G "$udc_class/*" >/dev/null; do
+    if ((wait_seconds % 30 == 0)); then
+      log "waiting for a USB device controller"
+    fi
+    sleep 1
+    ((wait_seconds += 1))
+  done
+  udc=$(basename "$(find "$udc_class" -mindepth 1 -maxdepth 1 -print -quit)")
+  printf '%s\n' "$udc" > "$gadget/UDC"
+  log "bound gadget to $udc"
+fi
+
+for _ in {1..30}; do
+  [ -e /sys/class/net/usb0 ] && break
+  sleep 1
+done
+[ -e /sys/class/net/usb0 ] || {
+  log "usb0 did not appear after gadget binding"
+  exit 1
+}
+
+nmcli connection reload
+if ! nmcli connection up "$connection" ifname usb0; then
+  log "NetworkManager shared mode failed; applying static fallback address"
+  ip address replace 10.77.0.1/24 dev usb0
+  ip link set usb0 up
+fi
+systemctl start serial-getty@ttyGS0.service
+log "USB rescue ready at 10.77.0.1 and ttyGS0"
