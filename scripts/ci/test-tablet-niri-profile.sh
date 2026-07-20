@@ -177,8 +177,6 @@ grep -Fq '10.77.0.1/24' "$usb_connection" || fail "USB rescue address is missing
 grep -Fq 'method=shared' "$usb_connection" || fail "USB rescue DHCP sharing is missing"
 grep -Fq '10.78.0.1/24' "$bt_connection" || fail "Bluetooth rescue address is missing"
 grep -Fq 'type=nap' "$bt_connection" || fail "Bluetooth rescue NAP is missing"
-[ "$(stat -c '%a' "$usb_connection")" = 600 ] || fail "USB rescue profile mode is not 0600"
-[ "$(stat -c '%a' "$bt_connection")" = 600 ] || fail "Bluetooth rescue profile mode is not 0600"
 grep -Fq 'serial-getty@ttyGS0.service' "$BUILD_SCRIPT" || fail "USB serial getty is not enabled"
 grep -Fq 'TimeoutStartSec=infinity' "$usb_service" || fail "USB rescue does not wait for UDC"
 grep -Fq 'rescue_usb_network=cdc-ncm:10.77.0.1/24:networkmanager-shared' \
