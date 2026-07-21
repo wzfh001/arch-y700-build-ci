@@ -19,7 +19,8 @@ current-state document contradicts the authoritative status.
 - Replace the blocking USB oneshot with a persistent coordinator.
 - Coordinate Type-C role, UDC discovery, ConfigFS, bind/unbind, and hotplug.
 - Activate and retry Bluetooth NAP without blocking graphical boot.
-- Produce a one-command redacted support bundle without network access.
+- `SOURCE PASS` Produce a one-command redacted support bundle without network
+  access (`3a095ed`); hardware acceptance remains pending.
 
 Exit gate: rescue failures never block `graphical.target`; tests cover absent
 UDC, hotplug, retries, cleanup, and redaction.

@@ -79,3 +79,18 @@ References to earlier experiment IDs:
   `python3 -m py_compile` and an isolated bytecode cache.
 - Permanent decision: validate overlay programs with their declared
   interpreter instead of inferring one interpreter from executable mode.
+
+## Source validation results
+
+### SRC-20260721-001 — Offline support bundle and redaction
+
+- Result: `PASS` at source-test scope; TB321FU hardware remains `UNTESTED`.
+- Commit: `3a095ed`.
+- Primary variable: new support collector and Python redactor.
+- Evidence: fixture credentials were removed; useful ath12k evidence remained;
+  an actual local archive was created at mode `0600`, extracted, and every file
+  passed its included SHA-256 manifest.
+- Tests: `SUPPORT_BUNDLE=PASS`, `TABLET_NIRI_PROFILE=PASS`, actionlint and
+  workflow semantics PASS.
+- Boundary: this does not prove privileged journal access, niri session access,
+  or redaction coverage on the tablet's real logs.

@@ -12,6 +12,8 @@ functionality.
 - Current branch: `codex/tablet-rescue-20260720`
 - Last flashed build: workflow run `29709555909`, commit `4edf3a4`
 - First post-handoff source fix: commit `d480039`
+- Evidence-governance baseline: commit `34de491`
+- Offline support-bundle implementation: commit `3a095ed`
 - Release state: artifact-only; no approved Arch hardware release
 
 ## Evidence states
@@ -51,14 +53,15 @@ functionality.
 4. The current USB unit is `Type=oneshot` with an infinite start timeout. It
    can block startup ordering and does not coordinate hotplug or role changes.
 5. The Bluetooth NAP profile has no dedicated activation/retry coordinator.
-6. The current image lacks an automatic, redacted support bundle, so runtime
-   failures cannot yet be investigated reliably.
+6. Commit `3a095ed` adds an automatic offline support bundle, redaction, file
+   checksums, and an end-to-end archive test. It is not present in the flashed
+   image and remains `UNTESTED` on TB321FU hardware.
 
 ## Immediate release blockers
 
 - Persistent non-blocking USB role/UDC/gadget coordinator
 - Bluetooth NAP activation coordinator
-- Redacted offline support bundle
+- Install and verify the redacted support bundle on TB321FU hardware
 - Device-specific WCN7850 package, exact hashes, firmware path, and bootarg
 - Deterministic CI gates for the final raw filesystem
 - Complete rootfs/GRUB/boot/DTB offline audit
