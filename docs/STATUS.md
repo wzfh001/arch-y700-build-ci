@@ -27,7 +27,7 @@ functionality.
 - P3 pacman lock: seed run `29921200387`, immutable transaction audit
   `AUDIT-20260722-002`, committed pin `e87d90c`
 - Qualcomm SSC sensor proxy native replacement source gate:
-  `SRC-20260722-009`; complete candidate build still pending
+  `SRC-20260722-009`, commit `68898ad`; complete candidate build still pending
 - Release state: artifact-only; no approved Arch hardware release
 
 ## Evidence states

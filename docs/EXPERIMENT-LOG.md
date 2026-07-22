@@ -690,6 +690,7 @@ References to earlier experiment IDs:
 
 - Result: `PASS` for the source and fixed-payload gate; no firmware artifact,
   Release, or device write was produced.
+- Source commit: `68898adc3e502c6adac2b8191a52bfed7aad70c7`.
 - Primary variable: replace only the ownership model that failed in
   `CI-20260722-005`. The fixed Qualcomm SSC sensor proxy is now staged outside
   the generic import package and converted into native Arch package

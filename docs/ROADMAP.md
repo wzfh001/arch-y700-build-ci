@@ -58,7 +58,8 @@ Exit gate: raw-image content, hashes, package ownership, path, and bootarg all
   because the Qualcomm SSC sensor proxy differs from stock
   `iio-sensor-proxy`. `SRC-20260722-009` adds a dedicated native package with
   explicit `provides/conflicts/replaces`, exact payload hashes, ownership and
-  stock-removal gates while preserving the generic collision stop line.
+  stock-removal gates while preserving the generic collision stop line; source
+  commit `68898ad`.
 - Current stop: commit the source gate and run exactly one new artifact-only
   build. Do not retry `29924934432` unchanged and do not publish a Release.
 - Pin every remaining controllable input.
