@@ -13,7 +13,10 @@ expected_rootfs_sha=$3
 requested_file=$(realpath -e -- "$4") || fail "requested package file does not exist"
 
 [[ $expected_manifest_sha =~ ^[0-9a-f]{64}$ ]] || fail 'invalid lock manifest SHA-256'
-[[ $expected_rootfs_sha =~ ^[0-9a-f]{64}$ ]] || fail 'invalid rootfs SHA-256'
+if [[ ! $expected_rootfs_sha =~ ^[0-9a-f]{64}$ ]]; then
+  printf -v expected_rootfs_sha_quoted '%q' "$expected_rootfs_sha"
+  fail "invalid rootfs SHA-256 (length=${#expected_rootfs_sha}, shell=$expected_rootfs_sha_quoted)"
+fi
 [ -f "$lock_dir/SHA256SUMS" ] || fail 'lock SHA256SUMS is missing'
 [ "$(sha256sum "$lock_dir/SHA256SUMS" | awk '{print $1}')" = "$expected_manifest_sha" ] ||
   fail 'lock manifest SHA-256 differs from the pinned value'

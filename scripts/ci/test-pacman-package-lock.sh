@@ -65,6 +65,16 @@ bash "$VERIFY_SCRIPT" "$lock" "$manifest_sha" \
   3cf5764fb6fec7bffdff98787e52ccd15d5d6390a2496c7028d7c4950404c56a \
   "$tmp/requested.txt" >/dev/null || fail 'valid package lock fixture was rejected'
 
+invalid_rootfs_sha=$'3cf5764fb6fec7bffdff98787e52ccd15d5d6390a2496c7028d7c4950404c56a\n'
+if invalid_output=$(bash "$VERIFY_SCRIPT" "$lock" "$manifest_sha" \
+  "$invalid_rootfs_sha" "$tmp/requested.txt" 2>&1); then
+  fail 'rootfs SHA with a trailing newline was accepted'
+fi
+grep -Fq 'invalid rootfs SHA-256 (length=65,' <<< "$invalid_output" ||
+  fail 'invalid rootfs SHA diagnostic omitted the argument length'
+grep -Fq '\n' <<< "$invalid_output" ||
+  fail 'invalid rootfs SHA diagnostic omitted the shell-escaped hidden byte'
+
 archive="$tmp/fake-pacman-lock.tar"
 SOURCE_DATE_EPOCH=0 bash "$PACK_SCRIPT" "$lock" "$archive" >/dev/null ||
   fail 'deterministic lock archive creation failed'
