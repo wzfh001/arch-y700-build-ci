@@ -1376,3 +1376,15 @@ References to earlier experiment IDs:
 - Stop line: trigger exactly one artifact-only build with the rootfs SHA read
   and validated from `profiles/tablet-niri/pacman-lock.env`; do not publish a
   Release or treat CI success as hardware verification.
+
+### DEV-20260722-046 — Handoff update again inferred a full Git object ID
+
+- Result: `FAIL` in local handoff/plan review; no source behavior, GitHub, CI,
+  artifact, Release, or device state changed.
+- Primary variable: update the current source identity after evidence commit
+  `f094bbb`.
+- Observed: the first handoff patch again guessed the unprinted suffix and
+  wrote a nonexistent full object ID.
+- Correction: `git rev-parse f094bbb` returns
+  `f094bbb75e61f21b9d8f19e149b79bf697dac658`. Query every full Git identity;
+  never expand a short hash by inference.
