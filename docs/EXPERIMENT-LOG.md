@@ -906,8 +906,8 @@ References to earlier experiment IDs:
 
 ### CI-20260722-008 — Qualcomm libssc artifact-only rebuild authorization
 
-- Result: `AUTHORIZED/PENDING` at record creation; no artifact, Release, or
-  device write exists yet.
+- Result: `FAIL` in artifact-only workflow run `29931623980`; no rootfs, GRUB,
+  artifact, Release, or device write was produced.
 - Parent failure: `CI-20260722-007`, workflow run `29928261179`.
 - Commit: `04aa3949ae6ac5ab45b1d3bc9ef3398ef8865b67`, branch
   `codex/tablet-rescue-20260720`, repository `wzfh001/arch-y700-build-ci`.
@@ -920,6 +920,23 @@ References to earlier experiment IDs:
 - Expected result: the locked base transaction remains unchanged, both custom
   Qualcomm packages pass exact payload/ownership checks, rootfs and GRUB finish,
   and the two Actions artifacts upload without a Release.
+- New evidence: checkout, all source gates, release-mode validation, dependency
+  installation, lock resolution/download, and complete immutable lock
+  verification passed. The step environment displayed the exact pinned
+  `ARCH_ROOTFS_SHA256`, but the elevated rootfs script stopped immediately at
+  its second lock verification with
+  `pacman package lock verification failure: invalid rootfs SHA-256`.
+- Boundary: the same lock and hash passed immediately before `sudo`, so this is
+  a privileged environment-transport failure, not a package-lock-content or
+  Qualcomm payload failure. The run created zero artifacts and the repository
+  still has zero Releases.
+- Raw evidence: GitHub run
+  `https://github.com/wzfh001/arch-y700-build-ci/actions/runs/29931623980`,
+  failed job `88962544549`, step `Build rootfs image`.
+- Next hypothesis: remove reliance on `sudo --preserve-env` for the non-secret
+  rootfs SHA and pass that value explicitly through the post-`sudo` `env`
+  command, with a source regression test. This is the only authorized next
+  variable.
 - Stop line: any new collision, transaction drift, hash/ownership mismatch,
   hidden test failure, metadata leak, or missing log is a new failure. Do not
   rerun this commit unchanged after a failure.

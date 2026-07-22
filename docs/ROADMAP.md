@@ -65,9 +65,12 @@ Exit gate: raw-image content, hashes, package ownership, path, and bootarg all
   packages the complete fixed payload as native `qcom-sns-libssc` with
   `provides/conflicts/replaces=libssc`, exact member hashes, and transactional
   ordering before the sensor proxy; source commit `04aa394`.
-- Current stop: run exactly one new artifact-only build from the clean
-  `04aa394` tree. Do not retry either failed run unchanged and do not publish a
-  Release.
+- `CI FAIL`: run `29931623980` passed the immutable lock verification but the
+  rootfs script immediately rejected its rootfs SHA-256 after the `sudo`
+  boundary. No rootfs or artifact was created.
+- Current stop: record and fix only the elevated rootfs-SHA transport, add a
+  regression gate, then authorize one new artifact-only build. Do not retry
+  any failed run unchanged and do not publish a Release.
 - Pin every remaining controllable input.
 - Validate niri, service behavior, credentials policy, final configuration
   paths, package ownership, and secret absence.

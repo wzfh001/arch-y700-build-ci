@@ -12,9 +12,9 @@ functionality.
 - Current branch: `codex/tablet-rescue-20260720`
 - Current device OS: recovered Kubuntu 26.04 ARM64 baseline
 - Last flashed Arch build: workflow run `29709555909`, commit `4edf3a4`
-- Last artifact-only build attempt: workflow run `29928261179`, commit
-  `6e6f6c6`; failed before artifact creation at the stock/Qualcomm `libssc`
-  ownership collision
+- Last artifact-only build attempt: workflow run `29931623980`, commit
+  `87fe727`; failed before rootfs creation because the elevated build process
+  received an invalid `ARCH_ROOTFS_SHA256` value
 - First post-handoff source fix: commit `d480039`
 - Evidence-governance baseline: commit `34de491`
 - Offline support-bundle implementation: commit `3a095ed`
@@ -92,6 +92,11 @@ image; they do not describe the currently running filesystem.
    `/usr/bin/ssccli`; `SRC-20260722-010` packages Qualcomm `libssc` natively
    with explicit replacement semantics. A new artifact-only build is required
    to prove the final rootfs.
+9. `CI-20260722-008` passed the immutable lock download and complete pre-build
+   verification, while the same SHA-256 was rejected immediately after the
+   `sudo` boundary inside `build-arch-rootfs-image.sh`. The run produced no
+   artifacts; the elevated environment transport must be fixed and tested
+   before another build.
 
 ## Immediate release blockers
 
@@ -101,7 +106,9 @@ image; they do not describe the currently running filesystem.
   firmware path, and bootarg
 - Complete one artifact-only build using the audited pacman lock and the
   `SRC-20260722-009` sensor plus `SRC-20260722-010` `libssc` replacements; no
-  unchanged retry of runs `29924934432` or `29928261179`
+  unchanged retry of runs `29924934432`, `29928261179`, or `29931623980`
+- Explicitly bind and validate the pinned rootfs SHA-256 across the elevated
+  build boundary
 - Complete rootfs/GRUB/boot/DTB offline audit
 - Device-specific GPT verification and Firehose bundle
 - At least two independent rescue paths verified on hardware
