@@ -1328,3 +1328,51 @@ References to earlier experiment IDs:
 - Next hypothesis: isolate the device UCM profile and codec sequence under a
   non-conflicting path before one combined artifact-only build. Do not rerun
   `CI-20260722-011` with only this QCA change.
+
+### DEV-20260722-045 — ALSA package matrix used the wrong route token
+
+- Result: `FAIL` in documentation review before commit; no source behavior,
+  CI, artifact, Release, or device state changed.
+- Primary variable: describe the fixed TB321FU headphone route.
+- Observed: the first package-matrix edit wrote `CLSH_AB`, which is not the
+  value in the device UCM file. The fixed route is `RX HPH Mode=CLS_AB` with
+  `CLSH Switch=0`.
+- Correction: compare the prose with the pinned source file and use
+  `CLS_AB`. Do not reuse the rejected token.
+
+### SRC-20260722-014 — Independent TB321FU ALSA UCM source gate
+
+- Result: `SOURCE PASS`; source commit `395175c`
+  (`395175c9ca9f1cd8d36afcb9b595c02e13e6bf2f`); no new CI run, artifact,
+  Release, or device write.
+- Parent evidence: `AUDIT-20260722-003` identified the one remaining unhandled
+  fixed-device versus locked-Arch mismatch at
+  `/usr/share/alsa/ucm2/codecs/wcd939x/HeadphoneEnableSeq.conf`.
+- Primary variable: package the two `LenovoY700TB321` UCM profile files and all
+  eleven fixed device WCD939x sequence files as `tb321fu-alsa-ucm`. Device
+  codec files move to `/usr/share/alsa/ucm2/codecs/tb321fu-wcd939x`; exactly
+  seven profile includes are deterministically rewritten to that path.
+- Held constant: fixed device archive, pacman lock, generic
+  `alsa-ucm-conf-1.2.16.1-1`, QCA/WCN7850 policy, kernel, rootfs, sensor,
+  haptics, profile, credentials, and artifact-only release mode.
+- Content evidence: source and transformed manifests each pin 13 files. The
+  device headphone sequence remains 276 bytes / SHA-256
+  `333c56a133d260f696fbc817dfb7760e7c75619d0540bf62128527dd9a7438f5`
+  with `CLSH Switch=0` and `RX HPH Mode=CLS_AB`; the generic 282-byte / SHA-256
+  `f8b856216adf46b1b6a7e9e3cbd85fd50a6446c77a9ac7bb0a60dfd189adbbc0`
+  file remains unchanged and owned by `alsa-ucm-conf`.
+- Verification: the production staging function passes the fixed archive
+  fixture; the transformed tree combines with the locked generic UCM package
+  and passes `alsaucm` offline parsing; the complete 2,335-member versus
+  723-package collision audit passes at 16 intersections / 10 identical / 6
+  explicitly handled mismatches. All workflow, boundary, governance, rescue,
+  Wi-Fi, Bluetooth, ALSA, sensor, payload, profile, audio, native-package,
+  OpenPGP, pacman-signature, overlay, publication, and pacman-lock local gates
+  pass without hidden failures.
+- Remaining state: final raw ownership/content and all TB321FU audio behavior
+  are `UNTESTED`. The next build may contain both independently source-gated
+  QCA and ALSA fixes because either fix alone is already known to stop at the
+  other collision.
+- Stop line: trigger exactly one artifact-only build with the rootfs SHA read
+  and validated from `profiles/tablet-niri/pacman-lock.env`; do not publish a
+  Release or treat CI success as hardware verification.

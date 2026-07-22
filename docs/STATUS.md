@@ -34,10 +34,13 @@ functionality.
 - Rootfs SHA byte-diagnostic gate: `SRC-20260722-012`, commit `72c6bd5`
 - QCA Bluetooth firmware native-package source gate: `SRC-20260722-013`,
   commit `782dd08`
+- ALSA UCM independent-path native-package source gate: `SRC-20260722-014`,
+  commit `395175c`
 - Latest artifact-only attempt: `CI-20260722-011`, run `29933523257`, failed
   on a deterministic QCA Bluetooth firmware content collision before artifact
-  creation; that QCA collision is now source-gated, while the complete offline
-  overlap audit exposed one remaining ALSA UCM content collision
+  creation; the complete offline overlap audit found six mismatches, and all
+  six now have explicit source-gated package policies, but no post-fix artifact
+  exists yet
 - Release state: artifact-only; no approved Arch hardware release
 
 ## Evidence states
@@ -135,6 +138,13 @@ image; they do not describe the currently running filesystem.
     Wi-Fi plus four QCA differences now have explicit package policies; the
     remaining mismatch is the TB321FU headphone UCM sequence versus
     `alsa-ucm-conf`, so a build containing only the Bluetooth fix is forbidden.
+14. `SRC-20260722-014` packages the complete 13-file TB321FU UCM source set as
+    `tb321fu-alsa-ucm`, rewrites seven device-profile includes to
+    `/usr/share/alsa/ucm2/codecs/tb321fu-wcd939x`, and retains the generic
+    `alsa-ucm-conf` WCD939x tree unchanged. The fixed archive fixture, locked
+    generic-package combination, `alsaucm` parser, full archive-overlap audit,
+    and complete local P3 test matrix pass. Final raw and hardware audio remain
+    `UNTESTED`.
 
 ## Immediate release blockers
 
@@ -144,14 +154,13 @@ image; they do not describe the currently running filesystem.
   firmware path, and bootarg
 - Final-raw proof for the device-specific QCA Bluetooth package, hashes,
   ownership, firmware path, and bootarg
-- Isolate and source-gate the TB321FU ALSA UCM profile without overwriting the
-  generic `alsa-ucm-conf` WCD939x codec path
-- Complete one artifact-only build using the audited pacman lock and the
-  `SRC-20260722-009` sensor plus `SRC-20260722-010` `libssc` replacements; no
-  unchanged retry of runs `29924934432`, `29928261179`, or `29931623980`
-- Complete one artifact-only build only after the independent QCA Bluetooth
-  and ALSA UCM packages both pass their source gates; the rootfs SHA must be
-  read and validated from `profiles/tablet-niri/pacman-lock.env`
+- Final-raw proof for `tb321fu-alsa-ucm`, all 13 transformed hashes, seven
+  includes, package ownership, parser result, and unchanged generic UCM path
+- Complete exactly one artifact-only build containing the independently gated
+  QCA Bluetooth and ALSA UCM packages plus the `SRC-20260722-009` sensor and
+  `SRC-20260722-010` `libssc` replacements; the rootfs SHA must be read and
+  validated from `profiles/tablet-niri/pacman-lock.env`, with no unchanged
+  retry of prior failed runs
 - Complete rootfs/GRUB/boot/DTB offline audit
 - Device-specific GPT verification and Firehose bundle
 - At least two independent rescue paths verified on hardware

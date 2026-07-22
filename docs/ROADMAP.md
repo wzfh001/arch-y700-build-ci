@@ -97,10 +97,20 @@ Exit gate: raw-image content, hashes, package ownership, path, and bootarg all
   The remaining unhandled mismatch is
   `/usr/share/alsa/ucm2/codecs/wcd939x/HeadphoneEnableSeq.conf` from
   `alsa-ucm-conf-1.2.16.1-1`.
-- Current stop: package the TB321FU UCM profile and its fixed WCD939x sequences
-  under an independent codec path, rewrite and hash-gate all device includes,
-  and retain the generic `alsa-ucm-conf` files and ownership. Do not run a
-  Bluetooth-only rebuild or weaken the generic collision guard.
+- `SOURCE PASS`: `SRC-20260722-014` / commit `395175c` locks the complete
+  13-file device UCM source, moves all eleven device codec sequences to
+  `/usr/share/alsa/ucm2/codecs/tb321fu-wcd939x`, rewrites exactly seven
+  includes, retains the generic Arch path, and passes offline `alsaucm`
+  parsing with the locked package.
+- `LOCAL GATE PASS`: all current P3 workflow, boundary, governance, rescue,
+  firmware, UCM, sensor, payload, profile, audio, native-package, signature,
+  overlay, publication, and pacman-lock tests pass. The full archive collision
+  audit remains 2,335 device members / 723 packages / 16 intersections / ten
+  identical / six explicitly handled mismatches.
+- Current stop: record the source identities, push the branch, and trigger
+  exactly one artifact-only build with the rootfs SHA read from the committed
+  lock profile. Do not hand-transcribe the SHA, publish a Release, or retry an
+  unchanged failure.
 - Pin every remaining controllable input.
 - Validate niri, service behavior, credentials policy, final configuration
   paths, package ownership, and secret absence.
