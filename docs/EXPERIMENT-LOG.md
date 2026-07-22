@@ -724,3 +724,25 @@ References to earlier experiment IDs:
 - Next authorized experiment: one new artifact-only CI build from a committed
   clean tree. It must reference `CI-20260722-005` and this source gate; a
   Release or device write remains forbidden.
+
+### CI-20260722-006 — Native sensor proxy artifact-only rebuild
+
+- Result: `NOT TESTED` at authorization time.
+- Parent failure: `CI-20260722-005`, workflow run `29924934432`.
+- Source evidence: `SRC-20260722-009`, implementation commit
+  `68898adc3e502c6adac2b8191a52bfed7aad70c7`, source-record commit
+  `acb594f`.
+- Primary and only functional variable: remove the fixed Qualcomm SSC sensor
+  proxy from the generic imported package and install it transactionally as
+  native Arch package `qcom-sns-iio-sensor-proxy` after the same audited
+  pacman transaction. All URLs, hashes, package lock, profile, image size,
+  credentials policy, boot inputs, output prefix, and artifact-only release
+  mode remain unchanged from the failed run.
+- Expected result: the locked base set still matches all 830 expected packages;
+  stock `iio-sensor-proxy` is then replaced, the custom package owns all nine
+  payload/provenance paths, rootfs and GRUB complete, and two Actions artifacts
+  upload. `release_tag` must remain empty and no Release may be created.
+- Stop line: any different collision, package transaction drift, ownership
+  mismatch, checksum failure, hidden test failure, or metadata leak is a new
+  failure. Record it before considering another run; never rerun this commit
+  unchanged without new evidence.
