@@ -105,9 +105,13 @@ done
 for token in \
   'LOCK_ARCHIVE_SHA256' \
   'ci_extract_archive "$lock_archive" "$expanded"' \
+  'env ARCH_ROOTFS_SHA256="$ARCH_ROOTFS_SHA256" OUTPUT_DIR="$OUTPUT_DIR_ROOTFS"' \
   'out/pacman-lock/*-pacman-lock.tar'; do
   grep -Fq "$token" "$BUILD_WORKFLOW" || fail "lock transport policy is missing: $token"
 done
+if grep -Fq 'preserve-env=OUTPUT_PREFIX,ARCH_ROOTFS_URL,ARCH_ROOTFS_SHA256,' "$BUILD_WORKFLOW"; then
+  fail 'rootfs SHA still relies on sudo environment preservation'
+fi
 if grep -Fq 'path: out/pacman-lock/' "$BUILD_WORKFLOW"; then
   fail 'workflow still uploads epoch package filenames as artifact paths'
 fi
