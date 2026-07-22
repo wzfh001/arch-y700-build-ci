@@ -71,9 +71,12 @@ Exit gate: raw-image content, hashes, package ownership, path, and bootarg all
 - `SOURCE PASS`: `SRC-20260722-011` explicitly passes the non-secret rootfs
   SHA through the post-`sudo` `env` command and adds a regression gate that
   rejects returning it to `sudo --preserve-env`; source commit `f3b4bb4`.
-- Current stop: run exactly one new artifact-only build from the clean
-  `f3b4bb4` source tree. Do not retry any failed run unchanged and do not
-  publish a Release.
+- `CI FAIL`: run `29932470727` still reported an invalid rootfs SHA after that
+  explicit binding, falsifying the single-variable transport hypothesis. It
+  also produced zero artifacts.
+- Current stop: add fail-closed byte-level diagnostics to the verifier and run
+  one diagnostic artifact-only experiment. Do not apply another speculative
+  transport fix, retry any failed run unchanged, or publish a Release.
 - Pin every remaining controllable input.
 - Validate niri, service behavior, credentials policy, final configuration
   paths, package ownership, and secret absence.

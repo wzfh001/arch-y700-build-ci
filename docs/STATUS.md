@@ -12,9 +12,9 @@ functionality.
 - Current branch: `codex/tablet-rescue-20260720`
 - Current device OS: recovered Kubuntu 26.04 ARM64 baseline
 - Last flashed Arch build: workflow run `29709555909`, commit `4edf3a4`
-- Last artifact-only build attempt: workflow run `29931623980`, commit
-  `87fe727`; failed before rootfs creation because the elevated build process
-  received an invalid `ARCH_ROOTFS_SHA256` value
+- Last artifact-only build attempt: workflow run `29932470727`, commit
+  `10bc837`; failed before rootfs creation because the rootfs verifier still
+  received an invalid `ARCH_ROOTFS_SHA256` value after explicit binding
 - First post-handoff source fix: commit `d480039`
 - Evidence-governance baseline: commit `34de491`
 - Offline support-bundle implementation: commit `3a095ed`
@@ -102,7 +102,9 @@ image; they do not describe the currently running filesystem.
 10. `SRC-20260722-011` removes the rootfs SHA from the `sudo --preserve-env`
     dependency and binds it explicitly through the post-`sudo` `env` command.
     The workflow and lock regression gates reject restoration of the fragile
-    transport path.
+    transport path. `CI-20260722-009` falsified the hypothesis that
+    `sudo --preserve-env` alone caused the invalid value; byte-level diagnostics
+    are now required before another functional fix.
 
 ## Immediate release blockers
 
@@ -113,7 +115,8 @@ image; they do not describe the currently running filesystem.
 - Complete one artifact-only build using the audited pacman lock and the
   `SRC-20260722-009` sensor plus `SRC-20260722-010` `libssc` replacements; no
   unchanged retry of runs `29924934432`, `29928261179`, or `29931623980`
-- Prove `SRC-20260722-011` in one new artifact-only CI run
+- Capture the exact byte length and shell representation of the invalid
+  rootfs-SHA argument before attempting another transport fix
 - Complete rootfs/GRUB/boot/DTB offline audit
 - Device-specific GPT verification and Firehose bundle
 - At least two independent rescue paths verified on hardware

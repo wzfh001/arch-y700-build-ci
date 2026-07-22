@@ -964,7 +964,8 @@ References to earlier experiment IDs:
 
 ### CI-20260722-009 — Elevated rootfs SHA artifact-only rebuild authorization
 
-- Result: `AUTHORIZED/PENDING` at record creation.
+- Result: `FAIL` in artifact-only workflow run `29932470727`; no rootfs, GRUB,
+  artifact, Release, or device write was produced.
 - Parent failure: `CI-20260722-008`, workflow run `29931623980`.
 - Source evidence: `SRC-20260722-011`, implementation commit
   `f3b4bb44be9e87f91c9421963fe46513c11ee05e`.
@@ -977,6 +978,20 @@ References to earlier experiment IDs:
 - Expected result: both pre- and post-`sudo` lock verification accept the same
   rootfs SHA, the build reaches the Qualcomm package gates, rootfs and GRUB
   complete, and two artifacts upload without a Release.
+- Observed: the workflow source showed the new explicit
+  `env ARCH_ROOTFS_SHA256="$ARCH_ROOTFS_SHA256"` binding and the step environment
+  displayed the expected 64 hexadecimal characters, but the rootfs verifier
+  still stopped with `invalid rootfs SHA-256` before image creation.
+- Conclusion: `sudo --preserve-env` was not the sole cause; the
+  `SRC-20260722-011` hypothesis is falsified. The current log does not expose
+  argument length or hidden bytes, so another functional transport change is
+  forbidden until byte-level diagnostic evidence exists.
+- Raw evidence: GitHub run
+  `https://github.com/wzfh001/arch-y700-build-ci/actions/runs/29932470727`,
+  failed job `88965492451`, zero artifacts.
+- Next authorized variable: improve the fail-closed verifier error to report
+  the non-secret argument length and shell-escaped representation, with a
+  regression test, then execute one diagnostic artifact-only run.
 - Stop line: any new failure must be logged before another run; never rerun the
   same commit unchanged.
 
