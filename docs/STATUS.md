@@ -11,7 +11,10 @@ functionality.
 - Device: Lenovo Y700 2025, TB321FU, SM8650, 16 GiB + 512 GiB
 - Current branch: `codex/tablet-rescue-20260720`
 - Current device OS: recovered Kubuntu 26.04 ARM64 baseline
-- Last attempted Arch build: workflow run `29709555909`, commit `4edf3a4`
+- Last flashed Arch build: workflow run `29709555909`, commit `4edf3a4`
+- Last artifact-only build attempt: workflow run `29924934432`, commit
+  `e87d90c`; failed before artifact creation at the stock/Qualcomm sensor proxy
+  ownership collision
 - First post-handoff source fix: commit `d480039`
 - Evidence-governance baseline: commit `34de491`
 - Offline support-bundle implementation: commit `3a095ed`
@@ -21,7 +24,10 @@ functionality.
 - Bluetooth NAP coordinator: commit `406e0c1`
 - Rescue CI integration: commit `eaf0650`
 - P2 WCN7850 exact-hash/native-package source gate: `SRC-20260722-005`
-- P3 two-stage pacman lock mechanism: `SRC-20260722-007`; lock artifact unset
+- P3 pacman lock: seed run `29921200387`, immutable transaction audit
+  `AUDIT-20260722-002`, committed pin `e87d90c`
+- Qualcomm SSC sensor proxy native replacement source gate:
+  `SRC-20260722-009`; complete candidate build still pending
 - Release state: artifact-only; no approved Arch hardware release
 
 ## Evidence states
@@ -77,6 +83,11 @@ image; they do not describe the currently running filesystem.
    rejects differing Arch-owned imports. A new final raw and hardware test are
    still required before Wi-Fi can leave `BROKEN` for the historical image or
    become `VERIFIED` for a new candidate.
+8. `CI-20260722-005` proved that the fixed Qualcomm SSC sensor proxy differs
+   from the locked stock `iio-sensor-proxy`; silently dropping either payload
+   is forbidden. `SRC-20260722-009` stages the Qualcomm proxy as an independent
+   native Arch package with explicit transactional replacement and ownership
+   checks. A new artifact-only build is required to prove the final rootfs.
 
 ## Immediate release blockers
 
@@ -84,8 +95,9 @@ image; they do not describe the currently running filesystem.
 - Verify USB role/UDC/ACM/NCM and Bluetooth NAP on TB321FU hardware
 - Final-raw proof for the device-specific WCN7850 package, hashes, ownership,
   firmware path, and bootarg
-- Run and pin the immutable pacman lock seed, then prove the locked offline
-  transaction in a complete final raw build
+- Complete one artifact-only build using the audited pacman lock and the
+  `SRC-20260722-009` sensor replacement; no unchanged retry of run
+  `29924934432`
 - Complete rootfs/GRUB/boot/DTB offline audit
 - Device-specific GPT verification and Firehose bundle
 - At least two independent rescue paths verified on hardware

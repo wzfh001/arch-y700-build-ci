@@ -45,7 +45,7 @@ udisks2 2.11.1-2
 power-profiles-daemon 0.30-1
 nftables 1:1.1.6-3
 zram-generator 1.2.1-1
-iio-sensor-proxy 3.9-1
+iio-sensor-proxy 3.9-1 (locked bootstrap input; replaced before image finalization)
 feedbackd 0.8.9-2
 alsa-ucm-conf 1.2.16.1-1
 alsa-utils 1.2.16-1
@@ -54,6 +54,15 @@ pipewire-alsa 1:1.6.8-1
 pipewire-pulse 1:1.6.8-1
 wireplumber 0.5.15-1
 ```
+
+The locked stock `iio-sensor-proxy` is deliberately installed as part of the
+audited repository transaction, then transactionally replaced by native Arch
+package `qcom-sns-iio-sensor-proxy`. Its fixed Debian source package is
+`qcom-sns-iio-sensor-proxy_20260627.1_arm64.deb`, SHA-256
+`b010a9a783629c4e0fd4c404b1a34e14258fab8a674d0499d553d361cb59a843`.
+The replacement explicitly provides/conflicts/replaces `iio-sensor-proxy` and
+keeps the Qualcomm SSC-enabled daemon under pacman ownership; differing files
+are never silently discarded from the generic imported payload.
 
 ### Graphics and portals
 

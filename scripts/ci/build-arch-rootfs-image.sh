@@ -89,6 +89,10 @@ TB321FU_DEVICE_ARCHIVE_SHA256='047c1baccc420f1c28bf6d761cfc811dd7aeccfcbab6d0374
 TB321FU_WIFI_OVERLAY_DEB='y700-daily-rootfs-overlay_0.1+20260624-201420_arm64.deb'
 TB321FU_WIFI_OVERLAY_DEB_SHA256='9b45ab04d455cfcc24ed40779e9522930543330151c254e87a2aee7f381db5bc'
 TB321FU_WIFI_FIRMWARE_MANIFEST="$REPO_ROOT/profiles/tablet-niri/wifi-firmware.sha256"
+TB321FU_SENSOR_PROXY_PACKAGE='qcom-sns-iio-sensor-proxy'
+TB321FU_SENSOR_PROXY_VERSION='20260627.1'
+TB321FU_SENSOR_PROXY_DEB='qcom-sns-iio-sensor-proxy_20260627.1_arm64.deb'
+TB321FU_SENSOR_PROXY_DEB_SHA256='b010a9a783629c4e0fd4c404b1a34e14258fab8a674d0499d553d361cb59a843'
 
 OUTPUT_DIR=${OUTPUT_DIR:-out/ci-rootfs}
 OUTPUT_PREFIX=${OUTPUT_PREFIX:-y700-archlinuxarm}
@@ -180,6 +184,7 @@ rootfs_dir="$work_dir/rootfs"
 arch_import_stage="$work_dir/arch-import-stage"
 arch_import_sources="$work_dir/arch-import-sources.tsv"
 arch_camera_supplement_stage="$work_dir/arch-camera-supplement-stage"
+arch_sensor_proxy_stage="$work_dir/qcom-sns-iio-sensor-proxy-stage"
 rootfs_img="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.img"
 build_info="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.BUILD-INFO.txt"
 manifest="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.manifest"
@@ -187,6 +192,7 @@ third_party_manifest="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.third-party-assets.man
 requested_packages_file="$work_dir/requested-packages.txt"
 mounted_rootfs=0
 bind_mounts=()
+tb321fu_sensor_proxy_staged=0
 
 cleanup() {
   set +e
@@ -460,9 +466,13 @@ verify_required_y700_payload() {
     usr/share/qcom/sm8650/Lenovo/tb321fu/sensors/registry
     usr/share/qcom/sm8650/Lenovo/tb321fu/sensors/config
     usr/share/qcom/conf.d/tb321fu.yaml
+    usr/bin/monitor-sensor
+    usr/libexec/iio-sensor-proxy
     etc/systemd/system/multi-user.target.wants/iio-sensor-proxy.service
     etc/systemd/system/iio-sensor-proxy.service.d/99-qcom-sns.conf
     usr/lib/udev/rules.d/80-tb321fu-qcom-sns.rules
+    usr/share/tb321fu-sensor-proxy/SHA256SUMS
+    usr/share/tb321fu-sensor-proxy/SOURCE.txt
     usr/lib/systemd/system/tb321fu-haptics.service
     etc/systemd/system/multi-user.target.wants/tb321fu-haptics.service
     usr/libexec/tb321fu-haptics/bind-aw86937
@@ -1581,7 +1591,7 @@ apply_tablet_niri_profile() {
 
 freeze_tablet_niri_custom_packages() {
   local root=$1
-  local ignore_packages='noctalia wvkbd paru tb321fu-imported-release-payload tb321fu-camera-stack tb321fu-wifi-firmware tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli'
+  local ignore_packages='noctalia wvkbd paru tb321fu-imported-release-payload qcom-sns-iio-sensor-proxy tb321fu-camera-stack tb321fu-wifi-firmware tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli'
 
   if grep -Eq '^[[:space:]]*IgnorePkg[[:space:]]*=' "$root/etc/pacman.conf"; then
     ci_die "tablet-niri refuses to merge an existing IgnorePkg policy"
@@ -1618,11 +1628,12 @@ verify_tablet_niri_profile() {
   local package path mode hash_field target
   local -a required_packages=(
     noctalia wvkbd paru dnsmasq
-    tb321fu-wifi-firmware
+    tb321fu-wifi-firmware qcom-sns-iio-sensor-proxy
     tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli
   )
   local -a forbidden_packages=(
     plasma-meta plasma-desktop plasma-workspace sddm plasma-keyboard
+    iio-sensor-proxy
   )
   local -a custom_executables=(
     /opt/zen-browser/zen
@@ -1785,14 +1796,168 @@ apply_device_payloads() {
   fi
 }
 
+write_tb321fu_sensor_proxy_checksums() {
+  cat <<'SENSOR_PROXY_SHA256'
+aba9db5ea5c8768a1ab9f531a418caa815b824b54cfe6b85266ad9a7df54dea7  ./usr/bin/monitor-sensor
+c95c921c82fffbd340fa68f2c32c7959b0b7fb0ad2a3ca6e5d9978958ba04922  ./usr/lib/systemd/system/iio-sensor-proxy.service
+3d50c919f17e5140921fd6629f7d51ed89daef3a345e6ebaf70610c6299397d6  ./usr/lib/udev/rules.d/80-iio-sensor-proxy.rules
+7d7689708c5951b97df79814ea6a06d18f4d5bb7b40765afd3d5a880c05aabd5  ./usr/libexec/iio-sensor-proxy
+563750af5136988426bb3b615fbc91d57b712c4638b6b160338bbc92498ec11a  ./usr/share/dbus-1/system-services/net.hadess.SensorProxy.service
+33c9d5ee47c839a640ce549c57ef91b85ccab7dd4a8097c3225662655030fb25  ./usr/share/dbus-1/system.d/net.hadess.SensorProxy.conf
+035194978c2d9f3ca53af81e1936334ffd97f6efeabdf44420f52e74dc8fcea9  ./usr/share/polkit-1/actions/net.hadess.SensorProxy.policy
+SENSOR_PROXY_SHA256
+}
+
+validate_tb321fu_sensor_proxy_payload() {
+  local stage=$1
+  local actual_files expected_files special path mode
+
+  [ -d "$stage" ] || ci_die "TB321FU sensor proxy stage is missing: $stage"
+  special=$(find "$stage" -mindepth 1 ! -type d ! -type f -print -quit)
+  [ -z "$special" ] || ci_die "unsupported TB321FU sensor proxy member: $special"
+  actual_files=$(cd "$stage" && find . -type f -printf '%p\n' | LC_ALL=C sort)
+  expected_files=$(cat <<'SENSOR_PROXY_FILES'
+./usr/bin/monitor-sensor
+./usr/lib/systemd/system/iio-sensor-proxy.service
+./usr/lib/udev/rules.d/80-iio-sensor-proxy.rules
+./usr/libexec/iio-sensor-proxy
+./usr/share/dbus-1/system-services/net.hadess.SensorProxy.service
+./usr/share/dbus-1/system.d/net.hadess.SensorProxy.conf
+./usr/share/polkit-1/actions/net.hadess.SensorProxy.policy
+SENSOR_PROXY_FILES
+)
+  [ "$actual_files" = "$expected_files" ] || \
+    ci_die "TB321FU sensor proxy payload member list mismatch"
+
+  (
+    cd "$stage"
+    write_tb321fu_sensor_proxy_checksums | sha256sum -c -
+  ) || ci_die "TB321FU sensor proxy payload checksum mismatch"
+
+  for path in usr/bin/monitor-sensor usr/libexec/iio-sensor-proxy; do
+    mode=$(stat -c '%a' "$stage/$path")
+    [ "$mode" = 755 ] || ci_die "TB321FU sensor proxy executable has wrong mode $mode: /$path"
+    assert_aarch64_elf "$stage/$path"
+  done
+  while IFS= read -r path; do
+    mode=$(stat -c '%a' "$stage/$path")
+    [ "$mode" = 644 ] || ci_die "TB321FU sensor proxy data has wrong mode $mode: /$path"
+  done <<'SENSOR_PROXY_DATA_FILES'
+usr/lib/systemd/system/iio-sensor-proxy.service
+usr/lib/udev/rules.d/80-iio-sensor-proxy.rules
+usr/share/dbus-1/system-services/net.hadess.SensorProxy.service
+usr/share/dbus-1/system.d/net.hadess.SensorProxy.conf
+usr/share/polkit-1/actions/net.hadess.SensorProxy.policy
+SENSOR_PROXY_DATA_FILES
+  grep -Fxq 'ExecStart=/usr/libexec/iio-sensor-proxy' \
+    "$stage/usr/lib/systemd/system/iio-sensor-proxy.service" || \
+    ci_die "TB321FU sensor proxy service does not use the Qualcomm SSC binary"
+  grep -Fxq 'Exec=/usr/libexec/iio-sensor-proxy' \
+    "$stage/usr/share/dbus-1/system-services/net.hadess.SensorProxy.service" || \
+    ci_die "TB321FU sensor proxy D-Bus activation does not use the Qualcomm SSC binary"
+}
+
+stage_tb321fu_sensor_proxy_deb() {
+  local deb=$1
+  local package version architecture deb_sha
+
+  [ "$tb321fu_sensor_proxy_staged" = 0 ] || \
+    ci_die "multiple TB321FU sensor proxy packages were supplied"
+  [ "$(basename "$deb")" = "$TB321FU_SENSOR_PROXY_DEB" ] || \
+    ci_die "unexpected TB321FU sensor proxy package filename: $(basename "$deb")"
+  deb_sha=$(sha256sum "$deb" | awk '{print $1}')
+  [ "$deb_sha" = "$TB321FU_SENSOR_PROXY_DEB_SHA256" ] || \
+    ci_die "TB321FU sensor proxy package checksum mismatch: $deb_sha"
+  package=$(dpkg-deb -f "$deb" Package)
+  version=$(dpkg-deb -f "$deb" Version)
+  architecture=$(dpkg-deb -f "$deb" Architecture)
+  [ "$package" = "$TB321FU_SENSOR_PROXY_PACKAGE" ] || \
+    ci_die "unexpected TB321FU sensor proxy package identity: $package"
+  [ "$version" = "$TB321FU_SENSOR_PROXY_VERSION" ] || \
+    ci_die "unexpected TB321FU sensor proxy package version: $version"
+  [ "$architecture" = arm64 ] || \
+    ci_die "unexpected TB321FU sensor proxy package architecture: $architecture"
+  [ ! -e "$arch_sensor_proxy_stage" ] || \
+    ci_die "TB321FU sensor proxy stage already exists"
+
+  mkdir -p "$arch_sensor_proxy_stage"
+  dpkg-deb -x "$deb" "$arch_sensor_proxy_stage"
+  remove_legacy_y700_payload "$arch_sensor_proxy_stage"
+  remove_legacy_camera_payload "$arch_sensor_proxy_stage"
+  ci_normalize_system_payload_modes "$arch_sensor_proxy_stage"
+  ci_assert_normalized_system_payload_modes "$arch_sensor_proxy_stage"
+  validate_tb321fu_sensor_proxy_payload "$arch_sensor_proxy_stage"
+
+  install -d -m 0755 "$arch_sensor_proxy_stage/usr/share/tb321fu-sensor-proxy"
+  write_tb321fu_sensor_proxy_checksums > \
+    "$arch_sensor_proxy_stage/usr/share/tb321fu-sensor-proxy/SHA256SUMS"
+  cat > "$arch_sensor_proxy_stage/usr/share/tb321fu-sensor-proxy/SOURCE.txt" <<SOURCE
+device=Lenovo Y700 2025 TB321FU
+source_archive=${SENSOR_DEB_ARCHIVE:-local-directory}
+source_archive_sha256=${SENSOR_DEB_ARCHIVE_SHA256:-not-applicable}
+source_package=$TB321FU_SENSOR_PROXY_DEB
+source_package_sha256=$TB321FU_SENSOR_PROXY_DEB_SHA256
+source_package_identity=$TB321FU_SENSOR_PROXY_PACKAGE
+source_package_version=$TB321FU_SENSOR_PROXY_VERSION
+replacement_policy=provides-conflicts-replaces:iio-sensor-proxy
+SOURCE
+  tb321fu_sensor_proxy_staged=1
+  ci_log "staged pinned Qualcomm SSC sensor proxy for native Arch replacement"
+}
+
+install_tb321fu_sensor_proxy_package() {
+  local owner
+  local -a sensor_proxy_dependencies=(
+    glibc dbus glib2 libgudev polkit tb321fu-imported-release-payload
+  )
+  local -a sensor_proxy_provides=(iio-sensor-proxy)
+  local -a sensor_proxy_conflicts=(iio-sensor-proxy)
+  local -a sensor_proxy_replaces=(iio-sensor-proxy)
+
+  [ "$tb321fu_sensor_proxy_staged" = 1 ] || return 0
+  owner=$(arch_chroot /usr/bin/pacman -Qoq /usr/bin/monitor-sensor 2>/dev/null || true)
+  [ "$owner" = iio-sensor-proxy ] || \
+    ci_die "locked stock sensor proxy has unexpected owner before replacement: $owner"
+  arch_chroot /usr/bin/pacman -Q iio-sensor-proxy >/dev/null || \
+    ci_die "locked stock iio-sensor-proxy package is missing before replacement"
+
+  install_arch_native_stage_package \
+    "$TB321FU_SENSOR_PROXY_PACKAGE" \
+    'Pinned Qualcomm SSC sensor proxy from the TB321FU sensor payload' \
+    "$arch_sensor_proxy_stage" \
+    sensor_proxy_dependencies sensor_proxy_provides sensor_proxy_conflicts sensor_proxy_replaces
+
+  if arch_chroot /usr/bin/pacman -Q iio-sensor-proxy >/dev/null 2>&1; then
+    ci_die "stock iio-sensor-proxy package remains after Qualcomm replacement"
+  fi
+  [ ! -e "$rootfs_dir/usr/lib/iio-sensor-proxy" ] || \
+    ci_die "stock iio-sensor-proxy executable remains after Qualcomm replacement"
+  owner=$(arch_chroot /usr/bin/pacman -Qoq /usr/bin/monitor-sensor)
+  [ "$owner" = "$TB321FU_SENSOR_PROXY_PACKAGE" ] || \
+    ci_die "Qualcomm monitor-sensor has wrong package owner: $owner"
+  owner=$(arch_chroot /usr/bin/pacman -Qoq /usr/libexec/iio-sensor-proxy)
+  [ "$owner" = "$TB321FU_SENSOR_PROXY_PACKAGE" ] || \
+    ci_die "Qualcomm sensor proxy daemon has wrong package owner: $owner"
+  (
+    cd "$rootfs_dir"
+    sha256sum -c ./usr/share/tb321fu-sensor-proxy/SHA256SUMS
+  ) || ci_die "installed Qualcomm sensor proxy checksum mismatch"
+  tb321fu_sensor_proxy_staged=2
+}
+
 extract_tb321fu_deb_payload_dir() {
   local payload_dir=$1
   local label=$2
-  local deb stage found=0
+  local deb stage package found=0
 
   while IFS= read -r -d '' deb; do
     found=1
     ci_log "extracting $label deb data: $(basename "$deb")"
+    package=$(dpkg-deb -f "$deb" Package)
+    if [ "$label" = sensor ] && [ "$package" = "$TB321FU_SENSOR_PROXY_PACKAGE" ]; then
+      stage_tb321fu_sensor_proxy_deb "$deb"
+      continue
+    fi
     stage="$work_dir/${label}-stage-$(basename "$deb").d"
     rm -rf "$stage"
     mkdir -p "$stage"
@@ -1818,6 +1983,10 @@ apply_tb321fu_deb_payloads() {
   fi
   if [ -n "$SENSOR_DEB_DIR" ]; then
     extract_tb321fu_deb_payload_dir "$SENSOR_DEB_DIR" sensor
+  fi
+  if [ -n "$SENSOR_DEB_ARCHIVE" ] || [ -n "$SENSOR_DEB_DIR" ]; then
+    [ "$tb321fu_sensor_proxy_staged" = 1 ] || \
+      ci_die "TB321FU sensor payload did not provide the pinned Qualcomm sensor proxy"
   fi
 
   if [ -n "$HAPTICS_DEB_ARCHIVE" ]; then
@@ -2138,7 +2307,9 @@ GPU_HOOK
 
 verify_tb321fu_native_package_integrity() {
   local package path owner
-  local -a packages=(tb321fu-camera-stack tb321fu-wifi-firmware)
+  local -a packages=(
+    tb321fu-camera-stack tb321fu-wifi-firmware qcom-sns-iio-sensor-proxy
+  )
   local -a camera_paths=(
     /etc/ld.so.conf.d/y700-device.conf
     /opt/libcamera-y700/bin/cam
@@ -2167,6 +2338,17 @@ verify_tb321fu_native_package_integrity() {
     /usr/share/tb321fu-wifi-firmware/SHA256SUMS
     /usr/share/tb321fu-wifi-firmware/SOURCE.txt
   )
+  local -a sensor_proxy_paths=(
+    /usr/bin/monitor-sensor
+    /usr/libexec/iio-sensor-proxy
+    /usr/lib/systemd/system/iio-sensor-proxy.service
+    /usr/lib/udev/rules.d/80-iio-sensor-proxy.rules
+    /usr/share/dbus-1/system-services/net.hadess.SensorProxy.service
+    /usr/share/dbus-1/system.d/net.hadess.SensorProxy.conf
+    /usr/share/polkit-1/actions/net.hadess.SensorProxy.policy
+    /usr/share/tb321fu-sensor-proxy/SHA256SUMS
+    /usr/share/tb321fu-sensor-proxy/SOURCE.txt
+  )
 
   if arch_chroot /usr/bin/pacman -Q tb321fu-imported-release-payload >/dev/null 2>&1; then
     packages+=(tb321fu-imported-release-payload)
@@ -2191,6 +2373,21 @@ verify_tb321fu_native_package_integrity() {
     [ "$owner" = tb321fu-wifi-firmware ] || \
       ci_die "TB321FU Wi-Fi payload has wrong pacman owner $owner: $path"
   done
+  for path in "${sensor_proxy_paths[@]}"; do
+    owner=$(arch_chroot /usr/bin/pacman -Qoq "$path") || \
+      ci_die "TB321FU sensor proxy payload is not pacman-owned: $path"
+    [ "$owner" = qcom-sns-iio-sensor-proxy ] || \
+      ci_die "TB321FU sensor proxy payload has wrong pacman owner $owner: $path"
+  done
+  if arch_chroot /usr/bin/pacman -Q iio-sensor-proxy >/dev/null 2>&1; then
+    ci_die "stock iio-sensor-proxy package remains installed"
+  fi
+  [ ! -e "$rootfs_dir/usr/lib/iio-sensor-proxy" ] || \
+    ci_die "stock iio-sensor-proxy executable remains installed"
+  (
+    cd "$rootfs_dir"
+    sha256sum -c ./usr/share/tb321fu-sensor-proxy/SHA256SUMS
+  ) || ci_die "final TB321FU sensor proxy checksum mismatch"
   owner=$(arch_chroot /usr/bin/pacman -Qoq \
     /usr/lib/firmware/ath12k/WCN7850/hw2.0/board-2.bin) || \
     ci_die "generic WCN7850 board file is not pacman-owned"
@@ -2575,6 +2772,7 @@ apply_device_payloads
 apply_tb321fu_deb_payloads
 install_tb321fu_wifi_firmware_package
 install_arch_import_package
+install_tb321fu_sensor_proxy_package
 apply_tb321fu_camera_stack
 
 overlay_stage=
@@ -2681,6 +2879,9 @@ device_deb_archive_sha256=${DEVICE_DEB_ARCHIVE_SHA256:-}
 device_deb_dir=${DEVICE_DEB_DIR:-}
 sensor_deb_archive=${SENSOR_DEB_ARCHIVE:-}
 sensor_deb_dir=${SENSOR_DEB_DIR:-}
+sensor_proxy_package=$TB321FU_SENSOR_PROXY_PACKAGE
+sensor_proxy_source_package=$TB321FU_SENSOR_PROXY_DEB
+sensor_proxy_source_package_sha256=$TB321FU_SENSOR_PROXY_DEB_SHA256
 haptics_deb_archive=${HAPTICS_DEB_ARCHIVE:-}
 haptics_deb_dir=${HAPTICS_DEB_DIR:-}
 camera_stack_archive=${CAMERA_STACK_ARCHIVE:-}

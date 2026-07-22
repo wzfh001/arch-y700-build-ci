@@ -51,9 +51,16 @@ Exit gate: raw-image content, hashes, package ownership, path, and bootarg all
   `SRC-20260722-006` proved the historical ALARM archive is unavailable. The
   seed freezes repository databases, exact packages/signatures and expected
   package state; the build consumes the pinned artifact under `unshare --net`.
-- Current stop: the seed artifact and `profiles/tablet-niri/pacman-lock.env`
-  are still unset. No rootfs candidate may build until the immutable run,
-  artifact name, manifest SHA and rootfs SHA are committed.
+- `AUDIT PASS`: seed run `29921200387` and all 723 locked package/signature/
+  database bindings passed `AUDIT-20260722-002`; the immutable pin is committed
+  in `profiles/tablet-niri/pacman-lock.env` at `e87d90c`.
+- `CI FAIL`: artifact-only run `29924934432` stopped before producing an image
+  because the Qualcomm SSC sensor proxy differs from stock
+  `iio-sensor-proxy`. `SRC-20260722-009` adds a dedicated native package with
+  explicit `provides/conflicts/replaces`, exact payload hashes, ownership and
+  stock-removal gates while preserving the generic collision stop line.
+- Current stop: commit the source gate and run exactly one new artifact-only
+  build. Do not retry `29924934432` unchanged and do not publish a Release.
 - Pin every remaining controllable input.
 - Validate niri, service behavior, credentials policy, final configuration
   paths, package ownership, and secret absence.

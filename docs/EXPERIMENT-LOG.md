@@ -642,3 +642,84 @@ References to earlier experiment IDs:
   NUL or missing metadata, and pacman parses all four databases successfully.
 - Evidence directory:
   `/home/fuhao/002/y700-linux/builds/artifacts/TB321FU-pacman-lock-run-29921200387/`.
+
+### CI-20260722-005 — Locked build rejects Ubuntu sensor proxy collision
+
+- Result: `FAIL` in artifact-only workflow run `29924934432`; no rootfs, GRUB,
+  Release, or device write was produced.
+- Workflow identity: commit `e87d90ca61213a425e12edb17cf968333ea6c53d`, branch
+  `codex/tablet-rescue-20260720`, repository `wzfh001/arch-y700-build-ci`.
+- Primary variable: first full rootfs build using the audited pacman lock
+  (`run_id=29921200387`) while importing the fixed sensor archive and its
+  Debian payloads through the generic Arch import package.
+- New evidence: the locked transaction installed native Arch
+  `iio-sensor-proxy 3.9-1`; the imported `qcom-sns-iio-sensor-proxy` Debian
+  payload contains a different `/usr/bin/monitor-sensor`. The collision guard
+  stopped at that path before packaging or overwriting it:
+  `Arch import differs from existing file: /usr/bin/monitor-sensor`.
+- Scope: the failure is deterministic and occurs after the rootfs package
+  transaction, Wi-Fi native package, and niri validation all passed. No retry
+  is authorized without changing the ownership model for the Qualcomm sensor
+  proxy; do not weaken the generic collision guard or discard the differing
+  file silently.
+- Next hypothesis: stage the source-built Qualcomm sensor proxy as its own
+  native Arch package with explicit `provides/conflicts/replaces` for
+  `iio-sensor-proxy`, install it transactionally after the locked base set,
+  and keep unrelated imported files under the generic package. Add ownership,
+  package-integrity, and regression tests before one new CI run.
+- Raw evidence: GitHub run logs at
+  `https://github.com/wzfh001/arch-y700-build-ci/actions/runs/29924934432`;
+  failed step `Build rootfs image`, final diagnostic line
+  `error: Arch import differs from existing file: /usr/bin/monitor-sensor`.
+
+### DEV-20260722-019 — Repeated the known unavailable `dpkg-deb` parser
+
+- Result: `FAIL` in a local read-only inspection after the sensor archive and
+  all four inner Debian package hashes had already passed.
+- Primary variable: inspect Debian control fields and members with
+  `dpkg-deb` on the CachyOS host.
+- Observed: the command returned `dpkg-deb: command not found`, exactly the
+  host limitation already recorded in `DEV-20260722-002`. No package member
+  was interpreted and no repository or system state changed.
+- Process correction: this was an unauthorized no-new-evidence repeat. Do not
+  invoke `dpkg-deb` locally again. Continue with the already validated
+  `ar` plus `tar`/`bsdtar` parser path and retain this entry so the repetition
+  remains visible in the failure ledger.
+
+### SRC-20260722-009 — Native Qualcomm SSC sensor proxy replacement gate
+
+- Result: `PASS` for the source and fixed-payload gate; no firmware artifact,
+  Release, or device write was produced.
+- Primary variable: replace only the ownership model that failed in
+  `CI-20260722-005`. The fixed Qualcomm SSC sensor proxy is now staged outside
+  the generic import package and converted into native Arch package
+  `qcom-sns-iio-sensor-proxy` after the locked base transaction.
+- Source identity: archive
+  `tb321fu-sensor-debs_20260627.1_arm64.tar.gz` passed SHA-256
+  `62ebf6fb41730b9f52da2efc99ac5807fd41dd39d7f97dea070ba5f5ce34ab10`;
+  all four inner Debian packages passed the archive's checksum manifest. The
+  selected package
+  `qcom-sns-iio-sensor-proxy_20260627.1_arm64.deb` passed SHA-256
+  `b010a9a783629c4e0fd4c404b1a34e14258fab8a674d0499d553d361cb59a843`.
+- Payload evidence: exactly seven regular files were accepted. Both binaries
+  are AArch64; all seven fixed file hashes, executable/data modes, service
+  `ExecStart`, and D-Bus activation path passed against the real extracted
+  payload. Evidence directory:
+  `/home/fuhao/002/y700-linux/builds/inputs/tb321fu-sensor-debs-20260627.1/`.
+- Ownership policy: the audited stock `iio-sensor-proxy` remains part of the
+  initial locked transaction, then the custom package explicitly
+  `provides/conflicts/replaces` it through one pacman transaction. The generic
+  import collision guard remains fail-closed and the stock executable/package
+  must be absent after replacement. Final sensor proxy files, provenance, and
+  checksums must be owned by the custom package.
+- Regression coverage: new `SENSOR_PROXY_PACKAGE=PASS` gate checks source
+  pins, exact member policy, rejection of extra/wrong-mode/symlink members,
+  replacement relationships, ordering, stock-removal verification, rolling
+  freeze policy, and preservation of the generic collision stop line.
+- Full local workflow-equivalent gate passed, including actionlint/workflow
+  semantics, governance, rescue, Wi-Fi, sensor proxy, payload policy,
+  tablet-niri, audio, native package lifecycle, signatures, overlay,
+  publication, and `PACMAN_PACKAGE_LOCK_PIN=PASS`.
+- Next authorized experiment: one new artifact-only CI build from a committed
+  clean tree. It must reference `CI-20260722-005` and this source gate; a
+  Release or device write remains forbidden.
