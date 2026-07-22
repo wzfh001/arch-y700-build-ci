@@ -362,3 +362,23 @@ References to earlier experiment IDs:
   workflow blocks and add a source regression that rejects the ambiguous form.
 - Retry authorization: a new commit changes the one failed variable; the next
   seed run must reference this experiment and is not an unchanged retry.
+
+### CI-20260722-002 — Seed chroot root was not a mount point
+
+- Result: `FAIL`; no lock artifact was uploaded and the normal build job stayed
+  skipped.
+- Workflow run: `29918507952`, commit `3a0b0a8`, retry of
+  `CI-20260722-001` with the SC1007 variable fixed.
+- Primary variable: the seed extracted the fixed rootfs into an ordinary
+  directory instead of a filesystem mount point.
+- Observed: after downloading and verifying the 780 MiB fixed rootfs and
+  freezing the repository databases, pacman stopped before reinstalling
+  `archlinuxarm-keyring` with `could not determine root mount point /` and
+  `not enough free disk space`. A remaining GPG agent also kept the `/dev`
+  bind busy during best-effort cleanup; the safety guard correctly refused to
+  delete the mounted work tree.
+- Correction: self-bind the rootfs directory before entering the chroot so it
+  has an explicit mountinfo entry; stop both GPG contexts before unmounting,
+  then unmount child trees and the root mount in order.
+- Retry authorization: the next seed changes the root mount and cleanup state;
+  do not repeat run `29918507952` unchanged.

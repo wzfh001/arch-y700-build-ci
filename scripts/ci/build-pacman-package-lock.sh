@@ -45,7 +45,12 @@ mounted=0
 cleanup() {
   set +e
   if [ "$mounted" = 1 ]; then
-    for target in "$rootfs_dir/run" "$rootfs_dir/sys" "$rootfs_dir/proc" "$rootfs_dir/dev"; do
+    if [ -x "$rootfs_dir/usr/bin/gpgconf" ]; then
+      arch_chroot /usr/bin/gpgconf --kill all >/dev/null 2>&1 || true
+      arch_chroot /usr/bin/env GNUPGHOME=/etc/pacman.d/gnupg /usr/bin/gpgconf --kill all >/dev/null 2>&1 || true
+    fi
+    sync
+    for target in "$rootfs_dir/run" "$rootfs_dir/sys" "$rootfs_dir/proc" "$rootfs_dir/dev" "$rootfs_dir"; do
       mountpoint -q "$target" && umount -R -- "$target"
     done
     mounted=0
@@ -83,6 +88,7 @@ rm -f -- "$rootfs_dir/var/lib/pacman/sync"/*.db "$rootfs_dir/var/lib/pacman/sync
 find "$rootfs_dir/var/cache/pacman/pkg" -mindepth 1 -maxdepth 1 -type f -delete
 
 mounted=1
+mount --bind "$rootfs_dir" "$rootfs_dir"
 mount --rbind /dev "$rootfs_dir/dev"
 mount --make-rslave "$rootfs_dir/dev"
 mount -t proc proc "$rootfs_dir/proc"

@@ -68,6 +68,7 @@ fi
 for token in \
   'pacman -Syu --print' \
   'url.sig' \
+  'mount --bind "$rootfs_dir" "$rootfs_dir"' \
   'file:///run/tb321fu-pacman-lock/repo/$arch/$repo' \
   'arch_chroot_offline' \
   'expected-installed-packages.txt'; do
