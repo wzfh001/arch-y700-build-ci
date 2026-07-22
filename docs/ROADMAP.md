@@ -21,9 +21,15 @@ current-state document contradicts the authoritative status.
 - Activate and retry Bluetooth NAP without blocking graphical boot.
 - `SOURCE PASS` Produce a one-command redacted support bundle without network
   access (`3a095ed`); hardware acceptance remains pending.
+- `SOURCE PASS` Persistent USB coordinator, missing-UDC/hotplug/fallback tests,
+  and bounded external commands (`5f50ade`, `649d032`).
+- `SOURCE PASS` Bluetooth NAP activation/retry/cleanup coordinator with bounded
+  external commands (`406e0c1`).
+- `SOURCE PASS` Both coordinators are enabled and gated in CI (`eaf0650`).
 
 Exit gate: rescue failures never block `graphical.target`; tests cover absent
-UDC, hotplug, retries, cleanup, and redaction.
+UDC, hotplug, retries, cleanup, command timeouts, and redaction. The P1 source
+gate is complete; P7 still requires physical ACM/NCM/NAP acceptance.
 
 ## P2 — WCN7850 Wi-Fi
 

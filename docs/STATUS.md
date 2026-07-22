@@ -15,6 +15,11 @@ functionality.
 - First post-handoff source fix: commit `d480039`
 - Evidence-governance baseline: commit `34de491`
 - Offline support-bundle implementation: commit `3a095ed`
+- P0 recovery/governance completion: commit `c45ad2a`
+- Extended support-bundle redaction: commit `dc36f47`
+- Persistent USB coordinator: commits `5f50ade` and `649d032`
+- Bluetooth NAP coordinator: commit `406e0c1`
+- Rescue CI integration: commit `eaf0650`
 - Release state: artifact-only; no approved Arch hardware release
 
 ## Evidence states
@@ -57,18 +62,19 @@ image; they do not describe the currently running filesystem.
    the missing UDC/device-role transition. Commit `d480039` addresses only the
    first layer.
 4. The last flashed USB unit was `Type=oneshot` with an infinite start timeout.
-   The current source worktree replaces it with a persistent coordinator, but
-   no TB321FU runtime acceptance exists yet.
+   Commits `5f50ade`, `649d032`, and `eaf0650` replace it with a persistent,
+   command-bounded coordinator and source tests, but no TB321FU runtime
+   acceptance exists yet.
 5. The last flashed Bluetooth NAP profile had no activation/retry coordinator;
-   the current source worktree adds one, still hardware `UNTESTED`.
+   commits `406e0c1` and `eaf0650` add one, still hardware `UNTESTED`.
 6. Commit `3a095ed` adds an automatic offline support bundle, redaction, file
    checksums, and an end-to-end archive test. It is not present in the flashed
    image and remains `UNTESTED` on TB321FU hardware.
 
 ## Immediate release blockers
 
-- Commit and review the persistent USB and Bluetooth NAP coordinators
 - Install and verify the redacted support bundle on TB321FU hardware
+- Verify USB role/UDC/ACM/NCM and Bluetooth NAP on TB321FU hardware
 - Device-specific WCN7850 package, exact hashes, firmware path, and bootarg
 - Deterministic CI gates for the final raw filesystem
 - Complete rootfs/GRUB/boot/DTB offline audit

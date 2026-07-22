@@ -122,3 +122,32 @@ References to earlier experiment IDs:
   restoration, NetworkManager fallback, serial-getty failure, and clean stop.
 - Boundary: fake sysfs/configfs and commands do not prove that TB321FU `port0`
   can enter device role or that a real UDC will appear.
+
+### SRC-20260722-002 — Bluetooth NAP activation coordinator
+
+- Result: `PASS` at source-test scope; TB321FU NAP remains `UNTESTED` for this
+  candidate.
+- Commit: `406e0c1`; CI integration: `eaf0650`.
+- Primary variable: add a non-blocking owner for the existing NetworkManager
+  NAP profile, including adapter readiness, power-on, bounded activation retry,
+  status evidence, and cleanup.
+- Evidence: `BT_NAP_COORDINATOR=PASS` covers one failed activation followed by
+  a successful retry, NAP UUID reporting, missing adapter, cleanup, and a hung
+  `bluetoothctl` command.
+- Boundary: simulated BlueZ/NetworkManager output does not prove SDP
+  advertisement, `bnep0`, DHCP, or SSH on TB321FU.
+
+### SRC-20260722-003 — P0/P1 complete offline source gate
+
+- Result: `PASS` at source-test scope on commit `eaf0650` plus the documented
+  P0 governance files from `c45ad2a`.
+- Primary question: does the complete offline CI validation sequence accept the
+  governance, redaction, USB, Bluetooth, payload, profile, package, signature,
+  extraction, workflow, and release-safety controls together?
+- Evidence: actionlint; workflow semantics/input/action/service checks; safe
+  extraction; path boundaries; project governance; support bundle; USB rescue;
+  Bluetooth NAP; payload policy; tablet profile; audio reconciliation; native
+  package lifecycle; OpenPGP; pacman signatures; overlay boundary; publication
+  regressions; and Issue-template YAML all returned PASS.
+- Boundary: no network build, artifact audit, device access, write, or hardware
+  acceptance was performed.
