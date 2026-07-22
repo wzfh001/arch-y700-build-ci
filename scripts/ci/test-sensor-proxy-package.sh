@@ -19,6 +19,40 @@ extract_shell_function() {
 }
 
 bash -n "$BUILD_SCRIPT"
+grep -Fq 'arch_exact_package_installed() {' "$BUILD_SCRIPT" || \
+  fail 'exact installed-package query helper is missing'
+if grep -Eq '/usr/bin/pacman -Q (libssc|iio-sensor-proxy)([[:space:]]|$)' "$BUILD_SCRIPT"; then
+  fail 'provider-sensitive stock-package query remains'
+fi
+[ "$(grep -Fc 'arch_exact_package_installed libssc' "$BUILD_SCRIPT")" -eq 3 ] || \
+  fail 'libssc exact-name checks do not cover pre/post/final validation'
+[ "$(grep -Fc 'arch_exact_package_installed iio-sensor-proxy' "$BUILD_SCRIPT")" -eq 3 ] || \
+  fail 'sensor-proxy exact-name checks do not cover pre/post/final validation'
+grep -Fq 'if arch_exact_package_installed "$package"; then' \
+  <(extract_shell_function verify_tablet_niri_profile) || \
+  fail 'tablet profile forbidden-package gate is provider-sensitive'
+
+(
+  installed_packages=$'qcom-sns-libssc\nqcom-sns-iio-sensor-proxy\nlibssc-tools'
+  arch_chroot() {
+    [ "$#" -eq 2 ] && [ "$1" = /usr/bin/pacman ] && [ "$2" = -Qq ] || \
+      fail "exact package helper used unexpected query arguments: $*"
+    printf '%s\n' "$installed_packages"
+  }
+  eval "$(extract_shell_function arch_exact_package_installed)"
+
+  arch_exact_package_installed qcom-sns-libssc || \
+    fail 'exact helper missed installed Qualcomm libssc package'
+  arch_exact_package_installed qcom-sns-iio-sensor-proxy || \
+    fail 'exact helper missed installed Qualcomm sensor proxy package'
+  if arch_exact_package_installed libssc; then
+    fail 'provides=libssc was misclassified as exact stock libssc'
+  fi
+  if arch_exact_package_installed iio-sensor-proxy; then
+    fail 'provides=iio-sensor-proxy was misclassified as the exact stock package'
+  fi
+)
+
 grep -Fq "TB321FU_SENSOR_PROXY_DEB='qcom-sns-iio-sensor-proxy_20260627.1_arm64.deb'" \
   "$BUILD_SCRIPT" || fail 'sensor proxy source package filename is not pinned'
 grep -Fq "TB321FU_SENSOR_PROXY_DEB_SHA256='b010a9a783629c4e0fd4c404b1a34e14258fab8a674d0499d553d361cb59a843'" \

@@ -1479,3 +1479,18 @@ References to earlier experiment IDs:
 - Stop line: do not rerun commit `3c46e74` unchanged. A new artifact-only run
   requires a committed exact-package-query source gate and the complete local
   P3 test matrix to pass again.
+
+### DEV-20260722-049 — Exact-query patch hunks were in reverse file order
+
+- Result: `FAIL` at patch verification; the combined source/test patch was
+  rejected atomically and changed no file.
+- Primary variable: replace provider-sensitive stock-package queries and add
+  regressions.
+- Observed: the patch first targeted the helper near the start of
+  `build-arch-rootfs-image.sh`, then replacement functions later in the file,
+  and finally tried to match the earlier profile verifier. The backwards hunk
+  order made the otherwise current profile context unreachable to the patch
+  verifier.
+- Correction: apply bounded hunks in actual file order, then add the focused
+  test separately. The corrected edits passed shell syntax and
+  `test-sensor-proxy-package.sh`; do not repeat the rejected hunk ordering.

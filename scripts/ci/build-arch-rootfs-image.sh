@@ -372,6 +372,16 @@ arch_chroot() {
     "$@"
 }
 
+arch_exact_package_installed() {
+  local expected=$1
+
+  arch_chroot /usr/bin/pacman -Qq |
+    awk -v expected="$expected" '
+      $0 == expected { found = 1 }
+      END { exit !found }
+    '
+}
+
 arch_chroot_offline() {
   unshare --net -- chroot "$rootfs_dir" /usr/bin/env -i \
     HOME=/root TERM=xterm PATH=/usr/local/sbin:/usr/local/bin:/usr/bin "$@"
@@ -1911,8 +1921,8 @@ verify_tablet_niri_profile() {
       ci_die "required tablet-niri package failed its file check: $package"
   done
   for package in "${forbidden_packages[@]}"; do
-    if arch_chroot /usr/bin/pacman -Q "$package" >/dev/null 2>&1; then
-      ci_die "forbidden Plasma package is installed in tablet-niri: $package"
+    if arch_exact_package_installed "$package"; then
+      ci_die "forbidden package is installed in tablet-niri: $package"
     fi
   done
 
@@ -2323,7 +2333,7 @@ install_tb321fu_libssc_package() {
   owner=$(arch_chroot /usr/bin/pacman -Qoq /usr/bin/ssccli 2>/dev/null || true)
   [ "$owner" = libssc ] || \
     ci_die "locked stock libssc has unexpected owner before replacement: $owner"
-  arch_chroot /usr/bin/pacman -Q libssc >/dev/null || \
+  arch_exact_package_installed libssc || \
     ci_die "locked stock libssc package is missing before replacement"
 
   install_arch_native_stage_package \
@@ -2332,7 +2342,7 @@ install_tb321fu_libssc_package() {
     "$arch_libssc_stage" \
     libssc_dependencies libssc_provides libssc_conflicts libssc_replaces
 
-  if arch_chroot /usr/bin/pacman -Q libssc >/dev/null 2>&1; then
+  if arch_exact_package_installed libssc; then
     ci_die "stock libssc package remains after Qualcomm replacement"
   fi
   owner=$(arch_chroot /usr/bin/pacman -Qoq /usr/bin/ssccli)
@@ -2361,7 +2371,7 @@ install_tb321fu_sensor_proxy_package() {
   owner=$(arch_chroot /usr/bin/pacman -Qoq /usr/bin/monitor-sensor 2>/dev/null || true)
   [ "$owner" = iio-sensor-proxy ] || \
     ci_die "locked stock sensor proxy has unexpected owner before replacement: $owner"
-  arch_chroot /usr/bin/pacman -Q iio-sensor-proxy >/dev/null || \
+  arch_exact_package_installed iio-sensor-proxy || \
     ci_die "locked stock iio-sensor-proxy package is missing before replacement"
 
   install_arch_native_stage_package \
@@ -2370,7 +2380,7 @@ install_tb321fu_sensor_proxy_package() {
     "$arch_sensor_proxy_stage" \
     sensor_proxy_dependencies sensor_proxy_provides sensor_proxy_conflicts sensor_proxy_replaces
 
-  if arch_chroot /usr/bin/pacman -Q iio-sensor-proxy >/dev/null 2>&1; then
+  if arch_exact_package_installed iio-sensor-proxy; then
     ci_die "stock iio-sensor-proxy package remains after Qualcomm replacement"
   fi
   [ ! -e "$rootfs_dir/usr/lib/iio-sensor-proxy" ] || \
@@ -2873,14 +2883,14 @@ verify_tb321fu_native_package_integrity() {
     [ "$owner" = qcom-sns-libssc ] || \
       ci_die "TB321FU libssc payload has wrong pacman owner $owner: $path"
   done
-  if arch_chroot /usr/bin/pacman -Q libssc >/dev/null 2>&1; then
+  if arch_exact_package_installed libssc; then
     ci_die "stock libssc package remains installed"
   fi
   (
     cd "$rootfs_dir"
     sha256sum -c ./usr/share/tb321fu-libssc/SHA256SUMS
   ) || ci_die "final TB321FU libssc checksum mismatch"
-  if arch_chroot /usr/bin/pacman -Q iio-sensor-proxy >/dev/null 2>&1; then
+  if arch_exact_package_installed iio-sensor-proxy; then
     ci_die "stock iio-sensor-proxy package remains installed"
   fi
   [ ! -e "$rootfs_dir/usr/lib/iio-sensor-proxy" ] || \
