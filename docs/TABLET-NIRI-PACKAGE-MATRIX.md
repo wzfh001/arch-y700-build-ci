@@ -88,6 +88,17 @@ The TB321FU kernel/module/firmware payload remains a separately owned native
 package. The Plasma-only `tb321fu-ksystemstats-gpu` package is disabled for
 this profile.
 
+The fixed Kubuntu device archive also supplies Wi-Fi and Bluetooth firmware.
+`tb321fu-wifi-firmware` owns the six WCN7850 members under
+`/usr/lib/firmware/tb321fu/ath12k`, while `tb321fu-bluetooth-firmware` owns all
+62 device QCA members under `/usr/lib/firmware/tb321fu/qca`. The boot argument
+`firmware_class.path=/usr/lib/firmware/tb321fu` makes the device path win for
+the kernel requests `qca/hmtbtfw20.tlv` and
+`qca/hmtnv20_Kirby_prc.bin`; the generic
+`linux-firmware-atheros-20260622-1` paths remain installed and pacman-owned.
+The four direct-root overlaps were audited byte-for-byte and by type/mode;
+the device files are intentionally not merged into the generic path.
+
 ### Input method and fonts
 
 ```text

@@ -12,9 +12,9 @@ functionality.
 - Current branch: `codex/tablet-rescue-20260720`
 - Current device OS: recovered Kubuntu 26.04 ARM64 baseline
 - Last flashed Arch build: workflow run `29709555909`, commit `4edf3a4`
-- Last artifact-only build attempt: workflow run `29933069005`, commit
-  `bb85da3`; diagnostic output proved the dispatched rootfs SHA was 63
-  characters and omitted the final `a`
+- Last artifact-only build attempt: workflow run `29933523257`, commit
+  `a14ef75`; the corrected rootfs SHA passed and the build stopped on the
+  device-versus-generic QCA Bluetooth firmware collision
 - First post-handoff source fix: commit `d480039`
 - Evidence-governance baseline: commit `34de491`
 - Offline support-bundle implementation: commit `3a095ed`
@@ -32,6 +32,10 @@ functionality.
 - Elevated rootfs SHA transport source gate: `SRC-20260722-011`, commit
   `f3b4bb4`
 - Rootfs SHA byte-diagnostic gate: `SRC-20260722-012`, commit `72c6bd5`
+- Latest artifact-only attempt: `CI-20260722-011`, run `29933523257`, failed
+  on a deterministic QCA Bluetooth firmware content collision before artifact
+  creation; the full device overlay and locked Arch ownership are now under
+  offline audit
 - Release state: artifact-only; no approved Arch hardware release
 
 ## Evidence states
@@ -111,6 +115,16 @@ image; they do not describe the currently running filesystem.
     failed dispatches supplied the 63-character prefix
     `3cf5764f...0404c56`, missing the final `a` from the pinned 64-character
     SHA. This is an operator-input failure, not lock corruption.
+12. `CI-20260722-011` reached the device payload merge with the corrected
+    64-character rootfs SHA and stopped on a real content mismatch at
+    `/usr/lib/firmware/qca/hmtbtfw20.tlv`: the Kubuntu overlay is 265,528
+    bytes with SHA-256
+    `b4e7f61e7dd090e56811860a7781ff3b0ce8e87cc0480feaab34bf4f614308c5`,
+    while locked `linux-firmware-atheros-20260622-1` is 270,120 bytes with
+    SHA-256
+    `f1c00f4640a5c4e5dc36a2574d3d1d0afcfd1ab58a84f217dce4b1bb73cba981`.
+    This is a genuine device-versus-generic firmware collision, not a hash
+    transport error; the generic collision guard remains fail-closed.
 
 ## Immediate release blockers
 
@@ -118,11 +132,14 @@ image; they do not describe the currently running filesystem.
 - Verify USB role/UDC/ACM/NCM and Bluetooth NAP on TB321FU hardware
 - Final-raw proof for the device-specific WCN7850 package, hashes, ownership,
   firmware path, and bootarg
+- Final-raw proof for the device-specific QCA Bluetooth package, hashes,
+  ownership, firmware path, and bootarg
 - Complete one artifact-only build using the audited pacman lock and the
   `SRC-20260722-009` sensor plus `SRC-20260722-010` `libssc` replacements; no
   unchanged retry of runs `29924934432`, `29928261179`, or `29931623980`
-- Run one artifact-only build whose rootfs SHA is read and validated directly
-  from `profiles/tablet-niri/pacman-lock.env`, not manually transcribed
+- Complete one artifact-only build after the independent QCA Bluetooth
+  firmware package passes its source gate; the rootfs SHA must continue to be
+  read and validated from `profiles/tablet-niri/pacman-lock.env`
 - Complete rootfs/GRUB/boot/DTB offline audit
 - Device-specific GPT verification and Firehose bundle
 - At least two independent rescue paths verified on hardware

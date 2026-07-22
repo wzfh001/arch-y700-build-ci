@@ -1100,3 +1100,75 @@ References to earlier experiment IDs:
   Actions artifacts and never a Release.
 - Stop line: any new failure is a distinct experiment; never rerun a malformed
   dispatch or this corrected input unchanged after failure.
+
+### CI-20260722-011 — Corrected pinned rootfs SHA artifact-only build result
+
+- Result: `FAIL`; artifact-only workflow run `29933523257`; zero artifacts,
+  zero Release objects, and no device write.
+- Commit: `a14ef759f4ab4105f9903101fbc3930a9af74683`, branch
+  `codex/tablet-rescue-20260720`, repository `wzfh001/arch-y700-build-ci`.
+- Parent authorization: the corrected dispatch described immediately above;
+  malformed rootfs-SHA attempts `29931623980`, `29932470727`, and
+  `29933069005` are not being repeated.
+- Primary and only functional variable: use the exact 64-character rootfs
+  SHA read from the committed lock profile. All package, kernel, device
+  archive, sensor, haptics, profile, credential and release-mode inputs were
+  held constant.
+- Expected result: the rootfs build would pass the corrected hash gate and
+  either complete or expose a new payload-specific failure with its raw log.
+- Observed: the build passed the lock and Qualcomm package preparation far
+  enough to hit the generic Arch import guard, which reported:
+  `Arch import differs from existing file: /usr/lib/firmware/qca/hmtbtfw20.tlv`.
+  The device overlay member is 265,528 bytes, SHA-256
+  `b4e7f61e7dd090e56811860a7781ff3b0ce8e87cc0480feaab34bf4f614308c5`, and
+  mode `0777` in the Debian archive before the production mode normalizer.
+  The locked `linux-firmware-atheros-20260622-1-any.pkg.tar.xz` member is
+  270,120 bytes, SHA-256
+  `f1c00f4640a5c4e5dc36a2574d3d1d0afcfd1ab58a84f217dce4b1bb73cba981`, mode
+  `0644`; the bytes differ. The `sort: write failed: Broken pipe` line is a
+  secondary failure after the shell exited and is not a separate cause.
+- Offline follow-up evidence: the device overlay contains 62 regular QCA
+  files. Across all subdirectories, the locked `linux-firmware-atheros`
+  package contains 95 regular QCA members and 48 symlinks (143 non-directory
+  members; the direct-root view has 136 entries). Four direct-root paths
+  overlap; all four contents differ, and the `b112` types differ. No other
+  locked firmware split package contains a QCA path.
+- Stop line: this is a real content collision. Do not overwrite either
+  payload, drop the device file, or relax the generic collision guard. First
+  complete the offline path/owner/content/mode audit and implement a separate
+  firmware-search-path package as a new source experiment.
+
+### DEV-20260722-032 — Dispatch shell JavaScript string syntax error
+
+- Result: `FAIL` before dispatch; no file, repository, CI, or device state
+  changed.
+- Primary variable: compose the shell command used to dispatch the corrected
+  artifact-only workflow.
+- Observed: a JavaScript string literal containing `source_config=""` was
+  malformed, so the orchestration tool rejected the script before executing
+  any shell command.
+- Correction: use a safely quoted argument representation and verify the
+  generated command text before execution. Do not resend the malformed JS
+  literal.
+
+### DEV-20260722-033 — Bash parameter expansion parsed as JavaScript
+
+- Result: `FAIL` before dispatch; no external state changed.
+- Primary variable: validate the rootfs SHA length inside the dispatch shell
+  command.
+- Observed: a JavaScript template literal interpreted Bash `${#rootfs_sha}`
+  as a JavaScript private-field expression and failed before the shell ran.
+- Correction: avoid JavaScript template interpolation for Bash parameter
+  expansions; pass the command as a plain string or concatenate only validated
+  fragments.
+
+### DEV-20260722-034 — Safety-layer rejection of a read-only check command
+
+- Result: `FAIL` before execution; no filesystem or external state changed.
+- Primary variable: inspect temporary dispatch state with a command that
+  included the literal text `rm -rf` in a read-only conditional check.
+- Observed: the safety layer rejected the command text without running it;
+  there was no deletion and no new evidence.
+- Correction: use non-destructive inspection without deletion tokens (or let
+  temporary directories expire) and do not treat this rejected command as an
+  executed experiment.

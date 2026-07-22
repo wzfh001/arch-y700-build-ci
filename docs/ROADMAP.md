@@ -82,10 +82,18 @@ Exit gate: raw-image content, hashes, package ownership, path, and bootarg all
   `length=63` and exposed a value missing the final `a` from the pinned
   64-character rootfs SHA. All three recent dispatches repeated that same
   malformed input and produced zero artifacts.
-- Current stop: read the rootfs SHA directly from the committed pacman-lock
-  profile, validate it as 64 lowercase hexadecimal characters, and run exactly
-  one corrected artifact-only build. Do not hand-transcribe it, retry any
-  malformed dispatch, or publish a Release.
+- `CI FAIL`: corrected artifact-only run `29933523257` accepted the lock SHA
+  and reached device payload merging, then rejected the genuine content
+  collision at `/usr/lib/firmware/qca/hmtbtfw20.tlv`; no artifact was created.
+  The fixed overlay member is 265,528 bytes / SHA-256
+  `b4e7f61e7dd090e56811860a7781ff3b0ce8e87cc0480feaab34bf4f614308c5`, while
+  locked `linux-firmware-atheros-20260622-1` is 270,120 bytes /
+  `f1c00f4640a5c4e5dc36a2574d3d1d0afcfd1ab58a84f217dce4b1bb73cba981`.
+- Current stop: enumerate and audit every device-overlay `/usr/lib/firmware/qca`
+  member against every locked firmware package (path, owner, bytes, mode and
+  symlink type), then design one independent Bluetooth firmware package. Do
+  not discard, overwrite, or weaken the generic collision guard; do not rerun
+  `CI-20260722-011` unchanged.
 - Pin every remaining controllable input.
 - Validate niri, service behavior, credentials policy, final configuration
   paths, package ownership, and secret absence.

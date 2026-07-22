@@ -27,3 +27,15 @@ written to workflow inputs, metadata, logs, manifests, or release notes.
 The authoritative commands are the CI steps in
 `.github/workflows/build-rootfs-and-grub.yml`. Do not copy isolated commands
 from old runs as evidence for a new candidate.
+
+For a complete offline firmware collision audit, provide the already downloaded
+device archive and immutable pacman-lock tar (no network or device access is
+needed):
+
+```text
+scripts/ci/audit-tb321fu-firmware-collisions.sh \
+  /path/to/y700-device-debs-20260624-201420-compat1.tar.gz \
+  /path/to/TB321FU-tablet-niri-pacman-lock.tar
+```
+
+The audit fails closed on any new path, owner, byte, symlink, or mode change.

@@ -118,7 +118,7 @@ install -D -m 0644 /dev/stdin "$freeze_root/etc/pacman.conf" <<'PACMAN_CONF'
 [options]
 PACMAN_CONF
 freeze_tablet_niri_custom_packages "$freeze_root"
-expected_ignore='IgnorePkg = noctalia wvkbd paru tb321fu-imported-release-payload qcom-sns-libssc qcom-sns-iio-sensor-proxy tb321fu-camera-stack tb321fu-wifi-firmware tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli'
+expected_ignore='IgnorePkg = noctalia wvkbd paru tb321fu-imported-release-payload qcom-sns-libssc qcom-sns-iio-sensor-proxy tb321fu-camera-stack tb321fu-wifi-firmware tb321fu-bluetooth-firmware tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli'
 grep -Fxq "$expected_ignore" "$freeze_root/etc/pacman.conf" || \
   fail "custom package freeze policy is incomplete"
 

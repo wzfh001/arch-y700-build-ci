@@ -154,6 +154,8 @@ jobs:
           bash scripts/ci/test-usb-rescue-coordinator.sh
           bash scripts/ci/test-bt-nap-coordinator.sh
           bash scripts/ci/test-wifi-firmware-package.sh
+          bash scripts/ci/test-bluetooth-firmware-package.sh
+          bash -n scripts/ci/audit-tb321fu-firmware-collisions.sh
           bash scripts/ci/test-sensor-proxy-package.sh
           bash scripts/ci/test-system-payload-policy.sh
           bash scripts/ci/test-tablet-niri-profile.sh

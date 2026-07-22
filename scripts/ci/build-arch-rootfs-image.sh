@@ -89,6 +89,10 @@ TB321FU_DEVICE_ARCHIVE_SHA256='047c1baccc420f1c28bf6d761cfc811dd7aeccfcbab6d0374
 TB321FU_WIFI_OVERLAY_DEB='y700-daily-rootfs-overlay_0.1+20260624-201420_arm64.deb'
 TB321FU_WIFI_OVERLAY_DEB_SHA256='9b45ab04d455cfcc24ed40779e9522930543330151c254e87a2aee7f381db5bc'
 TB321FU_WIFI_FIRMWARE_MANIFEST="$REPO_ROOT/profiles/tablet-niri/wifi-firmware.sha256"
+TB321FU_BLUETOOTH_FIRMWARE_MANIFEST="$REPO_ROOT/profiles/tablet-niri/bluetooth-firmware.sha256"
+TB321FU_BLUETOOTH_FIRMWARE_PACKAGE='tb321fu-bluetooth-firmware'
+TB321FU_BLUETOOTH_FIRMWARE_SOURCE_PACKAGE='y700-daily-rootfs-overlay_0.1+20260624-201420_arm64.deb'
+TB321FU_BLUETOOTH_FIRMWARE_SOURCE_PACKAGE_SHA256='9b45ab04d455cfcc24ed40779e9522930543330151c254e87a2aee7f381db5bc'
 TB321FU_SENSOR_PROXY_PACKAGE='qcom-sns-iio-sensor-proxy'
 TB321FU_SENSOR_PROXY_VERSION='20260627.1'
 TB321FU_SENSOR_PROXY_DEB='qcom-sns-iio-sensor-proxy_20260627.1_arm64.deb'
@@ -172,6 +176,8 @@ if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
   [ -z "$DEVICE_DEB_DIR" ] || ci_die "tablet-niri forbids an unpinned device payload directory"
   [ -f "$TB321FU_WIFI_FIRMWARE_MANIFEST" ] || \
     ci_die "tablet-niri Wi-Fi firmware manifest is missing"
+  [ -f "$TB321FU_BLUETOOTH_FIRMWARE_MANIFEST" ] || \
+    ci_die "tablet-niri Bluetooth firmware manifest is missing"
   [ -n "$PACMAN_PACKAGE_LOCK_DIR" ] || \
     ci_die "tablet-niri requires a verified pacman package lock directory"
   [[ $PACMAN_PACKAGE_LOCK_MANIFEST_SHA256 =~ ^[0-9a-f]{64}$ ]] || \
@@ -188,6 +194,7 @@ rootfs_dir="$work_dir/rootfs"
 arch_import_stage="$work_dir/arch-import-stage"
 arch_import_sources="$work_dir/arch-import-sources.tsv"
 arch_camera_supplement_stage="$work_dir/arch-camera-supplement-stage"
+arch_bluetooth_firmware_stage="$work_dir/tb321fu-bluetooth-firmware-stage"
 arch_sensor_proxy_stage="$work_dir/qcom-sns-iio-sensor-proxy-stage"
 arch_libssc_stage="$work_dir/qcom-sns-libssc-stage"
 rootfs_img="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.img"
@@ -530,6 +537,10 @@ verify_required_y700_payload() {
       usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0/board-2.bin
       usr/share/tb321fu-wifi-firmware/SHA256SUMS
       usr/share/tb321fu-wifi-firmware/SOURCE.txt
+      usr/lib/firmware/tb321fu/qca/hmtbtfw20.tlv
+      usr/lib/firmware/tb321fu/qca/hmtnv20_Kirby_prc.bin
+      usr/share/tb321fu-bluetooth-firmware/SHA256SUMS
+      usr/share/tb321fu-bluetooth-firmware/SOURCE.txt
       usr/lib/modules/$KERNEL_VERSION/kernel/drivers/net/wireless/ath/ath12k/wifi7/ath12k_wifi7.ko
       usr/lib/modules/$KERNEL_VERSION/kernel/drivers/soc/qcom/pmic_glink.ko
       usr/lib/modules/$KERNEL_VERSION/kernel/drivers/usb/typec/ucsi/ucsi_glink.ko
@@ -1342,6 +1353,84 @@ SOURCE
     wifi_dependencies wifi_provides wifi_conflicts wifi_replaces
 }
 
+install_tb321fu_bluetooth_firmware_package() {
+  [ "$DESKTOP_PROFILE" = tablet-niri ] || return 0
+
+  local source_root="$arch_import_stage/usr/lib/firmware/qca"
+  local stage="$arch_bluetooth_firmware_stage"
+  local package_manifest="$stage/usr/share/tb321fu-bluetooth-firmware/SHA256SUMS"
+  local actual_files expected_files source_line custom_relative mode
+  local -a bluetooth_dependencies=()
+  local -a bluetooth_provides=(tb321fu-bluetooth-firmware)
+  local -a bluetooth_conflicts=()
+  local -a bluetooth_replaces=()
+
+  [ -d "$source_root" ] || \
+    ci_die "TB321FU QCA Bluetooth source directory is missing from the fixed device archive"
+  [ -f "$TB321FU_BLUETOOTH_FIRMWARE_MANIFEST" ] || \
+    ci_die "TB321FU Bluetooth firmware manifest is missing"
+  [ "$(wc -l < "$TB321FU_BLUETOOTH_FIRMWARE_MANIFEST")" -eq 62 ] || \
+    ci_die "TB321FU Bluetooth firmware manifest must contain exactly 62 files"
+  while read -r hash relative; do
+    [[ $hash =~ ^[0-9a-f]{64}$ ]] || \
+      ci_die "invalid TB321FU Bluetooth firmware hash: $hash"
+    [[ $relative =~ ^usr/lib/firmware/qca/[A-Za-z0-9._-]+$ ]] || \
+      ci_die "unsafe TB321FU Bluetooth firmware manifest path: $relative"
+    [ -f "$arch_import_stage/$relative" ] && [ ! -L "$arch_import_stage/$relative" ] || \
+      ci_die "TB321FU Bluetooth firmware source is missing or unsafe: $relative"
+    mode=$(stat -c '%a' "$arch_import_stage/$relative")
+    [ "$mode" = 644 ] || \
+      ci_die "TB321FU Bluetooth firmware has unsafe mode $mode: $relative"
+  done < "$TB321FU_BLUETOOTH_FIRMWARE_MANIFEST"
+
+  actual_files=$(cd "$arch_import_stage" && \
+    find usr/lib/firmware/qca -mindepth 1 -maxdepth 1 -type f -printf '%p\n' | LC_ALL=C sort)
+  expected_files=$(awk '{print $2}' "$TB321FU_BLUETOOTH_FIRMWARE_MANIFEST" | LC_ALL=C sort)
+  [ "$actual_files" = "$expected_files" ] || \
+    ci_die "fixed device archive QCA Bluetooth member list differs from the pinned manifest"
+  [ -z "$(find "$source_root" -mindepth 1 -maxdepth 1 ! -type f -print -quit)" ] || \
+    ci_die "fixed device archive QCA Bluetooth directory contains a non-regular member"
+  (cd "$arch_import_stage" && sha256sum -c "$TB321FU_BLUETOOTH_FIRMWARE_MANIFEST") || \
+    ci_die "fixed device archive QCA Bluetooth content differs from the pinned manifest"
+
+  source_line="deb:$TB321FU_BLUETOOTH_FIRMWARE_SOURCE_PACKAGE:$TB321FU_BLUETOOTH_FIRMWARE_SOURCE_PACKAGE_SHA256"
+  grep -Fxq "$source_line" "$arch_import_sources" || \
+    ci_die "TB321FU Bluetooth firmware did not originate from the pinned overlay package"
+
+  install -d -m 0755 "$stage"
+  while read -r hash relative; do
+    custom_relative=${relative#usr/lib/firmware/}
+    install -D -m 0644 "$arch_import_stage/$relative" \
+      "$stage/usr/lib/firmware/tb321fu/$custom_relative"
+    rm -f -- "$arch_import_stage/$relative"
+  done < "$TB321FU_BLUETOOTH_FIRMWARE_MANIFEST"
+  find "$arch_import_stage/usr/lib/firmware/qca" -depth -type d -empty -delete
+
+  install -d -m 0755 "$(dirname "$package_manifest")"
+  (
+    cd "$stage"
+    find ./usr/lib/firmware/tb321fu/qca -type f -print0 | \
+      LC_ALL=C sort -z | xargs -0 sha256sum
+  ) > "$package_manifest"
+  cat > "$stage/usr/share/tb321fu-bluetooth-firmware/SOURCE.txt" <<SOURCE
+device=Lenovo Y700 2025 TB321FU
+source_archive=$TB321FU_DEVICE_ARCHIVE_URL
+source_archive_sha256=$TB321FU_DEVICE_ARCHIVE_SHA256
+source_package=$TB321FU_BLUETOOTH_FIRMWARE_SOURCE_PACKAGE
+source_package_sha256=$TB321FU_BLUETOOTH_FIRMWARE_SOURCE_PACKAGE_SHA256
+firmware_search_path=/usr/lib/firmware/tb321fu
+runtime_requests=qca/hmtbtfw20.tlv,qca/hmtnv20_Kirby_prc.bin
+generic_arch_package=linux-firmware-atheros-20260622-1-any
+collision_policy=independent-search-path;generic-qca-paths-retained
+SOURCE
+
+  install_arch_native_stage_package \
+    "$TB321FU_BLUETOOTH_FIRMWARE_PACKAGE" \
+    'Pinned QCA Bluetooth firmware from the TB321FU-verified Kubuntu payload' \
+    "$stage" \
+    bluetooth_dependencies bluetooth_provides bluetooth_conflicts bluetooth_replaces
+}
+
 build_and_install_tablet_niri_source_package() {
   local package_name=$1
   local recipe_dir="$REPO_ROOT/packages/tablet-niri/$package_name"
@@ -1603,7 +1692,7 @@ apply_tablet_niri_profile() {
 
 freeze_tablet_niri_custom_packages() {
   local root=$1
-  local ignore_packages='noctalia wvkbd paru tb321fu-imported-release-payload qcom-sns-libssc qcom-sns-iio-sensor-proxy tb321fu-camera-stack tb321fu-wifi-firmware tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli'
+  local ignore_packages='noctalia wvkbd paru tb321fu-imported-release-payload qcom-sns-libssc qcom-sns-iio-sensor-proxy tb321fu-camera-stack tb321fu-wifi-firmware tb321fu-bluetooth-firmware tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli'
 
   if grep -Eq '^[[:space:]]*IgnorePkg[[:space:]]*=' "$root/etc/pacman.conf"; then
     ci_die "tablet-niri refuses to merge an existing IgnorePkg policy"
@@ -1640,7 +1729,7 @@ verify_tablet_niri_profile() {
   local package path mode hash_field target
   local -a required_packages=(
     noctalia wvkbd paru dnsmasq
-    tb321fu-wifi-firmware qcom-sns-libssc qcom-sns-iio-sensor-proxy
+    tb321fu-wifi-firmware tb321fu-bluetooth-firmware qcom-sns-libssc qcom-sns-iio-sensor-proxy
     tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli
   )
   local -a forbidden_packages=(
@@ -2510,7 +2599,8 @@ GPU_HOOK
 verify_tb321fu_native_package_integrity() {
   local package path owner
   local -a packages=(
-    tb321fu-camera-stack tb321fu-wifi-firmware qcom-sns-libssc qcom-sns-iio-sensor-proxy
+    tb321fu-camera-stack tb321fu-wifi-firmware tb321fu-bluetooth-firmware
+    qcom-sns-libssc qcom-sns-iio-sensor-proxy
   )
   local -a camera_paths=(
     /etc/ld.so.conf.d/y700-device.conf
@@ -2539,6 +2629,13 @@ verify_tb321fu_native_package_integrity() {
     /usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0/regdb.bin
     /usr/share/tb321fu-wifi-firmware/SHA256SUMS
     /usr/share/tb321fu-wifi-firmware/SOURCE.txt
+  )
+  local -a bluetooth_paths=(
+    /usr/lib/firmware/tb321fu/qca/hmtbtfw20.tlv
+    /usr/lib/firmware/tb321fu/qca/hmtnv20_Kirby_prc.bin
+    /usr/lib/firmware/tb321fu/qca/hmtnv20_Kirby_row.bin
+    /usr/share/tb321fu-bluetooth-firmware/SHA256SUMS
+    /usr/share/tb321fu-bluetooth-firmware/SOURCE.txt
   )
   local -a sensor_proxy_paths=(
     /usr/bin/monitor-sensor
@@ -2584,6 +2681,12 @@ verify_tb321fu_native_package_integrity() {
     [ "$owner" = tb321fu-wifi-firmware ] || \
       ci_die "TB321FU Wi-Fi payload has wrong pacman owner $owner: $path"
   done
+  for path in "${bluetooth_paths[@]}"; do
+    owner=$(arch_chroot /usr/bin/pacman -Qoq "$path") || \
+      ci_die "TB321FU Bluetooth payload is not pacman-owned: $path"
+    [ "$owner" = "$TB321FU_BLUETOOTH_FIRMWARE_PACKAGE" ] || \
+      ci_die "TB321FU Bluetooth payload has wrong pacman owner $owner: $path"
+  done
   for path in "${sensor_proxy_paths[@]}"; do
     owner=$(arch_chroot /usr/bin/pacman -Qoq "$path") || \
       ci_die "TB321FU sensor proxy payload is not pacman-owned: $path"
@@ -2624,6 +2727,29 @@ verify_tb321fu_native_package_integrity() {
     cd "$rootfs_dir"
     sha256sum -c ./usr/share/tb321fu-wifi-firmware/SHA256SUMS
   ) || ci_die "TB321FU Wi-Fi firmware package checksum mismatch"
+  [ "$(sha256sum "$rootfs_dir/usr/lib/firmware/tb321fu/qca/hmtbtfw20.tlv" | awk '{print $1}')" = \
+    b4e7f61e7dd090e56811860a7781ff3b0ce8e87cc0480feaab34bf4f614308c5 ] || \
+    ci_die "TB321FU Bluetooth firmware controller image hash mismatch"
+  (
+    cd "$rootfs_dir"
+    sha256sum -c ./usr/share/tb321fu-bluetooth-firmware/SHA256SUMS
+  ) || ci_die "TB321FU Bluetooth firmware package checksum mismatch"
+  for path in \
+    /usr/lib/firmware/qca/hmtbtfw20.tlv \
+    /usr/lib/firmware/qca/hmtnv20.b10f \
+    /usr/lib/firmware/qca/hmtnv20.b112 \
+    /usr/lib/firmware/qca/hmtnv20.bin; do
+    owner=$(arch_chroot /usr/bin/pacman -Qoq "$path") || \
+      ci_die "generic Arch QCA firmware ownership is missing: $path"
+    [ "$owner" = linux-firmware-atheros ] || \
+      ci_die "generic Arch QCA firmware has unexpected owner $owner: $path"
+  done
+  [ "$(sha256sum "$rootfs_dir/usr/lib/firmware/qca/hmtbtfw20.tlv" | awk '{print $1}')" = \
+    f1c00f4640a5c4e5dc36a2574d3d1d0afcfd1ab58a84f217dce4b1bb73cba981 ] || \
+    ci_die "generic Arch QCA firmware was unexpectedly overwritten"
+  [ -f "$rootfs_dir/usr/lib/firmware/tb321fu/qca/hmtnv20.b112" ] && \
+    [ ! -L "$rootfs_dir/usr/lib/firmware/tb321fu/qca/hmtnv20.b112" ] || \
+    ci_die "TB321FU custom QCA b112 member is missing or not a regular file"
   if ci_bool "$BUILD_TB321FU_GPU_SENSOR"; then
     for path in "${gpu_paths[@]}"; do
       owner=$(arch_chroot /usr/bin/pacman -Qoq "$path") || \
@@ -2995,6 +3121,7 @@ fi
 apply_device_payloads
 apply_tb321fu_deb_payloads
 install_tb321fu_wifi_firmware_package
+install_tb321fu_bluetooth_firmware_package
 install_arch_import_package
 install_tb321fu_libssc_package
 install_tb321fu_sensor_proxy_package
@@ -3137,6 +3264,10 @@ rescue_module_policy=pmic_glink,ucsi_glink,ath12k_wifi7,bnep,libcomposite,usb_f_
 wifi_firmware_package=tb321fu-wifi-firmware
 wifi_firmware_search_path=/usr/lib/firmware/tb321fu
 wifi_board_2_bin_sha256=c896bc7782e252aa915849d5c9c47d109ecfe9f0fc5650fe771f7ba8f8eb77fb
+bluetooth_firmware_package=tb321fu-bluetooth-firmware
+bluetooth_firmware_search_path=/usr/lib/firmware/tb321fu
+bluetooth_hmtbtfw20_sha256=b4e7f61e7dd090e56811860a7781ff3b0ce8e87cc0480feaab34bf4f614308c5
+bluetooth_runtime_requests=qca/hmtbtfw20.tlv,qca/hmtnv20_Kirby_prc.bin
 INFO
 fi
 
