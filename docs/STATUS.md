@@ -31,6 +31,7 @@ functionality.
   source gate is `SRC-20260722-010`, commit `04aa394`
 - Elevated rootfs SHA transport source gate: `SRC-20260722-011`, commit
   `f3b4bb4`
+- Rootfs SHA byte-diagnostic gate: `SRC-20260722-012`, commit `72c6bd5`
 - Release state: artifact-only; no approved Arch hardware release
 
 ## Evidence states
@@ -105,6 +106,9 @@ image; they do not describe the currently running filesystem.
     transport path. `CI-20260722-009` falsified the hypothesis that
     `sudo --preserve-env` alone caused the invalid value; byte-level diagnostics
     are now required before another functional fix.
+11. `SRC-20260722-012` makes malformed lock-verifier input report its byte
+    length and shell-escaped form, and tests a trailing-newline fixture. This
+    is diagnostic evidence only; it does not weaken the fail-closed check.
 
 ## Immediate release blockers
 
@@ -115,8 +119,7 @@ image; they do not describe the currently running filesystem.
 - Complete one artifact-only build using the audited pacman lock and the
   `SRC-20260722-009` sensor plus `SRC-20260722-010` `libssc` replacements; no
   unchanged retry of runs `29924934432`, `29928261179`, or `29931623980`
-- Capture the exact byte length and shell representation of the invalid
-  rootfs-SHA argument before attempting another transport fix
+- Run one diagnostic artifact-only build using `SRC-20260722-012`
 - Complete rootfs/GRUB/boot/DTB offline audit
 - Device-specific GPT verification and Firehose bundle
 - At least two independent rescue paths verified on hardware

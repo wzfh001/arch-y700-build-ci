@@ -1006,3 +1006,56 @@ References to earlier experiment IDs:
   identity `f3b4bb44be9e87f91c9421963fe46513c11ee05e` before commit.
 - Correction: replace both draft values with the Git-resolved identity and
   require `git rev-parse` evidence before writing any future full commit hash.
+
+### DEV-20260722-029 — Diagnostic regression assertion overescaped the newline
+
+- Result: `FAIL` in a local focused test; no CI run or external state change
+  occurred.
+- Primary variable: assert that the malformed rootfs-SHA diagnostic exposes a
+  shell-escaped trailing newline.
+- Observed: the first test fixture searched for two literal backslashes, while
+  Bash `%q` correctly emits one backslash before `n`; the production verifier
+  was already correct.
+- Correction: reduce the fixed-string assertion to one backslash, rerun the
+  focused lock test, and require a direct `%q` probe before writing future
+  shell-escape assertions.
+
+### DEV-20260722-030 — Combined diagnostic documentation patch used stale wrapping
+
+- Result: `FAIL` before any file edit was applied.
+- Primary variable: record the diagnostic source gate and authorization.
+- Observed: the combined patch expected a line break in `STATUS.md` that did
+  not exist in the current file, so `apply_patch` rejected the whole patch.
+- Correction: inspect the literal current lines and apply bounded status,
+  roadmap, and experiment-log patches separately. Do not resend the rejected
+  combined context.
+
+### SRC-20260722-012 — Fail-closed rootfs SHA byte diagnostics
+
+- Result: `PASS` for the source and regression gate; no firmware artifact,
+  Release, or device write was produced.
+- Source commit: `72c6bd539bc955fd436ec9bd532455fedfa73641`.
+- Parent failure: `CI-20260722-009`, workflow run `29932470727`.
+- Primary and only functional variable: when the verifier receives a malformed
+  rootfs SHA, report its non-secret byte length and Bash shell-escaped form
+  before failing. A valid 64-hex SHA remains the only accepted input.
+- Regression coverage: `test-pacman-package-lock.sh` now rejects a
+  trailing-newline SHA and checks both diagnostics; syntax and the complete
+  local lock policy pass.
+- Next authorized experiment: one diagnostic artifact-only CI build to expose
+  the exact post-boundary bytes. No Release or device write is authorized.
+
+### CI-20260722-010 — Rootfs SHA diagnostic artifact-only authorization
+
+- Result: `AUTHORIZED/PENDING` at record creation.
+- Parent failure: `CI-20260722-009`, workflow run `29932470727`.
+- Source evidence: `SRC-20260722-012`, implementation commit
+  `72c6bd539bc955fd436ec9bd532455fedfa73641`.
+- Primary and only functional variable: add fail-closed byte-level diagnostics
+  to the lock verifier. Build inputs, package ownership changes, lock seed,
+  credentials policy, output prefix, and release mode remain unchanged.
+- Expected result: if the hidden-byte hypothesis is correct, the failed step
+  will identify the exact length and escaped form; otherwise it will show that
+  the invalid value originates elsewhere. The run remains artifact-only.
+- Stop line: record the new evidence before any transport or input fix; never
+  rerun this commit unchanged after failure.
