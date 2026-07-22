@@ -44,7 +44,7 @@ Environment inputs:
   ROOT_SELECTOR              partlabel|uuid|raw, default: partlabel
   ROOTARGS                   optional full rootargs override
   ROOTARGS_EXTRA             appended to generated rootargs
-  STABLEARGS                 default: drm_client_lib.active=none
+  STABLEARGS                 default: drm_client_lib.active=none firmware_class.path=/usr/lib/firmware/tb321fu
   BOOT_COMPRESS              none|zstd|xz|7z, default: 7z
   BOOT_CHUNK_SIZE            optional 7z volume size; empty disables volumes
   KEEP_BOOT_IMAGE            keep uncompressed boot image after packaging, default: 0
@@ -74,7 +74,7 @@ BOOT_SECTOR_SIZE=${BOOT_SECTOR_SIZE:-512}
 GRUB_TIMEOUT=${GRUB_TIMEOUT:-3}
 ROOT_PARTLABEL=${ROOT_PARTLABEL:-userdata}
 ROOT_SELECTOR=${ROOT_SELECTOR:-partlabel}
-STABLEARGS=${STABLEARGS:-drm_client_lib.active=none}
+STABLEARGS=${STABLEARGS:-'drm_client_lib.active=none firmware_class.path=/usr/lib/firmware/tb321fu'}
 QCOMRAMP_CFG_NAME=${QCOMRAMP_CFG_NAME:-qcomramp.cfg}
 BOOT_COMPRESS=${BOOT_COMPRESS:-7z}
 BOOT_CHUNK_SIZE=${BOOT_CHUNK_SIZE:-}

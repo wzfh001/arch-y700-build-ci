@@ -58,6 +58,9 @@ for field in \
   'grub_sha256:' \
   'boot_sha256:' \
   'dtb_sha256:' \
+  'wifi_firmware_package:' \
+  'wifi_board_2_bin_sha256:' \
+  'firmware_search_path:' \
   'gpt_evidence:' \
   'readback:' \
   'support_bundle:' \

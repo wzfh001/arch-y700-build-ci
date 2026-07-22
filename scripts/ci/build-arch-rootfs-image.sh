@@ -81,6 +81,11 @@ ci_require_cmd readelf
 ci_require_cmd unshare
 
 REPO_ROOT=$(cd -- "$SCRIPT_DIR/../.." && pwd -P)
+TB321FU_DEVICE_ARCHIVE_URL='https://github.com/GUF296/ubuntu-y700-build-ci/releases/download/bootstrap-y700-20260625/y700-device-debs-20260624-201420-compat1.tar.gz'
+TB321FU_DEVICE_ARCHIVE_SHA256='047c1baccc420f1c28bf6d761cfc811dd7aeccfcbab6d03746ca01daf6cdfe04'
+TB321FU_WIFI_OVERLAY_DEB='y700-daily-rootfs-overlay_0.1+20260624-201420_arm64.deb'
+TB321FU_WIFI_OVERLAY_DEB_SHA256='9b45ab04d455cfcc24ed40779e9522930543330151c254e87a2aee7f381db5bc'
+TB321FU_WIFI_FIRMWARE_MANIFEST="$REPO_ROOT/profiles/tablet-niri/wifi-firmware.sha256"
 
 OUTPUT_DIR=${OUTPUT_DIR:-out/ci-rootfs}
 OUTPUT_PREFIX=${OUTPUT_PREFIX:-y700-archlinuxarm}
@@ -147,6 +152,13 @@ if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
     ci_die "tablet-niri requires authorized SSH keys from a repository secret"
   [ "$ROOT_PASSWORD_MODE" = locked ] || ci_die "tablet-niri requires a locked root password"
   [ "$USER_SUDO_MODE" = password ] || ci_die "tablet-niri requires password-based sudo"
+  [ "$DEVICE_DEB_ARCHIVE" = "$TB321FU_DEVICE_ARCHIVE_URL" ] || \
+    ci_die "tablet-niri requires the fixed TB321FU device archive URL"
+  [ "$DEVICE_DEB_ARCHIVE_SHA256" = "$TB321FU_DEVICE_ARCHIVE_SHA256" ] || \
+    ci_die "tablet-niri requires the fixed TB321FU device archive SHA-256"
+  [ -z "$DEVICE_DEB_DIR" ] || ci_die "tablet-niri forbids an unpinned device payload directory"
+  [ -f "$TB321FU_WIFI_FIRMWARE_MANIFEST" ] || \
+    ci_die "tablet-niri Wi-Fi firmware manifest is missing"
   INSTALL_FCITX5_CHINESE=1
   INSTALL_FIREFOX=1
   INSTALL_CAMERA_APPS=0
@@ -467,6 +479,9 @@ verify_required_y700_payload() {
       etc/NetworkManager/system-connections/tb321fu-rescue-bt.nmconnection
       usr/local/libexec/tb321fu-usb-rescue
       usr/local/libexec/tb321fu-bt-nap
+      usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0/board-2.bin
+      usr/share/tb321fu-wifi-firmware/SHA256SUMS
+      usr/share/tb321fu-wifi-firmware/SOURCE.txt
       usr/lib/modules/$KERNEL_VERSION/kernel/drivers/net/wireless/ath/ath12k/wifi7/ath12k_wifi7.ko
       usr/lib/modules/$KERNEL_VERSION/kernel/drivers/soc/qcom/pmic_glink.ko
       usr/lib/modules/$KERNEL_VERSION/kernel/drivers/usb/typec/ucsi/ucsi_glink.ko
@@ -851,9 +866,7 @@ remove_existing_identical_arch_import_members() {
     [ -e "$target" ] || [ -L "$target" ] || continue
     owner=$(arch_chroot /usr/bin/pacman -Qoq "/$relative" 2>/dev/null || true)
     if [ -n "$owner" ]; then
-      ci_log "excluding imported path already owned by native Arch package $owner: /$relative"
-      rm -f -- "$path"
-      continue
+      ci_log "verifying imported path already owned by native Arch package $owner: /$relative"
     fi
     if [ -L "$path" ] && [ -L "$target" ]; then
       [ "$(readlink "$path")" = "$(readlink "$target")" ] || \
@@ -866,6 +879,9 @@ remove_existing_identical_arch_import_members() {
         ci_die "Arch import metadata differs from existing file: /$relative"
     else
       ci_die "Arch import type differs from existing member: /$relative"
+    fi
+    if [ -n "$owner" ]; then
+      ci_log "excluding byte-identical imported path owned by native Arch package $owner: /$relative"
     fi
     rm -f -- "$path"
   done < <(find "$stage" -mindepth 1 \( -type f -o -type l \) -print0 | sort -z)
@@ -1206,6 +1222,78 @@ install_arch_native_stage_package() {
   ci_log "installed native Arch package: $package_name $package_version-1"
 }
 
+install_tb321fu_wifi_firmware_package() {
+  [ "$DESKTOP_PROFILE" = tablet-niri ] || return 0
+
+  local source_root="$arch_import_stage/usr/lib/firmware/ath12k/WCN7850/hw2.0"
+  local stage="$work_dir/tb321fu-wifi-firmware-stage"
+  local package_manifest="$stage/usr/share/tb321fu-wifi-firmware/SHA256SUMS"
+  local actual_files expected_files source_line hash relative custom_relative mode
+  local -a wifi_dependencies=()
+  local -a wifi_provides=(tb321fu-wifi-firmware)
+  local -a wifi_conflicts=()
+  local -a wifi_replaces=()
+
+  [ -d "$source_root" ] || ci_die "TB321FU WCN7850 source directory is missing from the fixed device archive"
+  [ -f "$TB321FU_WIFI_FIRMWARE_MANIFEST" ] || ci_die "TB321FU Wi-Fi firmware manifest is missing"
+  [ "$(wc -l < "$TB321FU_WIFI_FIRMWARE_MANIFEST")" -eq 6 ] || \
+    ci_die "TB321FU Wi-Fi firmware manifest must contain exactly six files"
+  while read -r hash relative; do
+    [[ $hash =~ ^[0-9a-f]{64}$ ]] || ci_die "invalid TB321FU Wi-Fi firmware hash: $hash"
+    [[ $relative =~ ^usr/lib/firmware/ath12k/WCN7850/hw2\.0/[A-Za-z0-9._-]+$ ]] || \
+      ci_die "unsafe TB321FU Wi-Fi firmware manifest path: $relative"
+    [ -f "$arch_import_stage/$relative" ] && [ ! -L "$arch_import_stage/$relative" ] || \
+      ci_die "TB321FU Wi-Fi firmware source is missing or unsafe: $relative"
+    mode=$(stat -c '%a' "$arch_import_stage/$relative")
+    [ "$mode" = 644 ] || ci_die "TB321FU Wi-Fi firmware has unsafe mode $mode: $relative"
+  done < "$TB321FU_WIFI_FIRMWARE_MANIFEST"
+
+  actual_files=$(cd "$arch_import_stage" && \
+    find usr/lib/firmware/ath12k/WCN7850/hw2.0 -mindepth 1 -maxdepth 1 -type f -printf '%p\n' | LC_ALL=C sort)
+  expected_files=$(awk '{print $2}' "$TB321FU_WIFI_FIRMWARE_MANIFEST" | LC_ALL=C sort)
+  [ "$actual_files" = "$expected_files" ] || \
+    ci_die "fixed device archive WCN7850 member list differs from the pinned manifest"
+  [ -z "$(find "$source_root" -mindepth 1 -maxdepth 1 ! -type f -print -quit)" ] || \
+    ci_die "fixed device archive WCN7850 directory contains a non-regular member"
+  (cd "$arch_import_stage" && sha256sum -c "$TB321FU_WIFI_FIRMWARE_MANIFEST") || \
+    ci_die "fixed device archive WCN7850 content differs from the pinned manifest"
+
+  source_line="deb:$TB321FU_WIFI_OVERLAY_DEB:$TB321FU_WIFI_OVERLAY_DEB_SHA256"
+  grep -Fxq "$source_line" "$arch_import_sources" || \
+    ci_die "TB321FU Wi-Fi firmware did not originate from the pinned overlay package"
+
+  install -d -m 0755 "$stage"
+  while read -r hash relative; do
+    custom_relative=${relative#usr/lib/firmware/}
+    install -D -m 0644 "$arch_import_stage/$relative" \
+      "$stage/usr/lib/firmware/tb321fu/$custom_relative"
+    rm -f -- "$arch_import_stage/$relative"
+  done < "$TB321FU_WIFI_FIRMWARE_MANIFEST"
+  find "$arch_import_stage/usr/lib/firmware/ath12k/WCN7850" -depth -type d -empty -delete
+
+  install -d -m 0755 "$(dirname "$package_manifest")"
+  (
+    cd "$stage"
+    find ./usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0 -type f -print0 | \
+      LC_ALL=C sort -z | xargs -0 sha256sum
+  ) > "$package_manifest"
+  cat > "$stage/usr/share/tb321fu-wifi-firmware/SOURCE.txt" <<SOURCE
+device=Lenovo Y700 2025 TB321FU
+source_archive=$TB321FU_DEVICE_ARCHIVE_URL
+source_archive_sha256=$TB321FU_DEVICE_ARCHIVE_SHA256
+source_package=$TB321FU_WIFI_OVERLAY_DEB
+source_package_sha256=$TB321FU_WIFI_OVERLAY_DEB_SHA256
+firmware_search_path=/usr/lib/firmware/tb321fu
+board_2_bin_sha256=c896bc7782e252aa915849d5c9c47d109ecfe9f0fc5650fe771f7ba8f8eb77fb
+SOURCE
+
+  install_arch_native_stage_package \
+    tb321fu-wifi-firmware \
+    'Pinned WCN7850 firmware from the TB321FU-verified Kubuntu payload' \
+    "$stage" \
+    wifi_dependencies wifi_provides wifi_conflicts wifi_replaces
+}
+
 build_and_install_tablet_niri_source_package() {
   local package_name=$1
   local recipe_dir="$REPO_ROOT/packages/tablet-niri/$package_name"
@@ -1467,7 +1555,7 @@ apply_tablet_niri_profile() {
 
 freeze_tablet_niri_custom_packages() {
   local root=$1
-  local ignore_packages='noctalia wvkbd paru tb321fu-imported-release-payload tb321fu-camera-stack tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli'
+  local ignore_packages='noctalia wvkbd paru tb321fu-imported-release-payload tb321fu-camera-stack tb321fu-wifi-firmware tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli'
 
   if grep -Eq '^[[:space:]]*IgnorePkg[[:space:]]*=' "$root/etc/pacman.conf"; then
     ci_die "tablet-niri refuses to merge an existing IgnorePkg policy"
@@ -1504,6 +1592,7 @@ verify_tablet_niri_profile() {
   local package path mode hash_field target
   local -a required_packages=(
     noctalia wvkbd paru dnsmasq
+    tb321fu-wifi-firmware
     tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli
   )
   local -a forbidden_packages=(
@@ -2023,7 +2112,7 @@ GPU_HOOK
 
 verify_tb321fu_native_package_integrity() {
   local package path owner
-  local -a packages=(tb321fu-camera-stack)
+  local -a packages=(tb321fu-camera-stack tb321fu-wifi-firmware)
   local -a camera_paths=(
     /etc/ld.so.conf.d/y700-device.conf
     /opt/libcamera-y700/bin/cam
@@ -2041,6 +2130,16 @@ verify_tb321fu_native_package_integrity() {
     /usr/lib/tb321fu/disable-stock-ksystemstats-gpu
     /usr/share/libalpm/hooks/99-tb321fu-disable-stock-ksystemstats-gpu.hook
     /usr/share/tb321fu-ksystemstats-gpu/ksystemstats_plugin_tb321fu_gpu.so.sha256
+  )
+  local -a wifi_paths=(
+    /usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0/Notice.txt.zst
+    /usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0/amss.bin.zst
+    /usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0/board-2.bin
+    /usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0/board-2.bin.zst
+    /usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0/m3.bin.zst
+    /usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0/regdb.bin
+    /usr/share/tb321fu-wifi-firmware/SHA256SUMS
+    /usr/share/tb321fu-wifi-firmware/SOURCE.txt
   )
 
   if arch_chroot /usr/bin/pacman -Q tb321fu-imported-release-payload >/dev/null 2>&1; then
@@ -2060,6 +2159,24 @@ verify_tb321fu_native_package_integrity() {
     [ "$owner" = tb321fu-camera-stack ] || \
       ci_die "camera payload has wrong pacman owner $owner: $path"
   done
+  for path in "${wifi_paths[@]}"; do
+    owner=$(arch_chroot /usr/bin/pacman -Qoq "$path") || \
+      ci_die "TB321FU Wi-Fi payload is not pacman-owned: $path"
+    [ "$owner" = tb321fu-wifi-firmware ] || \
+      ci_die "TB321FU Wi-Fi payload has wrong pacman owner $owner: $path"
+  done
+  owner=$(arch_chroot /usr/bin/pacman -Qoq \
+    /usr/lib/firmware/ath12k/WCN7850/hw2.0/board-2.bin) || \
+    ci_die "generic WCN7850 board file is not pacman-owned"
+  [ "$owner" = linux-firmware-atheros ] || \
+    ci_die "generic WCN7850 board file has unexpected owner: $owner"
+  [ "$(sha256sum "$rootfs_dir/usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0/board-2.bin" | awk '{print $1}')" = \
+    c896bc7782e252aa915849d5c9c47d109ecfe9f0fc5650fe771f7ba8f8eb77fb ] || \
+    ci_die "TB321FU WCN7850 board file hash mismatch"
+  (
+    cd "$rootfs_dir"
+    sha256sum -c ./usr/share/tb321fu-wifi-firmware/SHA256SUMS
+  ) || ci_die "TB321FU Wi-Fi firmware package checksum mismatch"
   if ci_bool "$BUILD_TB321FU_GPU_SENSOR"; then
     for path in "${gpu_paths[@]}"; do
       owner=$(arch_chroot /usr/bin/pacman -Qoq "$path") || \
@@ -2492,6 +2609,7 @@ fi
 
 apply_device_payloads
 apply_tb321fu_deb_payloads
+install_tb321fu_wifi_firmware_package
 install_arch_import_package
 apply_tb321fu_camera_stack
 
@@ -2594,6 +2712,7 @@ install_firefox=$INSTALL_FIREFOX
 install_camera_apps=$INSTALL_CAMERA_APPS
 third_party_asset_manifest=$([ -f "$third_party_manifest" ] && basename "$third_party_manifest" || true)
 device_deb_archive=${DEVICE_DEB_ARCHIVE:-}
+device_deb_archive_sha256=${DEVICE_DEB_ARCHIVE_SHA256:-}
 device_deb_dir=${DEVICE_DEB_DIR:-}
 sensor_deb_archive=${SENSOR_DEB_ARCHIVE:-}
 sensor_deb_dir=${SENSOR_DEB_DIR:-}
@@ -2616,6 +2735,9 @@ rescue_usb_network=cdc-ncm:10.77.0.1/24:networkmanager-shared
 rescue_usb_console=cdc-acm:ttyGS0:password-login
 rescue_bluetooth_network=nap:10.78.0.1/24:networkmanager-shared
 rescue_module_policy=pmic_glink,ucsi_glink,ath12k_wifi7,bnep,libcomposite,usb_f_acm,usb_f_ncm
+wifi_firmware_package=tb321fu-wifi-firmware
+wifi_firmware_search_path=/usr/lib/firmware/tb321fu
+wifi_board_2_bin_sha256=c896bc7782e252aa915849d5c9c47d109ecfe9f0fc5650fe771f7ba8f8eb77fb
 INFO
 fi
 

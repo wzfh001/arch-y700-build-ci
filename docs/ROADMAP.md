@@ -1,6 +1,6 @@
 # TB321FU roadmap and gates
 
-Last reviewed: 2026-07-21
+Last reviewed: 2026-07-22
 
 The long-term target is a deterministic, recoverable, auditable Arch Linux ARM
 tablet that is suitable for daily use. Work proceeds in dependency order.
@@ -33,18 +33,17 @@ gate is complete; P7 still requires physical ACM/NCM/NAP acceptance.
 
 ## P2 — WCN7850 Wi-Fi
 
-Current stop: the fixed archive and Kubuntu-proven 202148-byte board file are
-not present locally. `SRC-20260722-004` rejected the old raw's compressed member
-as a substitute. No package/build work may claim P2 progress until exact source
-bytes and hashes are obtained.
+`SOURCE PASS`: `SRC-20260722-005` pins and verifies the fixed device archive,
+the exact overlay package, and all six WCN7850 hashes. It packages the
+Kubuntu-proven firmware as `tb321fu-wifi-firmware`, uses
+`/usr/lib/firmware/tb321fu`, adds the kernel firmware search-path bootarg, and
+turns differing Arch-owned import collisions into hard failures.
 
-- Pin and verify the device archive.
-- Package the Kubuntu-proven device firmware with exact file hashes.
-- Use an independent firmware search path and verify the kernel bootarg.
-- Reject final images where the generic firmware replaces device firmware.
+The old rootfs compressed member remains permanently rejected by
+`SRC-20260722-004`. The next stop is P3 followed by a complete build: source
+tests do not yet prove the final raw or physical Wi-Fi behavior.
 
 Exit gate: raw-image content, hashes, package ownership, path, and bootarg all
-pass deterministic checks.
 
 ## P3 — Deterministic build candidate
 

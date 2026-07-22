@@ -20,6 +20,7 @@ functionality.
 - Persistent USB coordinator: commits `5f50ade` and `649d032`
 - Bluetooth NAP coordinator: commit `406e0c1`
 - Rescue CI integration: commit `eaf0650`
+- P2 WCN7850 exact-hash/native-package source gate: `SRC-20260722-005`
 - Release state: artifact-only; no approved Arch hardware release
 
 ## Evidence states
@@ -70,21 +71,27 @@ image; they do not describe the currently running filesystem.
 6. Commit `3a095ed` adds an automatic offline support bundle, redaction, file
    checksums, and an end-to-end archive test. It is not present in the flashed
    image and remains `UNTESTED` on TB321FU hardware.
+7. `SRC-20260722-005` pins the verified device archive and all six WCN7850
+   hashes, builds `tb321fu-wifi-firmware` on an independent search path, and
+   rejects differing Arch-owned imports. A new final raw and hardware test are
+   still required before Wi-Fi can leave `BROKEN` for the historical image or
+   become `VERIFIED` for a new candidate.
 
 ## Immediate release blockers
 
 - Install and verify the redacted support bundle on TB321FU hardware
 - Verify USB role/UDC/ACM/NCM and Bluetooth NAP on TB321FU hardware
-- Device-specific WCN7850 package, exact hashes, firmware path, and bootarg
+- Final-raw proof for the device-specific WCN7850 package, hashes, ownership,
+  firmware path, and bootarg
 - Deterministic CI gates for the final raw filesystem
 - Complete rootfs/GRUB/boot/DTB offline audit
 - Device-specific GPT verification and Firehose bundle
 - At least two independent rescue paths verified on hardware
 
-Local P2 search did not find the fixed device archive or a 202148-byte board
-file. Experiment `SRC-20260722-004` proved that the old raw's 33090-byte
-compressed member expands to a different 1,897,968-byte file; it is forbidden
-as a substitute.
+The fixed device archive is now locally verified and gated by
+`SRC-20260722-005`. Experiment `SRC-20260722-004` still permanently forbids the
+old raw's 33090-byte compressed member, which expands to a different
+1,897,968-byte file, as a substitute.
 
 ## Safety boundary
 

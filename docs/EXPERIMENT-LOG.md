@@ -173,3 +173,66 @@ References to earlier experiment IDs:
 - Next hypothesis: obtain and verify the fixed device archive itself, or
   read-only copy/hash the 202148-byte file from the currently working Kubuntu
   installation with explicit network/device authorization.
+
+### DEV-20260722-002 — Local archive audit assumed `dpkg-deb` was installed
+
+- Result: `FAIL`, then corrected with a different read-only parser and rerun to
+  `PASS`.
+- Primary variable: the local command used to inspect the already downloaded,
+  hash-verified device archive.
+- Observed: the first audit stopped because this CachyOS host does not provide
+  `dpkg-deb`; no archive member had been accepted and no package was installed.
+- New evidence and correction: the `.deb` ar container was inspected with
+  `ar`, its `data.tar.xz` member was streamed to `tar`, and the overlay package,
+  six WCN7850 members, file sizes, and SHA-256 values were then verified.
+- Permanent decision: local evidence scripts must not silently assume Debian
+  package tools; use a declared parser and fail before interpreting content.
+
+### DEV-20260722-003 — Wi-Fi staging fixture skipped production mode normalization
+
+- Result: `FAIL`, then corrected and rerun to `PASS`.
+- Primary variable: the source-test fixture used to call
+  `install_tb321fu_wifi_firmware_package()` outside the complete build.
+- Observed: Debian preserved the six firmware files as mode `0755`, so the
+  package function correctly rejected the fixture as unsafe.
+- New evidence and correction: production already normalizes imported system
+  payload modes to `0644` before the package function. Only the isolated
+  fixture was changed to reproduce that stage; the production permission gate
+  was not relaxed.
+- Permanent decision: isolated function tests must reproduce required upstream
+  normalization rather than weakening the function under test.
+
+### SRC-20260722-005 — P2 pinned WCN7850 native package source gate
+
+- Result: `PASS` at source and fixed-archive fixture scope; TB321FU Wi-Fi and
+  the final raw image remain `UNTESTED` until a new artifact is built.
+- Primary variable: replace path-owner-based firmware discard with an exact,
+  device-specific WCN7850 package and independent firmware search path.
+- Fixed archive: `y700-device-debs-20260624-201420-compat1.tar.gz`, size
+  `71142341`, SHA-256
+  `047c1baccc420f1c28bf6d761cfc811dd7aeccfcbab6d03746ca01daf6cdfe04`.
+- Fixed overlay package:
+  `y700-daily-rootfs-overlay_0.1+20260624-201420_arm64.deb`, SHA-256
+  `9b45ab04d455cfcc24ed40779e9522930543330151c254e87a2aee7f381db5bc`.
+- Evidence: all six WCN7850 files match
+  `profiles/tablet-niri/wifi-firmware.sha256`; the Kubuntu-proven
+  `board-2.bin` is 202148 bytes with SHA-256
+  `c896bc7782e252aa915849d5c9c47d109ecfe9f0fc5650fe771f7ba8f8eb77fb`.
+- Implementation: build pacman-owned `tb321fu-wifi-firmware`, install under
+  `/usr/lib/firmware/tb321fu`, retain the generic Arch firmware under its
+  original `linux-firmware-atheros` ownership, and add
+  `firmware_class.path=/usr/lib/firmware/tb321fu` to the GRUB command line.
+- Collision policy: an imported path already owned by Arch is now discarded
+  only when type, content, and relevant metadata are identical; differing
+  content is a hard failure and the source evidence is retained.
+- Tests: `WIFI_FIRMWARE_ARCHIVE=PASS`, `WIFI_FIRMWARE_PACKAGE=PASS`,
+  `ARCH_NATIVE_PACKAGE_LIFECYCLE=PASS`, `TABLET_NIRI_PROFILE=PASS`, and
+  `WORKFLOW_SEMANTICS=PASS`.
+- Boundary: only the next complete build can prove final-raw ownership,
+  contents, package manifest, and bootargs; only P7 hardware testing can mark
+  Wi-Fi `VERIFIED`.
+- Commit identity: the commit containing this record and the P2 implementation
+  is the authoritative source identity; its exact SHA is recorded in the
+  external current handoff after commit creation.
+- References: `SRC-20260722-004`, `DEV-20260722-002`,
+  `DEV-20260722-003`.

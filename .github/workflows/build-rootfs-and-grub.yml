@@ -94,6 +94,7 @@ jobs:
           bash scripts/ci/test-support-bundle.sh
           bash scripts/ci/test-usb-rescue-coordinator.sh
           bash scripts/ci/test-bt-nap-coordinator.sh
+          bash scripts/ci/test-wifi-firmware-package.sh
           bash scripts/ci/test-system-payload-policy.sh
           bash scripts/ci/test-tablet-niri-profile.sh
           bash scripts/ci/test-audio-route-reconciliation.sh
@@ -201,7 +202,7 @@ jobs:
           ROOT_UUID=
           ROOTARGS=
           ROOTARGS_EXTRA=
-          STABLEARGS=drm_client_lib.active=none
+          STABLEARGS=drm_client_lib.active=none firmware_class.path=/usr/lib/firmware/tb321fu
           BOOT_COMPRESS=7z
           BOOT_CHUNK_SIZE=
           KEEP_BOOT_IMAGE=0

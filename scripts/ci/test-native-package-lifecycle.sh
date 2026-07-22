@@ -178,8 +178,10 @@ remove_existing_identical_arch_import_members "$dedupe_stage" "$dedupe_root"
 arch_owner=iio-sensor-proxy
 printf 'Ubuntu monitor-sensor\n' > "$dedupe_stage/owned"
 printf 'Arch monitor-sensor\n' > "$dedupe_root/owned"
-remove_existing_identical_arch_import_members "$dedupe_stage" "$dedupe_root"
-[ ! -e "$dedupe_stage/owned" ] || fail "Arch-owned collision remained in imported package"
+if (remove_existing_identical_arch_import_members "$dedupe_stage" "$dedupe_root") >/dev/null 2>&1; then
+  fail "differing Arch-owned collision was silently discarded"
+fi
+[ -e "$dedupe_stage/owned" ] || fail "failed Arch-owned collision check removed source evidence"
 arch_owner=
 printf 'different bytes\n' > "$dedupe_stage/different"
 printf 'existing bytes\n' > "$dedupe_root/different"

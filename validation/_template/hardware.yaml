@@ -15,6 +15,9 @@ build:
   grub_sha256: "UNSET"
   boot_sha256: "UNSET"
   dtb_sha256: "UNSET"
+  wifi_firmware_package: "UNSET"
+  wifi_board_2_bin_sha256: "UNSET"
+  firmware_search_path: "UNSET"
 flash:
   bundle_id: "UNSET"
   programmer_sha256: "UNSET"
