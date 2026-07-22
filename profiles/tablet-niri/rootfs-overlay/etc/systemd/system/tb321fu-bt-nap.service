@@ -1,0 +1,14 @@
+[Unit]
+Description=TB321FU Bluetooth NAP rescue coordinator
+Wants=bluetooth.service NetworkManager.service
+After=bluetooth.service NetworkManager.service systemd-modules-load.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/libexec/tb321fu-bt-nap
+Restart=always
+RestartSec=5s
+TimeoutStopSec=15s
+
+[Install]
+WantedBy=multi-user.target

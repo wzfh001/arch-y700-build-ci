@@ -3,6 +3,7 @@ id=tb321fu-rescue-bt
 uuid=3f931a15-a5af-490a-ba52-79412a5ecd6c
 type=bluetooth
 interface-name=bnep0
+autoconnect=false
 
 [ethernet]
 

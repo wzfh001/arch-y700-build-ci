@@ -85,6 +85,7 @@ collect bluetooth-devices bluetoothctl devices
 collect system-failed systemctl --failed --no-pager
 collect system-analyze systemd-analyze
 collect service-usb systemctl status tb321fu-usb-rescue.service --no-pager
+collect service-bt-nap systemctl status tb321fu-bt-nap.service --no-pager
 collect service-network systemctl status NetworkManager.service bluetooth.service sshd.service nftables.service --no-pager
 collect user-failed systemctl --user --failed --no-pager
 collect niri-outputs niri msg outputs

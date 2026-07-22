@@ -461,10 +461,12 @@ verify_required_y700_payload() {
       etc/systemd/user/fcitx5-tablet.service
       etc/systemd/system/tb321fu-grow-rootfs.service
       etc/systemd/system/tb321fu-usb-rescue.service
+      etc/systemd/system/tb321fu-bt-nap.service
       etc/modules-load.d/60-tb321fu-rescue.conf
       etc/NetworkManager/system-connections/tb321fu-rescue-usb.nmconnection
       etc/NetworkManager/system-connections/tb321fu-rescue-bt.nmconnection
       usr/local/libexec/tb321fu-usb-rescue
+      usr/local/libexec/tb321fu-bt-nap
       usr/lib/modules/$KERNEL_VERSION/kernel/drivers/net/wireless/ath/ath12k/wifi7/ath12k_wifi7.ko
       usr/lib/modules/$KERNEL_VERSION/kernel/drivers/soc/qcom/pmic_glink.ko
       usr/lib/modules/$KERNEL_VERSION/kernel/drivers/usb/typec/ucsi/ucsi_glink.ko
@@ -1436,6 +1438,7 @@ apply_tablet_niri_profile() {
     "$root/usr/local/bin/tb321fu-osk-toggle" \
     "$root/usr/local/bin/tb321fu-suspend" \
     "$root/usr/local/libexec/tb321fu-grow-rootfs" \
+    "$root/usr/local/libexec/tb321fu-bt-nap" \
     "$root/usr/local/libexec/tb321fu-usb-rescue" \
     "$root/usr/local/libexec/tb321fu-pre-upgrade-snapshot" \
     "$root/usr/lib/systemd/system-sleep/tb321fu-suspend-log"
@@ -1443,6 +1446,7 @@ apply_tablet_niri_profile() {
     "$root/etc/systemd/user/noctalia.service" \
     "$root/etc/systemd/user/fcitx5-tablet.service" \
     "$root/etc/systemd/system/tb321fu-grow-rootfs.service" \
+    "$root/etc/systemd/system/tb321fu-bt-nap.service" \
     "$root/etc/systemd/system/tb321fu-usb-rescue.service" \
     "$root/etc/modules-load.d/60-tb321fu-rescue.conf"
   chmod 0600 \
@@ -2448,6 +2452,7 @@ if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
   required_system_units=(
     NetworkManager.service sshd.service greetd.service bluetooth.service
     nftables.service tb321fu-grow-rootfs.service tb321fu-usb-rescue.service
+    tb321fu-bt-nap.service
     serial-getty@ttyGS0.service systemd-timesyncd.service
   )
   required_user_units=(
