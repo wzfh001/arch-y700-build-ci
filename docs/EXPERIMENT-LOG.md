@@ -1388,3 +1388,32 @@ References to earlier experiment IDs:
 - Correction: `git rev-parse f094bbb` returns
   `f094bbb75e61f21b9d8f19e149b79bf697dac658`. Query every full Git identity;
   never expand a short hash by inference.
+
+### CI-20260722-012 — QCA plus ALSA artifact-only build authorization
+
+- Result: `AUTHORIZED/PENDING` at record creation; no dispatch has occurred in
+  this experiment yet.
+- Parent failure: `CI-20260722-011`, run `29933523257`, which created zero
+  artifacts and stopped at the first of the known archive/Arch mismatches.
+- Source gates: `SRC-20260722-013` / `782dd08` for all 62 QCA files and
+  `SRC-20260722-014` / `395175c` for the complete 13-file UCM source and
+  transformed package; current source/evidence HEAD before this authorization
+  is `b08b0051b466ee2065b254ed96d03ad99c0a5b23`.
+- Primary experiment: build the first candidate in which all six mismatches
+  from `AUDIT-20260722-003` have explicit package policies. QCA and ALSA are
+  combined only because each was independently source-gated and a build with
+  either one alone is already proven to stop at the other known mismatch.
+- Dispatch policy: branch `codex/tablet-rescue-20260720`, output prefix
+  `TB321FU-archlinuxarm-tablet-niri-ci12-20260722`, `tablet-niri`, `20G`, empty
+  advanced configs, empty `release_tag`, and `prerelease=false`.
+- Rootfs policy: read `rootfs_sha256` directly from the committed
+  `profiles/tablet-niri/pacman-lock.env`, require exactly 64 lowercase
+  hexadecimal characters, and pass that variable to the workflow without
+  manual transcription. Pacman seed run remains `29921200387`.
+- Held constant: rootfs URL, kernel/boot/device/sensor/haptics inputs, complete
+  pacman lock, credential policy, rootfs size, and all release protections.
+- Expected result: either one complete Actions artifact set for P4 offline
+  audit or one new deterministic failure with raw logs. Success is not hardware
+  verification and must not create a Release.
+- Stop line: dispatch exactly once. Any failure becomes a new experiment and
+  may only be retried after a documented evidence or source change.
