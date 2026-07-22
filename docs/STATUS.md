@@ -12,9 +12,11 @@ functionality.
 - Current branch: `codex/tablet-rescue-20260720`
 - Current device OS: recovered Kubuntu 26.04 ARM64 baseline
 - Last flashed Arch build: workflow run `29709555909`, commit `4edf3a4`
-- Last artifact-only build attempt: workflow run `29933523257`, commit
-  `a14ef75`; the corrected rootfs SHA passed and the build stopped on the
-  device-versus-generic QCA Bluetooth firmware collision
+- Last artifact-only build attempt: workflow run `29940159992`, commit
+  `3c46e74`; the corrected rootfs SHA and all six explicit collision policies
+  passed far enough to build/install the Wi-Fi, QCA Bluetooth, ALSA UCM, and
+  generic payload packages, then a provider-sensitive stock-package check
+  falsely reported that `libssc` remained after its logged removal
 - First post-handoff source fix: commit `d480039`
 - Evidence-governance baseline: commit `34de491`
 - Offline support-bundle implementation: commit `3a095ed`
@@ -36,11 +38,11 @@ functionality.
   commit `782dd08`
 - ALSA UCM independent-path native-package source gate: `SRC-20260722-014`,
   commit `395175c`
-- Latest artifact-only attempt: `CI-20260722-011`, run `29933523257`, failed
-  on a deterministic QCA Bluetooth firmware content collision before artifact
-  creation; the complete offline overlap audit found six mismatches, and all
-  six now have explicit source-gated package policies, but no post-fix artifact
-  exists yet
+- Latest artifact-only attempt: `CI-20260722-012`, run `29940159992`, failed
+  after the replacement transaction logged removal of stock `libssc` and
+  installation of `qcom-sns-libssc`; `pacman -Q libssc` then resolved the
+  replacement's `provides=libssc` and caused a false-positive stop. Zero
+  artifacts were created, and no post-fix artifact exists yet
 - Release state: artifact-only; no approved Arch hardware release
 
 ## Evidence states
@@ -145,6 +147,14 @@ image; they do not describe the currently running filesystem.
     generic-package combination, `alsaucm` parser, full archive-overlap audit,
     and complete local P3 test matrix pass. Final raw and hardware audio remain
     `UNTESTED`.
+15. `CI-20260722-012` accepted the exact committed rootfs SHA and passed the
+    immutable lock. It built and installed the new QCA Bluetooth and ALSA UCM
+    packages, then proved the stock-package removal validator is
+    provider-sensitive: pacman logged `removing libssc...` and
+    `installing qcom-sns-libssc...`, but `pacman -Q libssc` still succeeded
+    because the replacement declares `provides=libssc`. The same defect can
+    misclassify `iio-sensor-proxy`. Exact installed package names must be used
+    before another artifact-only build.
 
 ## Immediate release blockers
 
@@ -156,11 +166,11 @@ image; they do not describe the currently running filesystem.
   ownership, firmware path, and bootarg
 - Final-raw proof for `tb321fu-alsa-ucm`, all 13 transformed hashes, seven
   includes, package ownership, parser result, and unchanged generic UCM path
-- Complete exactly one artifact-only build containing the independently gated
-  QCA Bluetooth and ALSA UCM packages plus the `SRC-20260722-009` sensor and
-  `SRC-20260722-010` `libssc` replacements; the rootfs SHA must be read and
-  validated from `profiles/tablet-niri/pacman-lock.env`, with no unchanged
-  retry of prior failed runs
+- Replace provider-sensitive stock-package queries with an exact installed-name
+  gate, add provider regressions for both Qualcomm replacements, pass the full
+  local P3 matrix, and only then authorize one new artifact-only build; the
+  rootfs SHA must still be read and validated from
+  `profiles/tablet-niri/pacman-lock.env`
 - Complete rootfs/GRUB/boot/DTB offline audit
 - Device-specific GPT verification and Firehose bundle
 - At least two independent rescue paths verified on hardware

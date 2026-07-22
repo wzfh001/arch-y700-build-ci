@@ -107,10 +107,19 @@ Exit gate: raw-image content, hashes, package ownership, path, and bootarg all
   overlay, publication, and pacman-lock tests pass. The full archive collision
   audit remains 2,335 device members / 723 packages / 16 intersections / ten
   identical / six explicitly handled mismatches.
-- Current stop: record the source identities, push the branch, and trigger
-  exactly one artifact-only build with the rootfs SHA read from the committed
-  lock profile. Do not hand-transcribe the SHA, publish a Release, or retry an
-  unchanged failure.
+- `CI FAIL / VALIDATOR ROOT CAUSE`: run `29940159992` at commit `3c46e74`
+  accepted the exact committed rootfs SHA and built/installed the Wi-Fi, QCA
+  Bluetooth, ALSA UCM, and generic payload packages. Pacman then logged
+  removal of stock `libssc` and installation of `qcom-sns-libssc`, but the
+  provider-sensitive `pacman -Q libssc` check falsely treated
+  `provides=libssc` as the stock package remaining. Zero artifacts and no
+  Release were created. The same query defect exists for
+  `iio-sensor-proxy`.
+- Current stop: implement and regression-test exact installed-package-name
+  checks, rerun the complete local P3 matrix, and record a new source gate.
+  Only that new evidence may authorize exactly one artifact-only build with
+  the rootfs SHA read from the committed lock profile. Do not publish a
+  Release or retry commit `3c46e74` unchanged.
 - Pin every remaining controllable input.
 - Validate niri, service behavior, credentials policy, final configuration
   paths, package ownership, and secret absence.

@@ -1417,3 +1417,65 @@ References to earlier experiment IDs:
   verification and must not create a Release.
 - Stop line: dispatch exactly once. Any failure becomes a new experiment and
   may only be retried after a documented evidence or source change.
+
+### DEV-20260722-047 — Running job log endpoint returned BlobNotFound
+
+- Result: `FAIL` during read-only observation of the still-running
+  `CI-20260722-012` job; no source, workflow, artifact, Release, or device
+  state changed.
+- Primary variable: request the current log archive for job `88991683448`
+  before the job had completed.
+- Observed: the job-log endpoint returned HTTP `404` with `BlobNotFound`
+  instead of a usable log archive. This response did not change or cancel the
+  running workflow.
+- Correction: do not repeat the unchanged in-progress log-archive request.
+  Wait for a terminal job state, then use the completed run evidence. The
+  completed failed log was later available through `gh run view --log-failed`.
+
+### DEV-20260722-048 — Combined evidence patch used stale STATUS context
+
+- Result: `FAIL` at patch verification; `apply_patch` rejected the complete
+  patch atomically, so no repository file changed.
+- Primary variable: record the completed `CI-20260722-012` result in the
+  experiment log, status, and roadmap.
+- Observed: the patch expected a wrapped STATUS sentence that did not match
+  the current file exactly.
+- Correction: inspect the literal current ranges and apply bounded hunks with
+  exact context. Do not repeat the rejected combined patch.
+
+### CI-20260722-012 — QCA plus ALSA artifact-only build result
+
+- Result: `FAIL` in artifact-only workflow run `29940159992`; zero artifacts,
+  zero Releases, and zero device writes were produced.
+- Workflow identity: commit
+  `3c46e742274a715996854184c25e7c4595fdde8b`, branch
+  `codex/tablet-rescue-20260720`, repository
+  `wzfh001/arch-y700-build-ci`; build job `88991683448` ran from
+  `2026-07-22T16:55:54Z` through `2026-07-22T17:16:43Z`.
+- Primary variable: the independently source-gated QCA Bluetooth and ALSA UCM
+  native packages from `SRC-20260722-013` and `SRC-20260722-014`.
+- New evidence: the committed 64-character rootfs SHA
+  `3cf5764fb6fec7bffdff98787e52ccd15d5d6390a2496c7028d7c4950404c56a`
+  passed, the complete pacman lock passed, and the Wi-Fi, QCA Bluetooth, ALSA
+  UCM, and generic imported payload packages all built and installed. The
+  `qcom-sns-libssc` transaction explicitly logged `removing libssc...` followed
+  by `installing qcom-sns-libssc...`, then the script stopped at
+  `error: stock libssc package remains after Qualcomm replacement`.
+- Root cause: the removal validator uses `pacman -Q libssc`. Pacman resolves
+  that query through the replacement package's `provides=libssc`, so the
+  successful replacement is misclassified as the stock package remaining.
+  The same provider-sensitive error exists in the pre/post/final checks for
+  `iio-sensor-proxy` and in the tablet profile's forbidden-package loop.
+- Recovery action: none was required because the failure occurred in an
+  ephemeral GitHub runner before image creation. Preserve the generic
+  collision guards and replacement transactions.
+- Next hypothesis: query the complete installed-package name list with
+  `pacman -Qq` and compare exact names, then add regressions proving that
+  `qcom-sns-libssc` does not imply exact `libssc` and
+  `qcom-sns-iio-sensor-proxy` does not imply exact `iio-sensor-proxy`.
+- Raw evidence:
+  `https://github.com/wzfh001/arch-y700-build-ci/actions/runs/29940159992`;
+  failed step `Build rootfs image`; artifact API result `total_count=0`.
+- Stop line: do not rerun commit `3c46e74` unchanged. A new artifact-only run
+  requires a committed exact-package-query source gate and the complete local
+  P3 test matrix to pass again.
