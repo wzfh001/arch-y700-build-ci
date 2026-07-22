@@ -746,3 +746,122 @@ References to earlier experiment IDs:
   mismatch, checksum failure, hidden test failure, or metadata leak is a new
   failure. Record it before considering another run; never rerun this commit
   unchanged without new evidence.
+
+### CI-20260722-007 — Qualcomm libssc collision remains in generic import
+
+- Result: `FAIL` in artifact-only workflow run `29928261179`; no rootfs, GRUB,
+  Release, or device write was produced.
+- Workflow identity: commit `6e6f6c6e2892d83e21e63dc588b900a52e2fedb7`, branch
+  `codex/tablet-rescue-20260720`, repository `wzfh001/arch-y700-build-ci`.
+- Primary variable: the `CI-20260722-006` ownership fix for
+  `qcom-sns-iio-sensor-proxy`; all other inputs and the audited pacman lock
+  were unchanged.
+- New evidence: the fixed sensor payload reached the new staging and exact
+  seven-file/hash gate successfully, but the remaining
+  `qcom-sns-libssc_20260627.1_arm64.deb` was still merged into the generic
+  imported package. The locked Arch `libssc` package owns a different
+  `/usr/bin/ssccli`, and the fail-closed guard stopped at:
+  `Arch import differs from existing file: /usr/bin/ssccli`.
+- Decision boundary: do not discard `ssccli`, overwrite the stock package, or
+  retry unchanged. Stage the complete Qualcomm `libssc` payload as a second
+  native Arch package with explicit `provides/conflicts/replaces` for
+  `libssc`; install it before the Qualcomm sensor proxy and make the proxy
+  depend on that package. Preserve the generic collision guard for all other
+  imports.
+- Raw evidence: GitHub run logs at
+  `https://github.com/wzfh001/arch-y700-build-ci/actions/runs/29928261179`;
+  failed step `Build rootfs image`, final diagnostic line
+  `error: Arch import differs from existing file: /usr/bin/ssccli`.
+- Next hypothesis: one new source change only—split and verify the fixed
+  Qualcomm `libssc` payload, then run a new artifact-only build after local
+  gates pass. No Release or device write is authorized.
+
+### DEV-20260722-020 — Two malformed no-op patch attempts used a wrong path
+
+- Result: `FAIL` twice before any file edit was applied.
+- Primary variable: update the tablet package required/forbidden arrays for
+  the new Qualcomm `libssc` ownership model.
+- Observed: both patch attempts contained the duplicated, nonexistent path
+  segment `arch-y700-linux/repositories` and an empty hunk, so `apply_patch`
+  rejected them during verification. The second attempt repeated the same
+  malformed input without new evidence.
+- Recovery action: verify the exact repository path, then apply one bounded
+  hunk to the existing file. The corrected patch succeeded; no invalid path
+  was created and no prior change was overwritten.
+- Process correction: treat an `apply_patch` verification error as a failed
+  experiment and inspect the literal target/hunk before retrying; never resend
+  an unchanged rejected patch.
+
+### DEV-20260722-021 — Third malformed no-op patch used the same wrong path
+
+- Result: `FAIL` before execution; no file edit was applied.
+- Primary variable: add Qualcomm `libssc` ownership checks to the native
+  package integrity function.
+- Observed: the patch target again contained the duplicated nonexistent path
+  segment `arch-y700-linux/repositories`, and `apply_patch` rejected the empty
+  hunk. This was another process error, not new build evidence.
+- Correction: stop using the malformed absolute path form and apply the next
+  edit only after checking the repository root. Do not repeat this rejected
+  target string.
+
+### DEV-20260722-022 — libssc validator had a duplicate here-document terminator
+
+- Result: `FAIL` at the local shell syntax gate; no CI run or package action
+  occurred from this source tree.
+- Primary variable: add the fixed-member mode loop to the Qualcomm `libssc`
+  validator.
+- Observed: the generated function contained both the here-document's
+  terminating `done <<...` and a second indented `done` after the delimiter;
+  `bash -n` stopped at line 1923 with `syntax error near unexpected token done`.
+- Correction: remove only the duplicate terminator, rerun `bash -n` and the
+  focused payload test before any commit or dispatch. This is a source-test
+  failure, not a reason to retry CI run `29928261179`.
+
+### DEV-20260722-023 — libssc validator delimiter was indented
+
+- Result: `FAIL` at the immediate syntax rerun after `DEV-20260722-022`;
+  no package action occurred.
+- Primary variable: remove the duplicate `done` while retaining the
+  here-document member list.
+- Observed: the delimiter line still had two leading spaces, so Bash treated
+  the here-document as unterminated and reported `unexpected end of file`.
+- Correction: place `LIBSSC_DATA_FILES` at column zero, then rerun syntax and
+  focused tests. This is recorded as a separate source-test failure; no CI
+  retry is authorized from an unvalidated tree.
+
+### DEV-20260722-024 — libssc symlink was counted as a regular file
+
+- Result: `FAIL` in the focused sensor-payload fixture after shell syntax
+  passed; no CI run occurred.
+- Primary variable: execute the exact-member validator with one safe
+  `libssc.so -> libssc.so.2` symlink.
+- Observed: the validator correctly enumerated the symlink separately but its
+  regular-file/checksum/mode manifests also listed `libssc.so`, causing a file
+  list mismatch. The earlier streamed hash for a symlink member represented no
+  file bytes and was not a valid installed-tree checksum.
+- Correction: validate the symlink only by exact path and target; remove it
+  from regular-file, checksum, and mode manifests. Keep `libssc.so.2` as the
+  hashed AArch64 ABI file.
+
+### DEV-20260722-025 — libssc shared-object mode was treated as executable
+
+- Result: `FAIL` in the focused validator fixture after the symlink fix; no CI
+  run occurred.
+- Primary variable: validate the fixed `ssccli` and `libssc.so.2` ELF members.
+- Observed: the validator required mode `0755` for both, but the real fixed
+  package intentionally ships the shared object as mode `0644`; only
+  `/usr/bin/ssccli` is executable.
+- Correction: split the mode checks, retaining AArch64 ELF checks for both and
+  requiring `0644` for the ABI library. Do not relax data-file mode policy.
+
+### DEV-20260722-026 — libssc fixture omitted the unexpected-member directory
+
+- Result: `FAIL` in the focused regression test after the validator passed the
+  valid fixture; no CI run occurred.
+- Primary variable: exercise rejection of an extra `/usr/share/unexpected`
+  member.
+- Observed: the test wrote that path before creating its parent directory, so
+  it stopped with a local `No such file or directory` unrelated to production
+  validation.
+- Correction: create the fixture directory explicitly, then rerun the same
+  negative test. Production code was unchanged by this correction.

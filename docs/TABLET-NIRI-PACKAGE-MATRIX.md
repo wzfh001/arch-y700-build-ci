@@ -64,6 +64,14 @@ The replacement explicitly provides/conflicts/replaces `iio-sensor-proxy` and
 keeps the Qualcomm SSC-enabled daemon under pacman ownership; differing files
 are never silently discarded from the generic imported payload.
 
+The same ownership rule applies to the locked stock `libssc`: the fixed
+Qualcomm `qcom-sns-libssc_20260627.1_arm64.deb` (SHA-256
+`4c6f84c266a2c6d588289b5a9700a59711f0a7824744c8a788c8adf7c5786f86`) becomes
+native Arch package `qcom-sns-libssc`, which explicitly
+provides/conflicts/replaces `libssc`. The sensor proxy depends on this custom
+package, so neither Qualcomm binary nor library can be silently replaced by a
+rolling Arch implementation.
+
 ### Graphics and portals
 
 ```text

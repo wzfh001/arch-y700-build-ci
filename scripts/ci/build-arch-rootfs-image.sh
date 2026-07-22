@@ -93,6 +93,10 @@ TB321FU_SENSOR_PROXY_PACKAGE='qcom-sns-iio-sensor-proxy'
 TB321FU_SENSOR_PROXY_VERSION='20260627.1'
 TB321FU_SENSOR_PROXY_DEB='qcom-sns-iio-sensor-proxy_20260627.1_arm64.deb'
 TB321FU_SENSOR_PROXY_DEB_SHA256='b010a9a783629c4e0fd4c404b1a34e14258fab8a674d0499d553d361cb59a843'
+TB321FU_LIBSSC_PACKAGE='qcom-sns-libssc'
+TB321FU_LIBSSC_VERSION='20260627.1'
+TB321FU_LIBSSC_DEB='qcom-sns-libssc_20260627.1_arm64.deb'
+TB321FU_LIBSSC_DEB_SHA256='4c6f84c266a2c6d588289b5a9700a59711f0a7824744c8a788c8adf7c5786f86'
 
 OUTPUT_DIR=${OUTPUT_DIR:-out/ci-rootfs}
 OUTPUT_PREFIX=${OUTPUT_PREFIX:-y700-archlinuxarm}
@@ -185,6 +189,7 @@ arch_import_stage="$work_dir/arch-import-stage"
 arch_import_sources="$work_dir/arch-import-sources.tsv"
 arch_camera_supplement_stage="$work_dir/arch-camera-supplement-stage"
 arch_sensor_proxy_stage="$work_dir/qcom-sns-iio-sensor-proxy-stage"
+arch_libssc_stage="$work_dir/qcom-sns-libssc-stage"
 rootfs_img="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.img"
 build_info="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.BUILD-INFO.txt"
 manifest="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.manifest"
@@ -193,6 +198,7 @@ requested_packages_file="$work_dir/requested-packages.txt"
 mounted_rootfs=0
 bind_mounts=()
 tb321fu_sensor_proxy_staged=0
+tb321fu_libssc_staged=0
 
 cleanup() {
   set +e
@@ -466,6 +472,12 @@ verify_required_y700_payload() {
     usr/share/qcom/sm8650/Lenovo/tb321fu/sensors/registry
     usr/share/qcom/sm8650/Lenovo/tb321fu/sensors/config
     usr/share/qcom/conf.d/tb321fu.yaml
+    usr/bin/ssccli
+    usr/include/libssc/libssc.h
+    usr/lib/aarch64-linux-gnu/libssc.so.2
+    usr/lib/aarch64-linux-gnu/pkgconfig/libssc.pc
+    usr/share/tb321fu-libssc/SHA256SUMS
+    usr/share/tb321fu-libssc/SOURCE.txt
     usr/bin/monitor-sensor
     usr/libexec/iio-sensor-proxy
     etc/systemd/system/multi-user.target.wants/iio-sensor-proxy.service
@@ -1591,7 +1603,7 @@ apply_tablet_niri_profile() {
 
 freeze_tablet_niri_custom_packages() {
   local root=$1
-  local ignore_packages='noctalia wvkbd paru tb321fu-imported-release-payload qcom-sns-iio-sensor-proxy tb321fu-camera-stack tb321fu-wifi-firmware tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli'
+  local ignore_packages='noctalia wvkbd paru tb321fu-imported-release-payload qcom-sns-libssc qcom-sns-iio-sensor-proxy tb321fu-camera-stack tb321fu-wifi-firmware tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli'
 
   if grep -Eq '^[[:space:]]*IgnorePkg[[:space:]]*=' "$root/etc/pacman.conf"; then
     ci_die "tablet-niri refuses to merge an existing IgnorePkg policy"
@@ -1628,12 +1640,12 @@ verify_tablet_niri_profile() {
   local package path mode hash_field target
   local -a required_packages=(
     noctalia wvkbd paru dnsmasq
-    tb321fu-wifi-firmware qcom-sns-iio-sensor-proxy
+    tb321fu-wifi-firmware qcom-sns-libssc qcom-sns-iio-sensor-proxy
     tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli
   )
   local -a forbidden_packages=(
     plasma-meta plasma-desktop plasma-workspace sddm plasma-keyboard
-    iio-sensor-proxy
+    iio-sensor-proxy libssc
   )
   local -a custom_executables=(
     /opt/zen-browser/zen
@@ -1808,6 +1820,154 @@ c95c921c82fffbd340fa68f2c32c7959b0b7fb0ad2a3ca6e5d9978958ba04922  ./usr/lib/syst
 SENSOR_PROXY_SHA256
 }
 
+write_tb321fu_libssc_checksums() {
+  cat <<'LIBSSC_SHA256'
+b6d36d0ac4e83078b8c6024ebc741eddd3dd8b8e84847ca90775276109dbe9db  ./usr/bin/ssccli
+9bd3cb0821a115f57960f3893b3e3d38987aa73e00254de94f3b9e78744a4f57  ./usr/include/libssc/libssc-sensor-accelerometer.h
+e523d1517848816b2c8e14b60d4419242fd078f7100dfc424d4d70eba6ea93ad  ./usr/include/libssc/libssc-sensor-compass.h
+4749f32e68def1cc9f18b525e21ee519fcdc6fb21ed5dd44ed0add0b2588ccd1  ./usr/include/libssc/libssc-sensor-gyroscope.h
+da7da1b56cfa4f46b2a834ae234a59b1fd7f4289172270e9f21680fe96ae45a4  ./usr/include/libssc/libssc-sensor-light.h
+720ab9807d9c8f9d1942964ee0bdd433cff511534c9aa45f98e57d55f6b5f661  ./usr/include/libssc/libssc-sensor-magnetometer.h
+a66ee1327b3de41f60aabd6f6e0247d0e8bd74e134912f9d839a19af26e25754  ./usr/include/libssc/libssc-sensor-proximity.h
+44f106d680e16046a8e55cfc9459271e9d36456908ffb4c45322b085f84ccfb0  ./usr/include/libssc/libssc-sensor.h
+9eeeafae1c9331263809d6a061b49df058a8358a79031dba606377a1294120de  ./usr/include/libssc/libssc-version-private.h
+0e471d9c815b6d7272e4023943799c3aa528b3c80927addb90aa5a63a4d69c4c  ./usr/include/libssc/libssc.h
+3d4c31f72b2d642fcc5c05b45c8cd34a69ddf84e7973dd30342bee6c70a61fcf  ./usr/include/libssc/ssc-common.pb-c.h
+ddaaf179aeb1ae760c0c34f9fdf16fe3e6b47239587fee543180d27fd598c2af  ./usr/include/libssc/ssc-sensor-accelerometer.pb-c.h
+5378a2074d11fa88ef605f72027254d8ba53346a826c361c53be86e7d9f8fd7b  ./usr/include/libssc/ssc-sensor-gyroscope.pb-c.h
+1e46ce0b0bed354895673338904442a4acb64abce1673e96201fb89c8a4161af  ./usr/include/libssc/ssc-sensor-light.pb-c.h
+82cdcd90fe1408a9c4258eaf8e9b89bd051ff471ea0b7172b44ac421b4591d73  ./usr/include/libssc/ssc-sensor-magnetometer.pb-c.h
+10cc0c8775b07cdcc22be96535ddbe697b831c7b037713f8bea49c25592f1a58  ./usr/include/libssc/ssc-sensor-proximity.pb-c.h
+21e53930a2eab3fc6135668d9227c015ff82c1d9b7b45fb8d8ae708f116b29a9  ./usr/include/libssc/ssc-sensor-rotationvector.pb-c.h
+c476bc31dae1d4f306de5284a53a3c107c789046a78a22ba80a6a9a54165fa31  ./usr/include/libssc/ssc-sensor-suid.pb-c.h
+eb975ae142a5e648622ad218674895bb169b972f21cec6e511e9afc27b5bb7ae  ./usr/lib/aarch64-linux-gnu/libssc.so.2
+dd6979002c00b67ad2ef8fb15fd9b68674caf22838464d7d3d86e205ad18c5d8  ./usr/lib/aarch64-linux-gnu/pkgconfig/libssc.pc
+LIBSSC_SHA256
+}
+
+validate_tb321fu_libssc_payload() {
+  local stage=$1
+  local actual_files expected_files actual_links expected_links special path mode
+
+  [ -d "$stage" ] || ci_die "TB321FU libssc stage is missing: $stage"
+  special=$(find "$stage" -mindepth 1 ! -type d ! -type f ! -type l -print -quit)
+  [ -z "$special" ] || ci_die "unsupported TB321FU libssc member: $special"
+  actual_files=$(cd "$stage" && find . -type f -printf '%p\n' | LC_ALL=C sort)
+  expected_files=$(cat <<'LIBSSC_FILES'
+./usr/bin/ssccli
+./usr/include/libssc/libssc-sensor-accelerometer.h
+./usr/include/libssc/libssc-sensor-compass.h
+./usr/include/libssc/libssc-sensor-gyroscope.h
+./usr/include/libssc/libssc-sensor-light.h
+./usr/include/libssc/libssc-sensor-magnetometer.h
+./usr/include/libssc/libssc-sensor-proximity.h
+./usr/include/libssc/libssc-sensor.h
+./usr/include/libssc/libssc-version-private.h
+./usr/include/libssc/libssc.h
+./usr/include/libssc/ssc-common.pb-c.h
+./usr/include/libssc/ssc-sensor-accelerometer.pb-c.h
+./usr/include/libssc/ssc-sensor-gyroscope.pb-c.h
+./usr/include/libssc/ssc-sensor-light.pb-c.h
+./usr/include/libssc/ssc-sensor-magnetometer.pb-c.h
+./usr/include/libssc/ssc-sensor-proximity.pb-c.h
+./usr/include/libssc/ssc-sensor-rotationvector.pb-c.h
+./usr/include/libssc/ssc-sensor-suid.pb-c.h
+./usr/lib/aarch64-linux-gnu/libssc.so.2
+./usr/lib/aarch64-linux-gnu/pkgconfig/libssc.pc
+LIBSSC_FILES
+)
+  [ "$actual_files" = "$expected_files" ] || \
+    ci_die "TB321FU libssc payload file list mismatch"
+  actual_links=$(cd "$stage" && find . -type l -printf '%p\n' | LC_ALL=C sort)
+  expected_links='./usr/lib/aarch64-linux-gnu/libssc.so'
+  [ "$actual_links" = "$expected_links" ] || \
+    ci_die "TB321FU libssc payload symlink list mismatch"
+  [ "$(readlink "$stage/usr/lib/aarch64-linux-gnu/libssc.so")" = libssc.so.2 ] || \
+    ci_die "TB321FU libssc ABI symlink has an unsafe target"
+
+  (
+    cd "$stage"
+    write_tb321fu_libssc_checksums | sha256sum -c -
+  ) || ci_die "TB321FU libssc payload checksum mismatch"
+  mode=$(stat -c '%a' "$stage/usr/bin/ssccli")
+  [ "$mode" = 755 ] || ci_die "TB321FU libssc executable has wrong mode $mode: /usr/bin/ssccli"
+  assert_aarch64_elf "$stage/usr/bin/ssccli"
+  mode=$(stat -c '%a' "$stage/usr/lib/aarch64-linux-gnu/libssc.so.2")
+  [ "$mode" = 644 ] || ci_die "TB321FU libssc ABI has wrong mode $mode: /usr/lib/aarch64-linux-gnu/libssc.so.2"
+  assert_aarch64_elf "$stage/usr/lib/aarch64-linux-gnu/libssc.so.2"
+  while IFS= read -r path; do
+    mode=$(stat -c '%a' "$stage/$path")
+    [ "$mode" = 644 ] || ci_die "TB321FU libssc data has wrong mode $mode: /$path"
+  done <<'LIBSSC_DATA_FILES'
+usr/include/libssc/libssc-sensor-accelerometer.h
+usr/include/libssc/libssc-sensor-compass.h
+usr/include/libssc/libssc-sensor-gyroscope.h
+usr/include/libssc/libssc-sensor-light.h
+usr/include/libssc/libssc-sensor-magnetometer.h
+usr/include/libssc/libssc-sensor-proximity.h
+usr/include/libssc/libssc-sensor.h
+usr/include/libssc/libssc-version-private.h
+usr/include/libssc/libssc.h
+usr/include/libssc/ssc-common.pb-c.h
+usr/include/libssc/ssc-sensor-accelerometer.pb-c.h
+usr/include/libssc/ssc-sensor-gyroscope.pb-c.h
+usr/include/libssc/ssc-sensor-light.pb-c.h
+usr/include/libssc/ssc-sensor-magnetometer.pb-c.h
+usr/include/libssc/ssc-sensor-proximity.pb-c.h
+usr/include/libssc/ssc-sensor-rotationvector.pb-c.h
+usr/include/libssc/ssc-sensor-suid.pb-c.h
+usr/lib/aarch64-linux-gnu/pkgconfig/libssc.pc
+LIBSSC_DATA_FILES
+  grep -Fxq 'prefix=/usr' "$stage/usr/lib/aarch64-linux-gnu/pkgconfig/libssc.pc" || \
+    ci_die "TB321FU libssc pkg-config prefix is not Arch-compatible"
+}
+
+stage_tb321fu_libssc_deb() {
+  local deb=$1
+  local package version architecture deb_sha
+
+  [ "$tb321fu_libssc_staged" = 0 ] || ci_die "multiple TB321FU libssc packages were supplied"
+  [ "$(basename "$deb")" = "$TB321FU_LIBSSC_DEB" ] || \
+    ci_die "unexpected TB321FU libssc package filename: $(basename "$deb")"
+  deb_sha=$(sha256sum "$deb" | awk '{print $1}')
+  [ "$deb_sha" = "$TB321FU_LIBSSC_DEB_SHA256" ] || \
+    ci_die "TB321FU libssc package checksum mismatch: $deb_sha"
+  package=$(dpkg-deb -f "$deb" Package)
+  version=$(dpkg-deb -f "$deb" Version)
+  architecture=$(dpkg-deb -f "$deb" Architecture)
+  [ "$package" = "$TB321FU_LIBSSC_PACKAGE" ] || \
+    ci_die "unexpected TB321FU libssc package identity: $package"
+  [ "$version" = "$TB321FU_LIBSSC_VERSION" ] || \
+    ci_die "unexpected TB321FU libssc package version: $version"
+  [ "$architecture" = arm64 ] || \
+    ci_die "unexpected TB321FU libssc package architecture: $architecture"
+  [ ! -e "$arch_libssc_stage" ] || ci_die "TB321FU libssc stage already exists"
+
+  mkdir -p "$arch_libssc_stage"
+  dpkg-deb -x "$deb" "$arch_libssc_stage"
+  remove_legacy_y700_payload "$arch_libssc_stage"
+  remove_legacy_camera_payload "$arch_libssc_stage"
+  ci_normalize_system_payload_modes "$arch_libssc_stage"
+  ci_assert_normalized_system_payload_modes "$arch_libssc_stage"
+  validate_tb321fu_libssc_payload "$arch_libssc_stage"
+
+  install -d -m 0755 "$arch_libssc_stage/usr/share/tb321fu-libssc"
+  write_tb321fu_libssc_checksums > \
+    "$arch_libssc_stage/usr/share/tb321fu-libssc/SHA256SUMS"
+  cat > "$arch_libssc_stage/usr/share/tb321fu-libssc/SOURCE.txt" <<SOURCE
+device=Lenovo Y700 2025 TB321FU
+source_archive=${SENSOR_DEB_ARCHIVE:-local-directory}
+source_archive_sha256=${SENSOR_DEB_ARCHIVE_SHA256:-not-applicable}
+source_package=$TB321FU_LIBSSC_DEB
+source_package_sha256=$TB321FU_LIBSSC_DEB_SHA256
+source_package_identity=$TB321FU_LIBSSC_PACKAGE
+source_package_version=$TB321FU_LIBSSC_VERSION
+replacement_policy=provides-conflicts-replaces:libssc
+SOURCE
+  tb321fu_libssc_staged=1
+  ci_log "staged pinned Qualcomm libssc for native Arch replacement"
+}
+
 validate_tb321fu_sensor_proxy_payload() {
   local stage=$1
   local actual_files expected_files special path mode
@@ -1905,10 +2065,46 @@ SOURCE
   ci_log "staged pinned Qualcomm SSC sensor proxy for native Arch replacement"
 }
 
+install_tb321fu_libssc_package() {
+  local owner
+  local -a libssc_dependencies=(glibc glib2 protobuf-c libqmi libqrtr-glib)
+  local -a libssc_provides=(libssc)
+  local -a libssc_conflicts=(libssc)
+  local -a libssc_replaces=(libssc)
+
+  [ "$tb321fu_libssc_staged" = 1 ] || return 0
+  owner=$(arch_chroot /usr/bin/pacman -Qoq /usr/bin/ssccli 2>/dev/null || true)
+  [ "$owner" = libssc ] || \
+    ci_die "locked stock libssc has unexpected owner before replacement: $owner"
+  arch_chroot /usr/bin/pacman -Q libssc >/dev/null || \
+    ci_die "locked stock libssc package is missing before replacement"
+
+  install_arch_native_stage_package \
+    "$TB321FU_LIBSSC_PACKAGE" \
+    'Pinned Qualcomm Sensor Core library from the TB321FU sensor payload' \
+    "$arch_libssc_stage" \
+    libssc_dependencies libssc_provides libssc_conflicts libssc_replaces
+
+  if arch_chroot /usr/bin/pacman -Q libssc >/dev/null 2>&1; then
+    ci_die "stock libssc package remains after Qualcomm replacement"
+  fi
+  owner=$(arch_chroot /usr/bin/pacman -Qoq /usr/bin/ssccli)
+  [ "$owner" = "$TB321FU_LIBSSC_PACKAGE" ] || \
+    ci_die "Qualcomm ssccli has wrong package owner: $owner"
+  owner=$(arch_chroot /usr/bin/pacman -Qoq /usr/lib/aarch64-linux-gnu/libssc.so.2)
+  [ "$owner" = "$TB321FU_LIBSSC_PACKAGE" ] || \
+    ci_die "Qualcomm libssc ABI has wrong package owner: $owner"
+  (
+    cd "$rootfs_dir"
+    sha256sum -c ./usr/share/tb321fu-libssc/SHA256SUMS
+  ) || ci_die "installed Qualcomm libssc checksum mismatch"
+  tb321fu_libssc_staged=2
+}
+
 install_tb321fu_sensor_proxy_package() {
   local owner
   local -a sensor_proxy_dependencies=(
-    glibc dbus glib2 libgudev polkit tb321fu-imported-release-payload
+    glibc dbus glib2 libgudev polkit qcom-sns-libssc
   )
   local -a sensor_proxy_provides=(iio-sensor-proxy)
   local -a sensor_proxy_conflicts=(iio-sensor-proxy)
@@ -1958,6 +2154,10 @@ extract_tb321fu_deb_payload_dir() {
       stage_tb321fu_sensor_proxy_deb "$deb"
       continue
     fi
+    if [ "$label" = sensor ] && [ "$package" = "$TB321FU_LIBSSC_PACKAGE" ]; then
+      stage_tb321fu_libssc_deb "$deb"
+      continue
+    fi
     stage="$work_dir/${label}-stage-$(basename "$deb").d"
     rm -rf "$stage"
     mkdir -p "$stage"
@@ -1987,6 +2187,8 @@ apply_tb321fu_deb_payloads() {
   if [ -n "$SENSOR_DEB_ARCHIVE" ] || [ -n "$SENSOR_DEB_DIR" ]; then
     [ "$tb321fu_sensor_proxy_staged" = 1 ] || \
       ci_die "TB321FU sensor payload did not provide the pinned Qualcomm sensor proxy"
+    [ "$tb321fu_libssc_staged" = 1 ] || \
+      ci_die "TB321FU sensor payload did not provide the pinned Qualcomm libssc"
   fi
 
   if [ -n "$HAPTICS_DEB_ARCHIVE" ]; then
@@ -2308,7 +2510,7 @@ GPU_HOOK
 verify_tb321fu_native_package_integrity() {
   local package path owner
   local -a packages=(
-    tb321fu-camera-stack tb321fu-wifi-firmware qcom-sns-iio-sensor-proxy
+    tb321fu-camera-stack tb321fu-wifi-firmware qcom-sns-libssc qcom-sns-iio-sensor-proxy
   )
   local -a camera_paths=(
     /etc/ld.so.conf.d/y700-device.conf
@@ -2349,6 +2551,15 @@ verify_tb321fu_native_package_integrity() {
     /usr/share/tb321fu-sensor-proxy/SHA256SUMS
     /usr/share/tb321fu-sensor-proxy/SOURCE.txt
   )
+  local -a libssc_paths=(
+    /usr/bin/ssccli
+    /usr/include/libssc/libssc.h
+    /usr/lib/aarch64-linux-gnu/libssc.so
+    /usr/lib/aarch64-linux-gnu/libssc.so.2
+    /usr/lib/aarch64-linux-gnu/pkgconfig/libssc.pc
+    /usr/share/tb321fu-libssc/SHA256SUMS
+    /usr/share/tb321fu-libssc/SOURCE.txt
+  )
 
   if arch_chroot /usr/bin/pacman -Q tb321fu-imported-release-payload >/dev/null 2>&1; then
     packages+=(tb321fu-imported-release-payload)
@@ -2379,6 +2590,19 @@ verify_tb321fu_native_package_integrity() {
     [ "$owner" = qcom-sns-iio-sensor-proxy ] || \
       ci_die "TB321FU sensor proxy payload has wrong pacman owner $owner: $path"
   done
+  for path in "${libssc_paths[@]}"; do
+    owner=$(arch_chroot /usr/bin/pacman -Qoq "$path") || \
+      ci_die "TB321FU libssc payload is not pacman-owned: $path"
+    [ "$owner" = qcom-sns-libssc ] || \
+      ci_die "TB321FU libssc payload has wrong pacman owner $owner: $path"
+  done
+  if arch_chroot /usr/bin/pacman -Q libssc >/dev/null 2>&1; then
+    ci_die "stock libssc package remains installed"
+  fi
+  (
+    cd "$rootfs_dir"
+    sha256sum -c ./usr/share/tb321fu-libssc/SHA256SUMS
+  ) || ci_die "final TB321FU libssc checksum mismatch"
   if arch_chroot /usr/bin/pacman -Q iio-sensor-proxy >/dev/null 2>&1; then
     ci_die "stock iio-sensor-proxy package remains installed"
   fi
@@ -2772,6 +2996,7 @@ apply_device_payloads
 apply_tb321fu_deb_payloads
 install_tb321fu_wifi_firmware_package
 install_arch_import_package
+install_tb321fu_libssc_package
 install_tb321fu_sensor_proxy_package
 apply_tb321fu_camera_stack
 
@@ -2882,6 +3107,9 @@ sensor_deb_dir=${SENSOR_DEB_DIR:-}
 sensor_proxy_package=$TB321FU_SENSOR_PROXY_PACKAGE
 sensor_proxy_source_package=$TB321FU_SENSOR_PROXY_DEB
 sensor_proxy_source_package_sha256=$TB321FU_SENSOR_PROXY_DEB_SHA256
+libssc_package=$TB321FU_LIBSSC_PACKAGE
+libssc_source_package=$TB321FU_LIBSSC_DEB
+libssc_source_package_sha256=$TB321FU_LIBSSC_DEB_SHA256
 haptics_deb_archive=${HAPTICS_DEB_ARCHIVE:-}
 haptics_deb_dir=${HAPTICS_DEB_DIR:-}
 camera_stack_archive=${CAMERA_STACK_ARCHIVE:-}
