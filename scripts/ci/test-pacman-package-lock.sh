@@ -32,9 +32,12 @@ for package in niri linux-firmware networkmanager firefox fcitx5; do
 done
 
 lock="$tmp/lock"
-mkdir -p "$lock/repo/aarch64/core" "$lock/repo/aarch64/extra"
+mkdir -p "$lock/repo/aarch64/core" "$lock/repo/aarch64/extra" \
+  "$lock/repo/aarch64/alarm" "$lock/repo/aarch64/aur"
 printf 'fixture core db\n' > "$lock/repo/aarch64/core/core.db"
 printf 'fixture extra db\n' > "$lock/repo/aarch64/extra/extra.db"
+printf 'fixture alarm db\n' > "$lock/repo/aarch64/alarm/alarm.db"
+printf 'fixture aur db\n' > "$lock/repo/aarch64/aur/aur.db"
 package_name=fake-1-1-aarch64.pkg.tar.xz
 printf 'fixture package\n' > "$lock/repo/aarch64/core/$package_name"
 printf 'fixture signature\n' > "$lock/repo/aarch64/core/$package_name.sig"

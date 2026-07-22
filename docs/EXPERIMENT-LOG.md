@@ -382,3 +382,22 @@ References to earlier experiment IDs:
   then unmount child trees and the root mount in order.
 - Retry authorization: the next seed changes the root mount and cleanup state;
   do not repeat run `29918507952` unchanged.
+
+### CI-20260722-003 — Seed allowlist omitted the ALARM-specific repositories
+
+- Result: `FAIL`; no lock artifact was uploaded and the normal build job stayed
+  skipped.
+- Workflow run: `29918760462`, commit `36a7ea1`, retry of
+  `CI-20260722-002` with an explicit root mount.
+- Primary variable: the seed allowed only `core` and `extra` package URLs and
+  databases.
+- Observed: rootfs verification, keyring initialization, repository sync and
+  offline keyring installation passed. The resolved full transaction then
+  required `alarm/libpisp-1.5.0-1-aarch64.pkg.tar.xz`; the URL allowlist
+  correctly stopped because `alarm` was unmodeled. The fixed rootfs pacman
+  configuration also synchronizes `aur`.
+- Correction: freeze and verify all four configured signed repositories:
+  `core`, `extra`, `alarm`, and `aur`; accept package URLs only from those four
+  pinned paths. Cleanup now uses the common deepest-first mount traversal.
+- Retry authorization: the next seed changes the repository model and cleanup
+  traversal; do not repeat run `29918760462` unchanged.

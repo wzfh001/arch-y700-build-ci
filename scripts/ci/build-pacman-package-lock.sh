@@ -50,9 +50,7 @@ cleanup() {
       arch_chroot /usr/bin/env GNUPGHOME=/etc/pacman.d/gnupg /usr/bin/gpgconf --kill all >/dev/null 2>&1 || true
     fi
     sync
-    for target in "$rootfs_dir/run" "$rootfs_dir/sys" "$rootfs_dir/proc" "$rootfs_dir/dev" "$rootfs_dir"; do
-      mountpoint -q "$target" && umount -R -- "$target"
-    done
+    ci_unmount_tree "$rootfs_dir" || ci_log "pacman lock cleanup left mounted paths below: $rootfs_dir"
     mounted=0
   fi
   ci_safe_rmtree "$work_dir" "$OUTPUT_DIR" .pacman-lock-build. ||
@@ -75,7 +73,11 @@ arch_chroot_offline() {
 
 mkdir -p "$rootfs_dir"
 ci_safe_rmtree "$lock_dir" "$OUTPUT_DIR" "$OUTPUT_PREFIX-pacman-lock"
-mkdir -p "$lock_dir/repo/aarch64/core" "$lock_dir/repo/aarch64/extra"
+mkdir -p \
+  "$lock_dir/repo/aarch64/core" \
+  "$lock_dir/repo/aarch64/extra" \
+  "$lock_dir/repo/aarch64/alarm" \
+  "$lock_dir/repo/aarch64/aur"
 ci_log "downloading fixed Arch rootfs for package lock: $ARCH_ROOTFS_URL"
 ci_download "$ARCH_ROOTFS_URL" "$rootfs_archive" "$ARCH_ROOTFS_SHA256"
 tar -C "$rootfs_dir" -xpf "$rootfs_archive" --numeric-owner
@@ -102,7 +104,7 @@ arch_chroot /usr/bin/pacman-key --init
 arch_chroot /usr/bin/pacman-key --populate archlinuxarm
 arch_chroot /usr/bin/pacman -Sy --noconfirm
 
-for repo in core extra; do
+for repo in core extra alarm aur; do
   [ -f "$rootfs_dir/var/lib/pacman/sync/$repo.db" ] || ci_die "seed did not download $repo.db"
   install -m 0644 "$rootfs_dir/var/lib/pacman/sync/$repo.db" "$lock_dir/repo/aarch64/$repo/$repo.db"
   if [ -f "$rootfs_dir/var/lib/pacman/sync/$repo.db.sig" ]; then
@@ -116,11 +118,12 @@ mirror_root=${ARCH_MIRROR%/\$arch/\$repo}
 download_package_url() {
   local url=$1 rel repo filename destination
   case "$url" in
-    "$mirror_root/aarch64/core/"*|"$mirror_root/aarch64/extra/"*) ;;
+    "$mirror_root/aarch64/core/"*|"$mirror_root/aarch64/extra/"*|\
+    "$mirror_root/aarch64/alarm/"*|"$mirror_root/aarch64/aur/"*) ;;
     *) ci_die "pacman emitted a package URL outside the pinned mirror: $url" ;;
   esac
   rel=${url#"$mirror_root/"}
-  [[ $rel =~ ^aarch64/(core|extra)/([A-Za-z0-9][A-Za-z0-9+._@:-]*\.pkg\.tar\.(xz|zst|gz|bz2|lz4|lrz|lzo|Z))$ ]] ||
+  [[ $rel =~ ^aarch64/(core|extra|alarm|aur)/([A-Za-z0-9][A-Za-z0-9+._@:-]*\.pkg\.tar\.(xz|zst|gz|bz2|lz4|lrz|lzo|Z))$ ]] ||
     ci_die "unsafe package URL path: $url"
   repo=${BASH_REMATCH[1]}
   filename=${BASH_REMATCH[2]}

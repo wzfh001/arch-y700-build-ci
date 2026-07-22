@@ -62,7 +62,9 @@ installed_sha=$(sha256sum "$lock_dir/expected-installed-packages.txt" | awk '{pr
 
 [ -d "$lock_dir/repo/aarch64/core" ] || fail 'locked core repository is missing'
 [ -d "$lock_dir/repo/aarch64/extra" ] || fail 'locked extra repository is missing'
-for db in core extra; do
+[ -d "$lock_dir/repo/aarch64/alarm" ] || fail 'locked alarm repository is missing'
+[ -d "$lock_dir/repo/aarch64/aur" ] || fail 'locked aur repository is missing'
+for db in core extra alarm aur; do
   [ -f "$lock_dir/repo/aarch64/$db/$db.db" ] || fail "locked $db database is missing"
 done
 
@@ -77,7 +79,8 @@ while IFS=$'\t' read -r repo filename digest; do
     continue
   fi
   [ -n "$repo" ] || fail 'empty package repository in PACKAGE-FILES.tsv'
-  [[ $repo == core || $repo == extra ]] || fail "unsupported package repository: $repo"
+  [[ $repo == core || $repo == extra || $repo == alarm || $repo == aur ]] ||
+    fail "unsupported package repository: $repo"
   [[ $filename =~ ^[A-Za-z0-9][A-Za-z0-9+._@:-]*\.pkg\.tar\.(xz|zst|gz|bz2|lz4|lrz|lzo|Z)$ ]] ||
     fail "unsafe package filename: $filename"
   [[ $digest =~ ^[0-9a-f]{64}$ ]] || fail "invalid package digest: $filename"
