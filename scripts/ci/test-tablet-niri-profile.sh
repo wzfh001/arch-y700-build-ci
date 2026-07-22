@@ -21,6 +21,7 @@ for script in \
   "$PROFILE/usr/local/bin/tb321fu-suspend" \
   "$PROFILE/usr/local/bin/tb321fu-support-bundle" \
   "$PROFILE/usr/local/libexec/tb321fu-grow-rootfs" \
+  "$PROFILE/usr/local/libexec/tb321fu-bt-nap" \
   "$PROFILE/usr/local/libexec/tb321fu-usb-rescue" \
   "$PROFILE/usr/local/libexec/tb321fu-pre-upgrade-snapshot" \
   "$PROFILE/usr/lib/systemd/system-sleep/tb321fu-suspend-log"; do
@@ -173,24 +174,35 @@ usb_service="$PROFILE/etc/systemd/system/tb321fu-usb-rescue.service"
 module_list="$PROFILE/etc/modules-load.d/60-tb321fu-rescue.conf"
 usb_connection="$PROFILE/etc/NetworkManager/system-connections/tb321fu-rescue-usb.nmconnection"
 bt_connection="$PROFILE/etc/NetworkManager/system-connections/tb321fu-rescue-bt.nmconnection"
+bt_script="$PROFILE/usr/local/libexec/tb321fu-bt-nap"
+bt_service="$PROFILE/etc/systemd/system/tb321fu-bt-nap.service"
 for module in pmic_glink ucsi_glink ath12k_wifi7 bnep; do
   grep -Fxq "$module" "$module_list" || fail "rescue module list is missing $module"
 done
 grep -Fq 'for module in pmic_glink ucsi_glink libcomposite usb_f_acm usb_f_ncm; do' \
   "$usb_script" || fail "USB rescue module load sequence is incomplete"
-grep -Fq 'ln -s "$gadget/functions/acm.usb0" "$gadget/configs/c.1/acm.usb0"' \
-  "$usb_script" || fail "USB ACM ConfigFS link does not use an absolute target"
-grep -Fq 'ln -s "$gadget/functions/ncm.usb0" "$gadget/configs/c.1/ncm.usb0"' \
-  "$usb_script" || fail "USB NCM ConfigFS link does not use an absolute target"
-if grep -Fq 'ln -s ../../functions/' "$usb_script"; then
-  fail "USB rescue still uses ConfigFS-incompatible relative link targets"
-fi
+grep -Fq 'ensure_function_link "$gadget/functions/acm.usb0"' "$usb_script" || \
+  fail "USB ACM ConfigFS link is not reconciled"
+grep -Fq 'ensure_function_link "$gadget/functions/ncm.usb0"' "$usb_script" || \
+  fail "USB NCM ConfigFS link is not reconciled"
 grep -Fq '10.77.0.1/24' "$usb_connection" || fail "USB rescue address is missing"
 grep -Fq 'method=shared' "$usb_connection" || fail "USB rescue DHCP sharing is missing"
 grep -Fq '10.78.0.1/24' "$bt_connection" || fail "Bluetooth rescue address is missing"
 grep -Fq 'type=nap' "$bt_connection" || fail "Bluetooth rescue NAP is missing"
+grep -Fq 'autoconnect=false' "$bt_connection" || \
+  fail "Bluetooth rescue NAP is not controlled by its coordinator"
 grep -Fq 'serial-getty@ttyGS0.service' "$BUILD_SCRIPT" || fail "USB serial getty is not enabled"
-grep -Fq 'TimeoutStartSec=infinity' "$usb_service" || fail "USB rescue does not wait for UDC"
+grep -Fxq 'Type=simple' "$usb_service" || fail "USB rescue is not a simple persistent service"
+grep -Fxq 'Restart=always' "$usb_service" || fail "USB rescue does not restart persistently"
+if grep -Fq 'TimeoutStartSec=infinity' "$usb_service"; then
+  fail "USB rescue still blocks startup while waiting for UDC"
+fi
+grep -Fxq 'Type=simple' "$bt_service" || fail "Bluetooth NAP is not a simple persistent service"
+grep -Fxq 'Restart=always' "$bt_service" || fail "Bluetooth NAP does not restart persistently"
+grep -Fq 'connection up "$connection"' "$bt_script" || \
+  fail "Bluetooth NAP coordinator does not activate its profile"
+grep -Fq 'tb321fu-bt-nap.service' "$BUILD_SCRIPT" || \
+  fail "Bluetooth NAP coordinator is not enabled in the image"
 grep -Fq 'rescue_usb_network=cdc-ncm:10.77.0.1/24:networkmanager-shared' \
   "$BUILD_SCRIPT" || fail "USB rescue build metadata is missing"
 grep -Fq 'rescue_bluetooth_network=nap:10.78.0.1/24:networkmanager-shared' \
@@ -215,6 +227,7 @@ assert usb["connection"]["interface-name"] == "usb0"
 bt = configparser.ConfigParser(interpolation=None)
 bt.read(sys.argv[2])
 assert bt["connection"]["interface-name"] == "bnep0"
+assert bt["connection"]["autoconnect"] == "false"
 assert bt["bluetooth"]["type"] == "nap"
 PY
 

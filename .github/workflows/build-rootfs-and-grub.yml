@@ -92,6 +92,8 @@ jobs:
           bash scripts/ci/test-input-and-path-boundaries.sh
           bash scripts/ci/test-project-governance.sh
           bash scripts/ci/test-support-bundle.sh
+          bash scripts/ci/test-usb-rescue-coordinator.sh
+          bash scripts/ci/test-bt-nap-coordinator.sh
           bash scripts/ci/test-system-payload-policy.sh
           bash scripts/ci/test-tablet-niri-profile.sh
           bash scripts/ci/test-audio-route-reconciliation.sh
