@@ -38,6 +38,8 @@ functionality.
   commit `782dd08`
 - ALSA UCM independent-path native-package source gate: `SRC-20260722-014`,
   commit `395175c`
+- Exact installed-package name source gate: `SRC-20260722-015`, commit
+  `e31977c`
 - Latest artifact-only attempt: `CI-20260722-012`, run `29940159992`, failed
   after the replacement transaction logged removal of stock `libssc` and
   installation of `qcom-sns-libssc`; `pacman -Q libssc` then resolved the
@@ -155,6 +157,13 @@ image; they do not describe the currently running filesystem.
     because the replacement declares `provides=libssc`. The same defect can
     misclassify `iio-sensor-proxy`. Exact installed package names must be used
     before another artifact-only build.
+16. `SRC-20260722-015` replaces every stock `libssc` and
+    `iio-sensor-proxy` pre/post/final query with an exact match against the
+    complete `pacman -Qq` installed-name list. The profile forbidden-package
+    gate uses the same helper. Regressions prove the installed Qualcomm
+    providers and a `libssc-tools` near-match do not imply either exact stock
+    package. The complete local P3 matrix and both offline collision audits
+    pass; final raw and hardware remain `UNTESTED`.
 
 ## Immediate release blockers
 
@@ -166,11 +175,9 @@ image; they do not describe the currently running filesystem.
   ownership, firmware path, and bootarg
 - Final-raw proof for `tb321fu-alsa-ucm`, all 13 transformed hashes, seven
   includes, package ownership, parser result, and unchanged generic UCM path
-- Replace provider-sensitive stock-package queries with an exact installed-name
-  gate, add provider regressions for both Qualcomm replacements, pass the full
-  local P3 matrix, and only then authorize one new artifact-only build; the
-  rootfs SHA must still be read and validated from
-  `profiles/tablet-niri/pacman-lock.env`
+- Push `SRC-20260722-015`, record a separate authorization, and complete
+  exactly one new artifact-only build; the rootfs SHA must be read and
+  validated from `profiles/tablet-niri/pacman-lock.env`
 - Complete rootfs/GRUB/boot/DTB offline audit
 - Device-specific GPT verification and Firehose bundle
 - At least two independent rescue paths verified on hardware

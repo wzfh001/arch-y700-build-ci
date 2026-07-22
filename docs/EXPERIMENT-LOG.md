@@ -1494,3 +1494,42 @@ References to earlier experiment IDs:
 - Correction: apply bounded hunks in actual file order, then add the focused
   test separately. The corrected edits passed shell syntax and
   `test-sensor-proxy-package.sh`; do not repeat the rejected hunk ordering.
+
+### SRC-20260722-015 — Exact installed-package name gate
+
+- Result: `SOURCE PASS`; implementation commit
+  `e31977c6f3385e83c1ea22fba537dd82fe7b1907`; no CI run, artifact, Release,
+  or device write was created by this source experiment.
+- Parent failure: `CI-20260722-012`, run `29940159992`, where pacman logged
+  removal of stock `libssc` and installation of `qcom-sns-libssc` before the
+  provider-sensitive query falsely reported that stock `libssc` remained.
+- Primary variable: replace all stock `libssc` and `iio-sensor-proxy`
+  presence/removal checks with one helper that reads `pacman -Qq` and accepts
+  only an exact installed package name. The tablet profile's forbidden-package
+  loop now uses the same exact-name rule.
+- Held constant: replacement package payloads and
+  `provides/conflicts/replaces`, complete pacman lock, QCA/WCN7850/ALSA
+  policies, device archive, rootfs, kernel, boot inputs, credentials, and
+  artifact-only release mode.
+- Regression evidence: a fixture containing `qcom-sns-libssc`,
+  `qcom-sns-iio-sensor-proxy`, and the near-match `libssc-tools` recognizes
+  both Qualcomm packages but rejects exact `libssc` and
+  `iio-sensor-proxy`. Static gates require exact-name coverage before
+  replacement, after replacement, during final native-package integrity, and
+  in the profile forbidden-package pass; direct provider-sensitive queries are
+  forbidden.
+- Verification: shell syntax and focused sensor tests pass; the complete
+  workflow-equivalent local P3 matrix passes, including actionlint, workflow,
+  boundary, governance, rescue, Wi-Fi, Bluetooth, ALSA, sensor, payload,
+  profile, audio, native-package, OpenPGP, pacman-signature, overlay,
+  publication, and pacman-lock gates. Both complete offline audits pass again:
+  QCA is 62 device regular files versus 95 regular/48 symlink locked members
+  with four handled overlaps, and the full archive remains 2,335 device
+  members versus 723 packages with 16 intersections, ten identical, and six
+  explicitly handled mismatches.
+- Remaining state: no final raw exists for this fix. All hardware, rescue, and
+  final-image claims remain `UNTESTED`.
+- Stop line: push the source/evidence commits, then create a separate
+  artifact-only authorization. Dispatch exactly once with the rootfs SHA read
+  from `profiles/tablet-niri/pacman-lock.env`; no Release or device write is
+  authorized.

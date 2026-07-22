@@ -115,11 +115,16 @@ Exit gate: raw-image content, hashes, package ownership, path, and bootarg all
   `provides=libssc` as the stock package remaining. Zero artifacts and no
   Release were created. The same query defect exists for
   `iio-sensor-proxy`.
-- Current stop: implement and regression-test exact installed-package-name
-  checks, rerun the complete local P3 matrix, and record a new source gate.
-  Only that new evidence may authorize exactly one artifact-only build with
-  the rootfs SHA read from the committed lock profile. Do not publish a
-  Release or retry commit `3c46e74` unchanged.
+- `SOURCE PASS`: `SRC-20260722-015` / commit `e31977c` queries the complete
+  `pacman -Qq` installed-name list and matches exact package names for all
+  stock `libssc` and `iio-sensor-proxy` pre/post/final checks and the tablet
+  profile forbidden-package pass. Regressions reject provider-only and
+  near-match false positives. The complete local P3 matrix and both offline
+  collision audits pass again; final raw remains `UNTESTED`.
+- Current stop: push the source/evidence commits and record a separate
+  authorization. Only then trigger exactly one artifact-only build with the
+  rootfs SHA read from the committed lock profile. Do not publish a Release or
+  retry commit `3c46e74` unchanged.
 - Pin every remaining controllable input.
 - Validate niri, service behavior, credentials policy, final configuration
   paths, package ownership, and secret absence.
