@@ -29,6 +29,8 @@ functionality.
 - Qualcomm SSC sensor proxy native replacement source gate:
   `SRC-20260722-009`, commit `68898ad`; the follow-up `libssc` replacement
   source gate is `SRC-20260722-010`, commit `04aa394`
+- Elevated rootfs SHA transport source gate: `SRC-20260722-011`, commit
+  `f3b4bb4`
 - Release state: artifact-only; no approved Arch hardware release
 
 ## Evidence states
@@ -97,6 +99,10 @@ image; they do not describe the currently running filesystem.
    `sudo` boundary inside `build-arch-rootfs-image.sh`. The run produced no
    artifacts; the elevated environment transport must be fixed and tested
    before another build.
+10. `SRC-20260722-011` removes the rootfs SHA from the `sudo --preserve-env`
+    dependency and binds it explicitly through the post-`sudo` `env` command.
+    The workflow and lock regression gates reject restoration of the fragile
+    transport path.
 
 ## Immediate release blockers
 
@@ -107,8 +113,7 @@ image; they do not describe the currently running filesystem.
 - Complete one artifact-only build using the audited pacman lock and the
   `SRC-20260722-009` sensor plus `SRC-20260722-010` `libssc` replacements; no
   unchanged retry of runs `29924934432`, `29928261179`, or `29931623980`
-- Explicitly bind and validate the pinned rootfs SHA-256 across the elevated
-  build boundary
+- Prove `SRC-20260722-011` in one new artifact-only CI run
 - Complete rootfs/GRUB/boot/DTB offline audit
 - Device-specific GPT verification and Firehose bundle
 - At least two independent rescue paths verified on hardware

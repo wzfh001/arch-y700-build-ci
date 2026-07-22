@@ -68,9 +68,12 @@ Exit gate: raw-image content, hashes, package ownership, path, and bootarg all
 - `CI FAIL`: run `29931623980` passed the immutable lock verification but the
   rootfs script immediately rejected its rootfs SHA-256 after the `sudo`
   boundary. No rootfs or artifact was created.
-- Current stop: record and fix only the elevated rootfs-SHA transport, add a
-  regression gate, then authorize one new artifact-only build. Do not retry
-  any failed run unchanged and do not publish a Release.
+- `SOURCE PASS`: `SRC-20260722-011` explicitly passes the non-secret rootfs
+  SHA through the post-`sudo` `env` command and adds a regression gate that
+  rejects returning it to `sudo --preserve-env`; source commit `f3b4bb4`.
+- Current stop: run exactly one new artifact-only build from the clean
+  `f3b4bb4` source tree. Do not retry any failed run unchanged and do not
+  publish a Release.
 - Pin every remaining controllable input.
 - Validate niri, service behavior, credentials policy, final configuration
   paths, package ownership, and secret absence.

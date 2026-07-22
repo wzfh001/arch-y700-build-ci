@@ -940,3 +940,54 @@ References to earlier experiment IDs:
 - Stop line: any new collision, transaction drift, hash/ownership mismatch,
   hidden test failure, metadata leak, or missing log is a new failure. Do not
   rerun this commit unchanged after a failure.
+
+### SRC-20260722-011 — Explicit rootfs SHA transport across sudo
+
+- Result: `PASS` for the source gate; no firmware artifact, Release, or device
+  write was produced.
+- Source commit: `f3b4bb44be9e87f91c9421963fe46513c11ee05e`.
+- Parent failure: `CI-20260722-008`, workflow run `29931623980`.
+- Primary and only functional variable: stop relying on
+  `sudo --preserve-env` for the non-secret `ARCH_ROOTFS_SHA256`; bind its
+  already validated workflow value explicitly in the post-`sudo` `env`
+  command that starts `build-arch-rootfs-image.sh`.
+- Security boundary: password hashes and authorized keys remain step-scoped
+  secrets transported through the existing restricted path. No secret is
+  added to workflow inputs, command-line literals, metadata, or logs.
+- Regression coverage: actionlint, workflow semantics, input-boundary checks,
+  and `test-pacman-package-lock.sh` pass. The lock test now requires the
+  explicit SHA binding and rejects restoring it to the `sudo --preserve-env`
+  list.
+- Next authorized experiment: exactly one artifact-only CI build with all
+  package, rootfs, boot, kernel, payload, credential, and release-mode inputs
+  unchanged. No Release or device write is authorized.
+
+### CI-20260722-009 — Elevated rootfs SHA artifact-only rebuild authorization
+
+- Result: `AUTHORIZED/PENDING` at record creation.
+- Parent failure: `CI-20260722-008`, workflow run `29931623980`.
+- Source evidence: `SRC-20260722-011`, implementation commit
+  `f3b4bb44be9e87f91c9421963fe46513c11ee05e`.
+- Primary and only functional variable: explicitly transport the selected
+  rootfs SHA across the elevated command boundary. Qualcomm package handling,
+  pacman transaction content, and all fixed payload bytes are unchanged.
+- Held constant: pacman lock seed `29921200387`, pinned rootfs/boot/kernel/
+  device/sensor/haptics inputs, `tablet-niri`, `20G`, credentials policy,
+  artifact naming policy, `release_tag` empty, and `prerelease=false`.
+- Expected result: both pre- and post-`sudo` lock verification accept the same
+  rootfs SHA, the build reaches the Qualcomm package gates, rootfs and GRUB
+  complete, and two artifacts upload without a Release.
+- Stop line: any new failure must be logged before another run; never rerun the
+  same commit unchanged.
+
+### DEV-20260722-028 — Source record guessed an incorrect full commit hash
+
+- Result: `FAIL` in an uncommitted documentation check; no CI run or external
+  state change occurred.
+- Primary variable: record the full implementation identity for
+  `SRC-20260722-011` and `CI-20260722-009`.
+- Observed: the first draft expanded the known short hash `f3b4bb4` into an
+  unverified 40-character value. `git rev-parse f3b4bb4` returned the actual
+  identity `f3b4bb44be9e87f91c9421963fe46513c11ee05e` before commit.
+- Correction: replace both draft values with the Git-resolved identity and
+  require `git rev-parse` evidence before writing any future full commit hash.
