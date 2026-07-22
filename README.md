@@ -43,11 +43,16 @@ The complete design and source matrix are in:
 - `docs/TABLET-NIRI-PACKAGE-MATRIX.md`
 - `docs/STATUS.md`
 - `docs/ROADMAP.md`
+- `docs/BUILD.md`
+- `docs/FLASHING.md`
+- `docs/RECOVERY.md`
+- `docs/TROUBLESHOOTING.md`
 - `docs/EXPERIMENT-LOG.md`
 - `docs/RISK-REGISTER.md`
 
-The current flashed rescue image does not have working Wi-Fi or USB gadget
-rescue. Bluetooth is only partially observed and Bluetooth NAP is unverified.
+The tablet currently runs the recovered Kubuntu baseline. The last attempted
+Arch rescue image did not have working Wi-Fi or USB gadget rescue; Bluetooth
+was only partially observed and Bluetooth NAP was unverified.
 Treat `docs/STATUS.md` as authoritative for implementation/runtime status;
 configuration presence is not hardware acceptance evidence.
 

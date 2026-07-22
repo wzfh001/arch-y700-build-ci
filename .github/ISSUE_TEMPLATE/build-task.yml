@@ -1,0 +1,30 @@
+name: Deterministic build task
+description: Propose one bounded build or audit change
+title: "[build] "
+labels: [build]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Primary question and single variable
+    validations:
+      required: true
+  - type: textarea
+    id: inputs
+    attributes:
+      label: Pinned inputs and expected hashes
+    validations:
+      required: true
+  - type: textarea
+    id: gate
+    attributes:
+      label: Validation and rollback
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety boundary
+      options:
+        - label: This task does not authorize flashing or publishing a Release.
+          required: true

@@ -1,0 +1,44 @@
+name: TB321FU hardware evidence
+description: Record one reproducible hardware failure or acceptance result
+title: "[hardware] "
+labels: [hardware, needs-evidence]
+body:
+  - type: input
+    id: experiment
+    attributes:
+      label: Experiment ID
+      description: Must match the append-only experiment log.
+    validations:
+      required: true
+  - type: input
+    id: identity
+    attributes:
+      label: Candidate identity
+      description: Commit, workflow run, profile, and rootfs/GRUB/boot/DTB hashes.
+    validations:
+      required: true
+  - type: dropdown
+    id: state
+    attributes:
+      label: Evidence state
+      options: [VERIFIED, PARTIAL, BROKEN, UNTESTED]
+    validations:
+      required: true
+  - type: textarea
+    id: procedure
+    attributes:
+      label: Single question and exact procedure
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Raw evidence and support-bundle SHA-256
+    validations:
+      required: true
+  - type: textarea
+    id: recovery
+    attributes:
+      label: Recovery action and next hypothesis
+    validations:
+      required: true

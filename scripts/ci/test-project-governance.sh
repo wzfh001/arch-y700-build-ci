@@ -12,11 +12,28 @@ fail() {
 for path in \
   docs/STATUS.md \
   docs/ROADMAP.md \
+  docs/BUILD.md \
+  docs/FLASHING.md \
+  docs/RECOVERY.md \
+  docs/TROUBLESHOOTING.md \
   docs/EXPERIMENT-LOG.md \
   docs/RISK-REGISTER.md \
+  .github/ISSUE_TEMPLATE/hardware-bug.yml \
+  .github/ISSUE_TEMPLATE/build-task.yml \
+  .github/ISSUE_TEMPLATE/feature.yml \
   validation/_template/hardware.yaml; do
   [ -s "$REPO_ROOT/$path" ] || fail "missing or empty governance file: $path"
 done
+
+grep -Fq 'Current device OS: recovered Kubuntu 26.04 ARM64 baseline' \
+  "$REPO_ROOT/docs/STATUS.md" || \
+  fail 'STATUS.md does not identify the current recovered Kubuntu baseline'
+grep -Fq 'Never use Fastboot to write the 20 GiB `userdata` raw image.' \
+  "$REPO_ROOT/docs/FLASHING.md" || \
+  fail 'FLASHING.md does not preserve the Fastboot userdata stop line'
+grep -Fq 'A retry must cite the old experiment' \
+  "$REPO_ROOT/docs/TROUBLESHOOTING.md" || \
+  fail 'TROUBLESHOOTING.md permits evidence-free retries'
 
 for state in VERIFIED PARTIAL BROKEN UNTESTED OUT-OF-SCOPE; do
   grep -Fq "\`$state\`" "$REPO_ROOT/docs/STATUS.md" || \

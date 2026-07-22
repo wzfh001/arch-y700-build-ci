@@ -1,6 +1,6 @@
 # TB321FU Arch Linux ARM status
 
-Last reviewed: 2026-07-21
+Last reviewed: 2026-07-22
 
 This file records current implementation and runtime truth. A source file,
 installed package, enabled service, or green CI job does not prove hardware
@@ -10,7 +10,8 @@ functionality.
 
 - Device: Lenovo Y700 2025, TB321FU, SM8650, 16 GiB + 512 GiB
 - Current branch: `codex/tablet-rescue-20260720`
-- Last flashed build: workflow run `29709555909`, commit `4edf3a4`
+- Current device OS: recovered Kubuntu 26.04 ARM64 baseline
+- Last attempted Arch build: workflow run `29709555909`, commit `4edf3a4`
 - First post-handoff source fix: commit `d480039`
 - Evidence-governance baseline: commit `34de491`
 - Offline support-bundle implementation: commit `3a095ed`
@@ -26,9 +27,14 @@ functionality.
 
 ## Current device state
 
+The physical tablet was restored to Kubuntu on 2026-07-21. The Arch results
+below are retained as historical evidence for the last attempted Arch rescue
+image; they do not describe the currently running filesystem.
+
 | Area | State | Current evidence |
 |---|---|---|
-| Boot to Arch | PARTIAL | User reported the rescue image booted; full automated boot evidence is missing. |
+| Current Kubuntu recovery | VERIFIED | Kubuntu 26.04 ARM64, Wi-Fi, SSH, SDDM, and NetworkManager were observed after recovery. |
+| Last Arch boot | PARTIAL | User reported the rescue image booted; full automated boot evidence is missing. |
 | Wi-Fi | BROKEN | No usable interface; final raw contains generic WCN7850 firmware instead of the Kubuntu-proven device file. |
 | Bluetooth base | PARTIAL | Basic Bluetooth was observed by the user; detailed logs are missing. |
 | Bluetooth NAP | UNTESTED | Profile exists, but activation, SDP UUID, `bnep0`, DHCP, and SSH are unproved. |
@@ -50,17 +56,18 @@ functionality.
 3. USB gadget work has two independent layers: ConfigFS function linking and
    the missing UDC/device-role transition. Commit `d480039` addresses only the
    first layer.
-4. The current USB unit is `Type=oneshot` with an infinite start timeout. It
-   can block startup ordering and does not coordinate hotplug or role changes.
-5. The Bluetooth NAP profile has no dedicated activation/retry coordinator.
+4. The last flashed USB unit was `Type=oneshot` with an infinite start timeout.
+   The current source worktree replaces it with a persistent coordinator, but
+   no TB321FU runtime acceptance exists yet.
+5. The last flashed Bluetooth NAP profile had no activation/retry coordinator;
+   the current source worktree adds one, still hardware `UNTESTED`.
 6. Commit `3a095ed` adds an automatic offline support bundle, redaction, file
    checksums, and an end-to-end archive test. It is not present in the flashed
    image and remains `UNTESTED` on TB321FU hardware.
 
 ## Immediate release blockers
 
-- Persistent non-blocking USB role/UDC/gadget coordinator
-- Bluetooth NAP activation coordinator
+- Commit and review the persistent USB and Bluetooth NAP coordinators
 - Install and verify the redacted support bundle on TB321FU hardware
 - Device-specific WCN7850 package, exact hashes, firmware path, and bootarg
 - Deterministic CI gates for the final raw filesystem
