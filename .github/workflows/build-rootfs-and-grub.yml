@@ -102,7 +102,7 @@ jobs:
               ARCH_ROOTFS_SHA256=3cf5764fb6fec7bffdff98787e52ccd15d5d6390a2496c7028d7c4950404c56a \
               ARCH_MIRROR='https://de3.mirror.archlinuxarm.org/$arch/$repo' \
               DESKTOP_PROFILE=tablet-niri INSTALL_FCITX5_CHINESE=1 INSTALL_FIREFOX=1 \
-              INSTALL_CAMERA_APPS=0 BUILD_TB321FU_GPU_SENSOR=0 PACKAGE_LIST= \
+              INSTALL_CAMERA_APPS=0 BUILD_TB321FU_GPU_SENSOR=0 PACKAGE_LIST='' \
               SOURCE_DATE_EPOCH=0 GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_SHA="$GITHUB_SHA" \
               bash scripts/ci/build-pacman-package-lock.sh
 
@@ -234,7 +234,7 @@ jobs:
           . scripts/ci/common.sh
           . scripts/ci/package-list.sh
           DESKTOP_PROFILE=tablet-niri INSTALL_FCITX5_CHINESE=1 INSTALL_FIREFOX=1 \
-            INSTALL_CAMERA_APPS=0 BUILD_TB321FU_GPU_SENSOR=0 PACKAGE_LIST= \
+            INSTALL_CAMERA_APPS=0 BUILD_TB321FU_GPU_SENSOR=0 PACKAGE_LIST='' \
             build_package_list > "$requested"
           bash scripts/ci/verify-pacman-package-lock.sh \
             "$LOCK_DIR" "$LOCK_MANIFEST_SHA256" "$LOCK_ROOTFS_SHA256" "$requested"

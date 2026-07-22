@@ -84,6 +84,9 @@ grep -Fq 'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093' "$
   fail 'build workflow does not use the pinned cross-run artifact downloader'
 grep -Fq "release_tag == '__PACMAN_LOCK_SEED__'" "$BUILD_WORKFLOW" ||
   fail 'existing dispatch workflow lacks the reserved lock-only mode'
+if grep -Eq 'PACKAGE_LIST=[[:space:]]+\\$' "$BUILD_WORKFLOW"; then
+  fail 'workflow contains an ambiguous empty PACKAGE_LIST assignment'
+fi
 grep -Fq 'name: tb321fu-pacman-lock-${{ github.run_id }}' "$BUILD_WORKFLOW" ||
   fail 'seed workflow artifact identity is not tied to the seed run'
 python3 "$SCRIPT_DIR/check-action-pins.py" "$BUILD_WORKFLOW" >/dev/null

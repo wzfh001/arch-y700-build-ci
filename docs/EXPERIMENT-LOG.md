@@ -347,3 +347,18 @@ References to earlier experiment IDs:
   value, and release publication remains impossible in seed mode.
 - Permanent decision: preserve the platform input limit and use an explicit,
   validated mode sentinel rather than silently dropping an existing input.
+
+### CI-20260722-001 — First lock seed stopped at remote shell validation
+
+- Result: `FAIL`; seed/download/upload steps did not run.
+- Workflow run: `29918348833`, commit `9d6e8a5`, reserved lock-only mode.
+- Primary variable: the workflow shell spelling for an empty `PACKAGE_LIST`
+  environment assignment.
+- Observed: the remote actionlint shellcheck integration reported SC1007 for
+  `PACKAGE_LIST= \\` and stopped in `Validate lock source`. The normal build job
+  was skipped as intended; no rootfs, GRUB, Release, or firmware artifact was
+  created.
+- Correction: spell the empty value as `PACKAGE_LIST=''` in both lock-related
+  workflow blocks and add a source regression that rejects the ambiguous form.
+- Retry authorization: a new commit changes the one failed variable; the next
+  seed run must reference this experiment and is not an unchanged retry.
