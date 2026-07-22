@@ -12,8 +12,8 @@ functionality.
 - Current branch: `codex/tablet-rescue-20260720`
 - Current device OS: recovered Kubuntu 26.04 ARM64 baseline
 - Last flashed Arch build: workflow run `29709555909`, commit `4edf3a4`
-- Last artifact-only build attempt: workflow run `29924934432`, commit
-  `e87d90c`; failed before artifact creation at the stock/Qualcomm sensor proxy
+- Last artifact-only build attempt: workflow run `29928261179`, commit
+  `6e6f6c6`; failed before artifact creation at the stock/Qualcomm `libssc`
   ownership collision
 - First post-handoff source fix: commit `d480039`
 - Evidence-governance baseline: commit `34de491`
@@ -27,7 +27,8 @@ functionality.
 - P3 pacman lock: seed run `29921200387`, immutable transaction audit
   `AUDIT-20260722-002`, committed pin `e87d90c`
 - Qualcomm SSC sensor proxy native replacement source gate:
-  `SRC-20260722-009`, commit `68898ad`; complete candidate build still pending
+  `SRC-20260722-009`, commit `68898ad`; the follow-up `libssc` replacement
+  source gate is `SRC-20260722-010`, commit `04aa394`
 - Release state: artifact-only; no approved Arch hardware release
 
 ## Evidence states
@@ -87,7 +88,10 @@ image; they do not describe the currently running filesystem.
    from the locked stock `iio-sensor-proxy`; silently dropping either payload
    is forbidden. `SRC-20260722-009` stages the Qualcomm proxy as an independent
    native Arch package with explicit transactional replacement and ownership
-   checks. A new artifact-only build is required to prove the final rootfs.
+   checks. `CI-20260722-007` then found the same ownership problem for
+   `/usr/bin/ssccli`; `SRC-20260722-010` packages Qualcomm `libssc` natively
+   with explicit replacement semantics. A new artifact-only build is required
+   to prove the final rootfs.
 
 ## Immediate release blockers
 
@@ -96,8 +100,8 @@ image; they do not describe the currently running filesystem.
 - Final-raw proof for the device-specific WCN7850 package, hashes, ownership,
   firmware path, and bootarg
 - Complete one artifact-only build using the audited pacman lock and the
-  `SRC-20260722-009` sensor replacement; no unchanged retry of run
-  `29924934432`
+  `SRC-20260722-009` sensor plus `SRC-20260722-010` `libssc` replacements; no
+  unchanged retry of runs `29924934432` or `29928261179`
 - Complete rootfs/GRUB/boot/DTB offline audit
 - Device-specific GPT verification and Firehose bundle
 - At least two independent rescue paths verified on hardware

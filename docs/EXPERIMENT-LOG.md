@@ -727,7 +727,9 @@ References to earlier experiment IDs:
 
 ### CI-20260722-006 — Native sensor proxy artifact-only rebuild
 
-- Result: `NOT TESTED` at authorization time.
+- Result: `FAIL` as an isolated experiment; the authorized run was terminated
+  by the next deterministic collision recorded as `CI-20260722-007` in
+  workflow run `29928261179` before any artifact was created.
 - Parent failure: `CI-20260722-005`, workflow run `29924934432`.
 - Source evidence: `SRC-20260722-009`, implementation commit
   `68898adc3e502c6adac2b8191a52bfed7aad70c7`, source-record commit
@@ -865,3 +867,59 @@ References to earlier experiment IDs:
   validation.
 - Correction: create the fixture directory explicitly, then rerun the same
   negative test. Production code was unchanged by this correction.
+
+### DEV-20260722-027 — Documentation patch used stale roadmap context
+
+- Result: `FAIL` before any file edit was applied.
+- Primary variable: update the status, roadmap, and experiment records after
+  commit `04aa394`.
+- Observed: one combined patch used text from an older `ROADMAP.md` revision;
+  `apply_patch` rejected the roadmap hunk during verification, so no part of
+  that patch was applied. No repository or external state changed.
+- Correction: inspect the literal current context and apply three bounded
+  patches separately. Do not resend the rejected combined hunk.
+
+### SRC-20260722-010 — Native Qualcomm libssc replacement gate
+
+- Result: `PASS` for the source and fixed-payload gate; no firmware artifact,
+  Release, or device write was produced.
+- Source commit: `04aa3949ae6ac5ab45b1d3bc9ef3398ef8865b67`.
+- Primary variable: address only the `/usr/bin/ssccli` collision observed in
+  `CI-20260722-007` by removing the fixed Qualcomm `libssc` payload from the
+  generic import and packaging it as native Arch `qcom-sns-libssc`.
+- Source identity: selected package
+  `qcom-sns-libssc_20260627.1_arm64.deb` passed SHA-256
+  `4c6f84c266a2c6d588289b5a9700a59711f0a7824744c8a788c8adf7c5786f86`.
+  The fixed payload contains 19 exact regular files and one explicitly checked
+  ABI symlink; all member hashes, modes, and AArch64 ELF checks passed.
+- Ownership policy: the native package explicitly
+  `provides/conflicts/replaces=libssc`, is installed before
+  `qcom-sns-iio-sensor-proxy`, and leaves the generic collision guard
+  fail-closed for every unrelated imported path. Stock `libssc` must be absent
+  after the transaction and all fixed files must be pacman-owned.
+- Regression coverage: focused payload, package lifecycle, ownership,
+  ordering, checksum, symlink, mode, and full workflow-equivalent gates all
+  passed locally, including the audited pacman lock and publication guards.
+- Next authorized experiment: exactly one artifact-only CI build from this
+  clean commit. `release_tag` remains empty; no Release or device write is
+  authorized.
+
+### CI-20260722-008 — Qualcomm libssc artifact-only rebuild authorization
+
+- Result: `AUTHORIZED/PENDING` at record creation; no artifact, Release, or
+  device write exists yet.
+- Parent failure: `CI-20260722-007`, workflow run `29928261179`.
+- Commit: `04aa3949ae6ac5ab45b1d3bc9ef3398ef8865b67`, branch
+  `codex/tablet-rescue-20260720`, repository `wzfh001/arch-y700-build-ci`.
+- Primary and only functional variable: split the fixed Qualcomm `libssc`
+  payload into native `qcom-sns-libssc`, replace the locked stock `libssc`
+  transactionally, and install it before `qcom-sns-iio-sensor-proxy`.
+- Held constant: pacman lock seed `29921200387`, rootfs/boot/kernel/sensor/
+  haptics inputs, `tablet-niri` profile, image size, output identity, and all
+  credential policy. `release_tag` is empty and `prerelease=false`.
+- Expected result: the locked base transaction remains unchanged, both custom
+  Qualcomm packages pass exact payload/ownership checks, rootfs and GRUB finish,
+  and the two Actions artifacts upload without a Release.
+- Stop line: any new collision, transaction drift, hash/ownership mismatch,
+  hidden test failure, metadata leak, or missing log is a new failure. Do not
+  rerun this commit unchanged after a failure.
