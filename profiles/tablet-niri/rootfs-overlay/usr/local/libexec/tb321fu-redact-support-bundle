@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 import re
 from collections import Counter
@@ -18,10 +19,14 @@ KNOWN_TOKEN = re.compile(
     r"\b(?:sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b"
 )
 URL_USERINFO = re.compile(r"(?i)([a-z][a-z0-9+.-]*://)[^/@\s:]+:[^/@\s]+@")
+URL_QUERY_SECRET = re.compile(
+    r"(?i)([?&](?:token|access_token|key|api[_-]?key|auth|password|passwd|secret)=)"
+    r"[^&#\s]+"
+)
 SENSITIVE_ASSIGNMENT = re.compile(
     r"(?im)^(?P<prefix>[ \t]*(?:[^#\n:=]{0,80})?"
     r"(?:password|passwd|passphrase|psk|secret|token|api[_-]?key|"
-    r"authorization|subscription)[^:=\n]*[=:][ \t]*)(?P<value>.*)$"
+    r"authorization|subscription|private[_-]?key)[^:=\n]*[=:][ \t]*)(?P<value>.*)$"
 )
 NMCLI_SECRET = re.compile(
     r"(?im)^(?P<prefix>[ \t]*(?:802-11-wireless-security\.)?"
@@ -54,6 +59,8 @@ def redact_text(text: str, identifiers: set[str], counts: Counter[str]) -> str:
     counts["known_token"] += replaced
     text, replaced = URL_USERINFO.subn(r"\1<REDACTED-USERINFO>@", text)
     counts["url_userinfo"] += replaced
+    text, replaced = URL_QUERY_SECRET.subn(r"\1<REDACTED>", text)
+    counts["url_query_secret"] += replaced
 
     def replace_assignment(match: re.Match[str]) -> str:
         counts["sensitive_assignment"] += 1
@@ -65,12 +72,21 @@ def redact_text(text: str, identifiers: set[str], counts: Counter[str]) -> str:
 
 
 def redact_tree(root: pathlib.Path) -> Counter[str]:
+    machine_id_path = pathlib.Path(
+        os.environ.get("TB321FU_MACHINE_ID_PATH", "/etc/machine-id")
+    )
+    dbus_machine_id_path = pathlib.Path(
+        os.environ.get("TB321FU_DBUS_MACHINE_ID_PATH", "/var/lib/dbus/machine-id")
+    )
+    boot_id_path = pathlib.Path(
+        os.environ.get("TB321FU_BOOT_ID_PATH", "/proc/sys/kernel/random/boot_id")
+    )
     identifiers = {
         value
         for value in (
-            read_identifier(pathlib.Path("/etc/machine-id")),
-            read_identifier(pathlib.Path("/var/lib/dbus/machine-id")),
-            read_identifier(pathlib.Path("/proc/sys/kernel/random/boot_id")),
+            read_identifier(machine_id_path),
+            read_identifier(dbus_machine_id_path),
+            read_identifier(boot_id_path),
         )
         if value
     }

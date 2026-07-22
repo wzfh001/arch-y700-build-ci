@@ -22,25 +22,39 @@ PYTHONPYCACHEPREFIX="$tmp/pycache" python3 -m py_compile "$redactor"
 
 fixture="$tmp/fixture"
 mkdir -p "$fixture"
+machine_id="$tmp/machine-id"
+boot_id="$tmp/boot-id"
+printf '0123456789abcdef0123456789abcdef\n' > "$machine_id"
+printf '12345678-1234-1234-1234-123456789abc\n' > "$boot_id"
 cat > "$fixture/secrets.txt" <<'EOF'
 machine-id=0123456789abcdef0123456789abcdef
+boot-id=12345678-1234-1234-1234-123456789abc
 psk=correct-horse-battery-staple
 Password: hunter2
 Authorization: Bearer abcdefghijklmnopqrstuvwxyz012345
 OPENAI_API_KEY=sk-abcdefghijklmnopqrstuvwxyz012345
+private_key=wireguard-private-material
 remote=https://alice:secret@example.invalid/repository
+subscription=https://example.invalid/sub?token=query-secret-value&format=yaml
 -----BEGIN OPENSSH PRIVATE KEY-----
 private-private-private
 -----END OPENSSH PRIVATE KEY-----
 useful-hardware-line=ath12k_pci 0000:01:00.0
 EOF
 
-"$redactor" --tree "$fixture"
+TB321FU_MACHINE_ID_PATH="$machine_id" \
+  TB321FU_DBUS_MACHINE_ID_PATH="$machine_id" \
+  TB321FU_BOOT_ID_PATH="$boot_id" \
+  "$redactor" --tree "$fixture"
 for secret in \
+  0123456789abcdef0123456789abcdef \
+  12345678-1234-1234-1234-123456789abc \
   correct-horse-battery-staple \
   hunter2 \
   abcdefghijklmnopqrstuvwxyz012345 \
   sk-abcdefghijklmnopqrstuvwxyz012345 \
+  wireguard-private-material \
+  query-secret-value \
   'alice:secret' \
   private-private-private; do
   if grep -RIFq -- "$secret" "$fixture"; then
@@ -51,6 +65,8 @@ grep -Fq 'useful-hardware-line=ath12k_pci 0000:01:00.0' "$fixture/secrets.txt" |
   fail 'redactor removed useful hardware evidence'
 grep -Fq 'files_changed=' "$fixture/REDACTION-REPORT.txt" || \
   fail 'redaction report is missing change counts'
+grep -Fq 'stable_identifier=' "$fixture/REDACTION-REPORT.txt" || \
+  fail 'redaction report is missing stable identifier counts'
 
 for required in \
   'journalctl -b' \
