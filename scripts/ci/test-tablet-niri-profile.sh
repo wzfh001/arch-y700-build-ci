@@ -122,7 +122,7 @@ expected_ignore='IgnorePkg = noctalia wvkbd paru tb321fu-imported-release-payloa
 grep -Fxq "$expected_ignore" "$freeze_root/etc/pacman.conf" || \
   fail "custom package freeze policy is incomplete"
 
-package_block=$(sed -n '/local tablet_niri=(/,/^  )/p' "$BUILD_SCRIPT")
+package_block=$(sed -n '/local tablet_niri=(/,/^  )/p' "$SCRIPT_DIR/package-list.sh")
 for package in niri greetd foot nftables zram-generator dnsmasq dolphin mpv vlc nodejs rust; do
   grep -Eq "(^|[[:space:]])${package}([[:space:]]|$)" <<< "$package_block" || \
     fail "tablet package list is missing $package"

@@ -236,3 +236,85 @@ References to earlier experiment IDs:
   external current handoff after commit creation.
 - References: `SRC-20260722-004`, `DEV-20260722-002`,
   `DEV-20260722-003`.
+
+### SRC-20260722-006 — Historical Arch Linux ARM snapshot endpoints are unavailable
+
+- Result: `FAIL` for the hypothesis that an existing dated ALARM archive can
+  replace the rolling pacman mirror.
+- Primary variable: read-only availability checks for previously documented
+  Arch Linux ARM archive endpoints.
+- Observed: `archive.archlinuxarm.org` did not resolve. The historical Tardis
+  archive returned a page stating that the archive was disabled on
+  2026-06-02 and would be removed. The alternative archive hostname checked in
+  the same probe also did not resolve.
+- New evidence: the live `de3` mirror still serves current signed `core.db`,
+  `extra.db`, packages, and detached package signatures, but it is rolling and
+  cannot be treated as a dated snapshot.
+- Permanent decision: do not repeat availability probes against the retired
+  Tardis archive or claim that a fixed rootfs SHA also fixes later `pacman
+  -Syu` inputs.
+- Next hypothesis: create an immutable seed artifact containing the frozen
+  repository databases, complete package transaction, signatures, hashes, and
+  expected installed package set; consume it offline in a second run.
+
+### DEV-20260722-004 — Read-only repository probe cleanup was rejected before execution
+
+- Result: `FAIL` before command execution; no download or filesystem change
+  occurred.
+- Primary variable: an automatic recursive cleanup trap attached to a new
+  `/tmp/tb321fu-p3-probe.*` directory.
+- Observed: the local command safety layer rejected the command because it
+  contained recursive removal syntax.
+- Correction: create a new mode-0700 temporary probe directory without an
+  automatic delete step. The repository database probe then completed.
+- Permanent decision: evidence probes must not weaken cleanup safety checks;
+  retained temporary evidence is preferable to broad deletion syntax.
+
+### DEV-20260722-005 — Package-lock manifest mixed newline records with NUL sorting
+
+- Result: `FAIL`, then corrected and rerun to `PASS`.
+- Primary variable: the source fixture that creates canonical `SHA256SUMS` for
+  a package-lock directory.
+- Observed: `find -printf '%P\\n'` was piped to `sort -z`, so all pathnames were
+  passed to `sha256sum` as one invalid argument.
+- Correction: emit NUL-delimited paths with `-printf '%P\\0'` throughout the
+  seed and fixture before `sort -z | xargs -0`.
+- Permanent decision: every pathname pipeline must use one delimiter end to
+  end; newline/NUL mixing is a hard test failure.
+
+### DEV-20260722-006 — Unsafe-path glob rejected every valid lock member
+
+- Result: `FAIL`, then corrected and rerun to `PASS`.
+- Primary variable: the verifier's hostile-path rejection expression.
+- Observed: a shell `case` pattern intended to reject dollar signs interacted
+  with shell expansion and matched ordinary paths such as `LOCK-INFO.env`.
+- Correction: iterate NUL-delimited absolute members, derive their relative
+  names, and use explicit `[[ ... ]]` checks for empty, absolute, traversal,
+  dollar, CR, and LF content.
+- Permanent decision: hostile path checks use explicit predicates and a
+  positive fixture; no compact glob is accepted without a valid-path test.
+
+### SRC-20260722-007 — Two-stage pacman package-lock source mechanism
+
+- Result: `PASS` at source/hostile-fixture scope; the package lock is still
+  `UNSET`, so the P3 exit Gate is not complete.
+- Primary variable: replace live `pacman -Syu` for `tablet-niri` with a seed
+  artifact and a locked offline transaction.
+- Implementation: one shared package request function feeds both workflows;
+  the seed freezes `core.db`/`extra.db`, exact package files, detached
+  signatures, package SHA-256 values, expected final `pacman -Q`, seed run, and
+  seed commit. The build pins the manifest SHA and immutable run/artifact
+  identity, verifies every member, mounts a `file://` repository, and runs both
+  pacman transactions under `unshare --net`.
+- Fail-closed behavior: `tablet-niri` refuses to build without
+  `profiles/tablet-niri/pacman-lock.env`, a 64-hex manifest pin, matching fixed
+  rootfs SHA, matching request list, valid package signatures, and an exact
+  post-transaction installed package set.
+- Tests: `PACMAN_PACKAGE_LOCK_SOURCE=PASS`, hostile lock tampering rejected,
+  both workflows pass actionlint and immutable-action checks, workflow
+  semantics pass, and the complete existing offline validation sequence passes.
+- Boundary: no seed workflow has run, no lock artifact has been pinned, and no
+  rootfs/GRUB build has consumed the mechanism. The next action is a lock-only
+  seed run; it is not a firmware candidate or Release.
+- References: `SRC-20260722-006`, `DEV-20260722-004`,
+  `DEV-20260722-005`, `DEV-20260722-006`.

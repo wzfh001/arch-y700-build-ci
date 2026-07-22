@@ -47,7 +47,14 @@ Exit gate: raw-image content, hashes, package ownership, path, and bootarg all
 
 ## P3 — Deterministic build candidate
 
-- Pin every controllable input.
+- `SOURCE PASS`: `SRC-20260722-007` implements a two-stage pacman lock because
+  `SRC-20260722-006` proved the historical ALARM archive is unavailable. The
+  seed freezes repository databases, exact packages/signatures and expected
+  package state; the build consumes the pinned artifact under `unshare --net`.
+- Current stop: the seed artifact and `profiles/tablet-niri/pacman-lock.env`
+  are still unset. No rootfs candidate may build until the immutable run,
+  artifact name, manifest SHA and rootfs SHA are committed.
+- Pin every remaining controllable input.
 - Validate niri, service behavior, credentials policy, final configuration
   paths, package ownership, and secret absence.
 - Build artifact-only; do not publish a release.

@@ -12,7 +12,7 @@ Last reviewed: 2026-07-22
 | R-006 | P1 | UDC/device role never appears | ACM/NCM unavailable | Type-C role and UDC state machine | Support bundle Type-C/UDC snapshot | OPEN |
 | R-007 | P1 | NAP profile never activates | Bluetooth rescue unavailable | Dedicated activation/retry service | SDP, `bnep0`, DHCP, SSH evidence | SOURCE CONTROL VERIFIED; HARDWARE UNTESTED |
 | R-008 | P1 | Support bundle leaks secrets | Credential/privacy exposure | Redaction fixtures and secret scan | Delete unsafe bundle; rotate exposed secret | SOURCE CONTROL IMPLEMENTED; HARDWARE UNTESTED |
-| R-009 | P1 | Rolling update breaks payload ABI | Boot/hardware regression | Freeze compatibility unit; test before thaw | Roll back known image/config snapshot | OPEN |
+| R-009 | P1 | Rolling update breaks payload ABI | Boot/hardware regression | Immutable pacman DB/package lock plus frozen compatibility unit | Roll back known image/config snapshot | SOURCE MECHANISM VERIFIED by SRC-20260722-007; LOCK ARTIFACT UNSET |
 | R-010 | P1 | Suspend resumes to lit black screen | Loss of local UI | No automatic suspend; rescue first | Pre/post logs and forced-reboot plan | DEFERRED |
 
 Risk updates must cite an experiment ID or evidence path. Closing a risk means

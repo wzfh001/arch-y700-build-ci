@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 . "$SCRIPT_DIR/common.sh"
 . "$SCRIPT_DIR/system-payload-policy.sh"
+. "$SCRIPT_DIR/package-list.sh"
 
 usage() {
   cat <<USAGE
@@ -38,6 +39,8 @@ Environment inputs:
   INSTALL_CAMERA_APPS         install camera test apps, default: 1
   DEVICE_DEB_ARCHIVE          Y700 device payload archive containing .deb files and overlays
   DEVICE_DEB_DIR              optional local directory containing device .deb files/overlays
+  PACMAN_PACKAGE_LOCK_DIR     verified offline pacman repository lock for tablet-niri
+  PACMAN_PACKAGE_LOCK_MANIFEST_SHA256 pinned SHA-256 of the lock manifest
   SENSOR_DEB_ARCHIVE          TB321FU qcom-sns sensor package archive
   SENSOR_DEB_DIR              optional local directory containing TB321FU sensor packages
   HAPTICS_DEB_ARCHIVE         TB321FU haptics package archive
@@ -117,6 +120,8 @@ INSTALL_CAMERA_APPS=${INSTALL_CAMERA_APPS:-1}
 DEVICE_DEB_ARCHIVE=${DEVICE_DEB_ARCHIVE:-}
 DEVICE_DEB_ARCHIVE_SHA256=${DEVICE_DEB_ARCHIVE_SHA256:-}
 DEVICE_DEB_DIR=${DEVICE_DEB_DIR:-}
+PACMAN_PACKAGE_LOCK_DIR=${PACMAN_PACKAGE_LOCK_DIR:-}
+PACMAN_PACKAGE_LOCK_MANIFEST_SHA256=${PACMAN_PACKAGE_LOCK_MANIFEST_SHA256:-}
 SENSOR_DEB_ARCHIVE=${SENSOR_DEB_ARCHIVE:-}
 SENSOR_DEB_ARCHIVE_SHA256=${SENSOR_DEB_ARCHIVE_SHA256:-}
 SENSOR_DEB_DIR=${SENSOR_DEB_DIR:-}
@@ -159,6 +164,10 @@ if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
   [ -z "$DEVICE_DEB_DIR" ] || ci_die "tablet-niri forbids an unpinned device payload directory"
   [ -f "$TB321FU_WIFI_FIRMWARE_MANIFEST" ] || \
     ci_die "tablet-niri Wi-Fi firmware manifest is missing"
+  [ -n "$PACMAN_PACKAGE_LOCK_DIR" ] || \
+    ci_die "tablet-niri requires a verified pacman package lock directory"
+  [[ $PACMAN_PACKAGE_LOCK_MANIFEST_SHA256 =~ ^[0-9a-f]{64}$ ]] || \
+    ci_die "tablet-niri requires a pinned pacman package lock manifest SHA-256"
   INSTALL_FCITX5_CHINESE=1
   INSTALL_FIREFOX=1
   INSTALL_CAMERA_APPS=0
@@ -175,6 +184,7 @@ rootfs_img="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.img"
 build_info="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.BUILD-INFO.txt"
 manifest="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.manifest"
 third_party_manifest="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.third-party-assets.manifest"
+requested_packages_file="$work_dir/requested-packages.txt"
 mounted_rootfs=0
 bind_mounts=()
 
@@ -191,6 +201,17 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
+
+if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
+  build_package_list > "$requested_packages_file"
+  [ -s "$requested_packages_file" ] || ci_die "tablet-niri package request list is empty"
+  bash "$SCRIPT_DIR/verify-pacman-package-lock.sh" \
+    "$PACMAN_PACKAGE_LOCK_DIR" \
+    "$PACMAN_PACKAGE_LOCK_MANIFEST_SHA256" \
+    "$ARCH_ROOTFS_SHA256" \
+    "$requested_packages_file"
+  PACMAN_PACKAGE_LOCK_DIR=$(realpath -e -- "$PACMAN_PACKAGE_LOCK_DIR")
+fi
 
 mount_bind() {
   local source=$1
@@ -318,6 +339,11 @@ arch_chroot() {
     HTTPS_PROXY="${HTTPS_PROXY:-}" \
     PATH=/usr/local/sbin:/usr/local/bin:/usr/bin \
     "$@"
+}
+
+arch_chroot_offline() {
+  unshare --net -- chroot "$rootfs_dir" /usr/bin/env -i \
+    HOME=/root TERM=xterm PATH=/usr/local/sbin:/usr/local/bin:/usr/bin "$@"
 }
 
 assert_pacman_remote_policy_tokens() {
@@ -2342,90 +2368,6 @@ copy_skel_to_user() {
   chroot "$root" chown -R "$DEFAULT_USER_NAME:$group_name" "/home/$DEFAULT_USER_NAME/.config"
 }
 
-build_package_list() {
-  local base_packages=(
-    base bash-completion sudo openssh rsync curl wget ca-certificates gnupg fakeroot
-    nano vim less which file htop usbutils pciutils iproute2 inetutils
-    networkmanager bluez bluez-utils power-profiles-daemon udisks2 upower
-    linux-firmware
-    alsa-ucm-conf alsa-utils iio-sensor-proxy feedbackd
-    glib2 libgudev polkit protobuf-c libqmi libqrtr-glib
-    libevent libyaml gstreamer gst-plugins-base gst-plugins-base-libs gst-plugins-good gst-plugin-libcamera gtk3 gdk-pixbuf2 libunwind elfutils gnutls libglvnd
-    mesa vulkan-freedreno vulkan-tools
-    pipewire pipewire-alsa pipewire-pulse wireplumber
-  )
-  local desktop_standard=(
-    plasma-meta sddm sddm-kcm plasma-keyboard xdg-desktop-portal-kde
-    dolphin konsole kate ark gwenview okular spectacle discover packagekit-qt6 bluedevil
-    packagekit
-    noto-fonts noto-fonts-cjk ttf-dejavu ttf-liberation
-  )
-  local desktop_full=(kde-applications-meta)
-  local tablet_niri=(
-    niri xwayland-satellite greetd greetd-tuigreet foot fuzzel
-    xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk qt6-wayland
-    wl-clipboard wtype playerctl grim slurp satty zenity brightnessctl
-    nftables zram-generator e2fsprogs wpa_supplicant dnsmasq
-    pavucontrol gvfs kio-extras ffmpegthumbnailer phonon-qt6-vlc
-    dolphin ark mpv vlc elisa gwenview okular
-    noto-fonts noto-fonts-cjk noto-fonts-emoji ttf-jetbrains-mono-nerd
-    base-devel git nodejs npm pnpm python rust ripgrep fd jq tmux neovim
-    7zip zip unzip unrar zstd exfatprogs dosfstools
-    gtk3 libxt mailcap shared-mime-info desktop-file-utils hicolor-icon-theme
-    gtk-update-icon-cache
-    dbus-glib nss ffmpeg4.4 libnotify libxss libxtst
-    xdg-utils at-spi2-core util-linux-libs libsecret libayatana-appindicator
-    webkit2gtk-4.1
-    cairo fontconfig freetype2 gcc-libs glib2 glibc jemalloc libpipewire
-    libqalculate librsvg libwebp libwireplumber libxkbcommon libxml2 md4c pam
-    polkit pango sdbus-cpp tomlplusplus wayland meson ninja nlohmann-json
-    pkgconf stb wayland-protocols scdoc
-  )
-  local fcitx_packages=(
-    fcitx5 fcitx5-chinese-addons fcitx5-configtool fcitx5-qt fcitx5-gtk fcitx5-material-color
-  )
-  local browser_packages=(firefox)
-  local camera_app_packages=(snapshot kamoso)
-  local gpu_sensor_build_packages=(cmake extra-cmake-modules gcc make libksysguard ksystemstats qt6-base kcoreaddons ki18n)
-  local packages=("${base_packages[@]}")
-
-  case "$DESKTOP_PROFILE" in
-    minimal)
-      packages+=(plasma-desktop plasma-workspace sddm plasma-keyboard konsole dolphin noto-fonts-cjk)
-      ;;
-    standard)
-      packages+=("${desktop_standard[@]}")
-      ;;
-    full)
-      packages+=("${desktop_standard[@]}" "${desktop_full[@]}")
-      ;;
-    tablet-niri)
-      packages+=("${tablet_niri[@]}")
-      ;;
-    *) ci_die "unsupported DESKTOP_PROFILE=$DESKTOP_PROFILE" ;;
-  esac
-
-  if ci_bool "$INSTALL_FCITX5_CHINESE"; then
-    packages+=("${fcitx_packages[@]}")
-  fi
-  if ci_bool "$INSTALL_FIREFOX"; then
-    packages+=("${browser_packages[@]}")
-  fi
-  if ci_bool "$INSTALL_CAMERA_APPS"; then
-    packages+=("${camera_app_packages[@]}")
-  fi
-  if ci_bool "$BUILD_TB321FU_GPU_SENSOR"; then
-    packages+=("${gpu_sensor_build_packages[@]}")
-  fi
-  if [ -n "$PACKAGE_LIST" ]; then
-    while IFS= read -r package; do
-      [ -n "$package" ] && packages+=("$package")
-    done <<< "$PACKAGE_LIST"
-  fi
-
-  printf '%s\n' "${packages[@]}" | awk 'NF && !seen[$0]++'
-}
-
 ci_log "creating rootfs image: $rootfs_img ($ROOTFS_IMAGE_SIZE)"
 rm -f "$rootfs_img"
 truncate -s "$ROOTFS_IMAGE_SIZE" "$rootfs_img"
@@ -2441,7 +2383,12 @@ ci_log "extracting Arch Linux ARM rootfs"
 tar -C "$rootfs_dir" -xpf "$rootfs_archive" --numeric-owner
 
 install -d -m 0755 "$rootfs_dir/etc/pacman.d" "$rootfs_dir/etc/systemd/system"
-printf 'Server = %s\n' "$ARCH_MIRROR" > "$rootfs_dir/etc/pacman.d/mirrorlist"
+if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
+  printf 'Server = file:///run/tb321fu-pacman-lock/repo/$arch/$repo\n' > \
+    "$rootfs_dir/etc/pacman.d/mirrorlist"
+else
+  printf 'Server = %s\n' "$ARCH_MIRROR" > "$rootfs_dir/etc/pacman.d/mirrorlist"
+fi
 rm -f "$rootfs_dir/etc/resolv.conf"
 cp -L /etc/resolv.conf "$rootfs_dir/etc/resolv.conf"
 if ! awk '
@@ -2455,19 +2402,36 @@ if ! awk '
 fi
 
 mount_chroot_runtime
+if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
+  install -d -m 0755 "$rootfs_dir/run/tb321fu-pacman-lock"
+  mount_bind "$PACMAN_PACKAGE_LOCK_DIR" "$rootfs_dir/run/tb321fu-pacman-lock"
+fi
 
 ci_log "initializing pacman keyring"
 arch_chroot /usr/bin/pacman-key --init
 arch_chroot /usr/bin/pacman-key --populate archlinuxarm
 assert_arch_remote_signature_policy
-arch_chroot /usr/bin/getent hosts os.archlinuxarm.org >/dev/null
-arch_chroot /usr/bin/pacman -Sy --noconfirm --needed archlinuxarm-keyring
-
-mapfile -t packages < <(build_package_list)
+if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
+  arch_chroot_offline /usr/bin/pacman -Sy --noconfirm --needed archlinuxarm-keyring
+  arch_chroot_offline /usr/bin/pacman-key --populate archlinuxarm
+  mapfile -t packages < "$requested_packages_file"
+else
+  arch_chroot /usr/bin/getent hosts os.archlinuxarm.org >/dev/null
+  arch_chroot /usr/bin/pacman -Sy --noconfirm --needed archlinuxarm-keyring
+  mapfile -t packages < <(build_package_list)
+fi
 printf '%s\n' "${packages[@]}" > "$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.packages"
 ci_log "installing Arch packages: ${#packages[@]} packages"
 assert_arch_remote_signature_policy
-arch_chroot /usr/bin/pacman -Syu --noconfirm --needed --disable-download-timeout -- "${packages[@]}"
+if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
+  arch_chroot_offline /usr/bin/pacman -Syu --noconfirm --needed --disable-download-timeout -- "${packages[@]}"
+  arch_chroot_offline /usr/bin/pacman -Q | LC_ALL=C sort > "$work_dir/locked-installed-packages.txt"
+  cmp -s "$PACMAN_PACKAGE_LOCK_DIR/expected-installed-packages.txt" \
+    "$work_dir/locked-installed-packages.txt" || \
+    ci_die "locked pacman transaction produced a different installed package set"
+else
+  arch_chroot /usr/bin/pacman -Syu --noconfirm --needed --disable-download-timeout -- "${packages[@]}"
+fi
 
 if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
   ci_log "building pinned tablet-niri source packages"
@@ -2694,6 +2658,7 @@ generated=$(ci_iso8601_timestamp)
 distribution=Arch Linux ARM
 arch=aarch64
 arch_rootfs_url=$ARCH_ROOTFS_URL
+arch_rootfs_sha256=$ARCH_ROOTFS_SHA256
 arch_mirror=$ARCH_MIRROR
 desktop_profile=$DESKTOP_PROFILE
 rootfs_image_size=$ROOTFS_IMAGE_SIZE
@@ -2730,6 +2695,11 @@ apply_y700_firmware_fixes=$APPLY_Y700_FIRMWARE_FIXES
 apply_y700_audio_policy_fixes=$APPLY_Y700_AUDIO_POLICY_FIXES
 INFO
 if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
+  cat >> "$build_info" <<INFO
+pacman_package_lock_manifest_sha256=$PACMAN_PACKAGE_LOCK_MANIFEST_SHA256
+pacman_package_lock_seed_run_id=$(awk -F= '$1 == "seed_run_id" { print $2; exit }' "$PACMAN_PACKAGE_LOCK_DIR/LOCK-INFO.env")
+pacman_package_lock_seed_commit=$(awk -F= '$1 == "seed_commit" { print $2; exit }' "$PACMAN_PACKAGE_LOCK_DIR/LOCK-INFO.env")
+INFO
   cat >> "$build_info" <<'INFO'
 rescue_usb_network=cdc-ncm:10.77.0.1/24:networkmanager-shared
 rescue_usb_console=cdc-acm:ttyGS0:password-login
@@ -2739,6 +2709,13 @@ wifi_firmware_package=tb321fu-wifi-firmware
 wifi_firmware_search_path=/usr/lib/firmware/tb321fu
 wifi_board_2_bin_sha256=c896bc7782e252aa915849d5c9c47d109ecfe9f0fc5650fe771f7ba8f8eb77fb
 INFO
+fi
+
+if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
+  for lock_member in LOCK-INFO.env SHA256SUMS PACKAGE-FILES.tsv requested-packages.txt expected-installed-packages.txt; do
+    install -m 0644 "$PACMAN_PACKAGE_LOCK_DIR/$lock_member" \
+      "$OUTPUT_DIR/${OUTPUT_PREFIX}-pacman-lock.$lock_member"
+  done
 fi
 
 ci_log "writing rootfs manifest"
@@ -2761,6 +2738,15 @@ checksum_inputs=(
 )
 if [ -f "$third_party_manifest" ]; then
   checksum_inputs+=("$(basename "$third_party_manifest")")
+fi
+if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
+  checksum_inputs+=(
+    "$(basename "$OUTPUT_PREFIX")-pacman-lock.LOCK-INFO.env"
+    "$(basename "$OUTPUT_PREFIX")-pacman-lock.SHA256SUMS"
+    "$(basename "$OUTPUT_PREFIX")-pacman-lock.PACKAGE-FILES.tsv"
+    "$(basename "$OUTPUT_PREFIX")-pacman-lock.requested-packages.txt"
+    "$(basename "$OUTPUT_PREFIX")-pacman-lock.expected-installed-packages.txt"
+  )
 fi
 (cd "$OUTPUT_DIR" && sha256sum "${checksum_inputs[@]}" > "$(basename "$checksum_file")")
 

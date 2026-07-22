@@ -21,6 +21,7 @@ functionality.
 - Bluetooth NAP coordinator: commit `406e0c1`
 - Rescue CI integration: commit `eaf0650`
 - P2 WCN7850 exact-hash/native-package source gate: `SRC-20260722-005`
+- P3 two-stage pacman lock mechanism: `SRC-20260722-007`; lock artifact unset
 - Release state: artifact-only; no approved Arch hardware release
 
 ## Evidence states
@@ -83,7 +84,8 @@ image; they do not describe the currently running filesystem.
 - Verify USB role/UDC/ACM/NCM and Bluetooth NAP on TB321FU hardware
 - Final-raw proof for the device-specific WCN7850 package, hashes, ownership,
   firmware path, and bootarg
-- Deterministic CI gates for the final raw filesystem
+- Run and pin the immutable pacman lock seed, then prove the locked offline
+  transaction in a complete final raw build
 - Complete rootfs/GRUB/boot/DTB offline audit
 - Device-specific GPT verification and Firehose bundle
 - At least two independent rescue paths verified on hardware
