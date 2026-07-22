@@ -65,21 +65,27 @@ Exit gate: raw-image content, hashes, package ownership, path, and bootarg all
   packages the complete fixed payload as native `qcom-sns-libssc` with
   `provides/conflicts/replaces=libssc`, exact member hashes, and transactional
   ordering before the sensor proxy; source commit `04aa394`.
-- `CI FAIL`: run `29931623980` passed the immutable lock verification but the
-  rootfs script immediately rejected its rootfs SHA-256 after the `sudo`
-  boundary. No rootfs or artifact was created.
+- `CI FAIL`: run `29931623980` passed verification of the lock profile but the
+  rootfs script rejected the separately dispatched rootfs SHA. Later diagnostic
+  evidence proved that dispatch value was only 63 characters. No artifact was
+  created.
 - `SOURCE PASS`: `SRC-20260722-011` explicitly passes the non-secret rootfs
   SHA through the post-`sudo` `env` command and adds a regression gate that
   rejects returning it to `sudo --preserve-env`; source commit `f3b4bb4`.
 - `CI FAIL`: run `29932470727` still reported an invalid rootfs SHA after that
-  explicit binding, falsifying the single-variable transport hypothesis. It
-  also produced zero artifacts.
+  explicit binding because the source value was already truncated. It also
+  produced zero artifacts.
 - `SOURCE PASS`: `SRC-20260722-012` adds fail-closed byte-level diagnostics for
   malformed rootfs-SHA input and a trailing-newline regression fixture; source
   commit `72c6bd5`.
-- Current stop: run exactly one diagnostic artifact-only experiment from the
-  clean `72c6bd5` tree. Do not apply another speculative transport fix, retry
-  any failed run unchanged, or publish a Release.
+- `CI FAIL / ROOT CAUSE`: diagnostic run `29933069005` reported
+  `length=63` and exposed a value missing the final `a` from the pinned
+  64-character rootfs SHA. All three recent dispatches repeated that same
+  malformed input and produced zero artifacts.
+- Current stop: read the rootfs SHA directly from the committed pacman-lock
+  profile, validate it as 64 lowercase hexadecimal characters, and run exactly
+  one corrected artifact-only build. Do not hand-transcribe it, retry any
+  malformed dispatch, or publish a Release.
 - Pin every remaining controllable input.
 - Validate niri, service behavior, credentials policy, final configuration
   paths, package ownership, and secret absence.

@@ -921,22 +921,18 @@ References to earlier experiment IDs:
   Qualcomm packages pass exact payload/ownership checks, rootfs and GRUB finish,
   and the two Actions artifacts upload without a Release.
 - New evidence: checkout, all source gates, release-mode validation, dependency
-  installation, lock resolution/download, and complete immutable lock
-  verification passed. The step environment displayed the exact pinned
-  `ARCH_ROOTFS_SHA256`, but the elevated rootfs script stopped immediately at
-  its second lock verification with
-  `pacman package lock verification failure: invalid rootfs SHA-256`.
-- Boundary: the same lock and hash passed immediately before `sudo`, so this is
-  a privileged environment-transport failure, not a package-lock-content or
-  Qualcomm payload failure. The run created zero artifacts and the repository
+  installation, lock resolution/download, and immutable lock verification
+  passed. The rootfs script then rejected the separately dispatched
+  `ARCH_ROOTFS_SHA256` with `invalid rootfs SHA-256`.
+- Boundary correction: the pre-build verification used the 64-character value
+  from `profiles/tablet-niri/pacman-lock.env`; it did not validate the
+  workflow-dispatch input. The run created zero artifacts and the repository
   still has zero Releases.
 - Raw evidence: GitHub run
   `https://github.com/wzfh001/arch-y700-build-ci/actions/runs/29931623980`,
   failed job `88962544549`, step `Build rootfs image`.
-- Next hypothesis: remove reliance on `sudo --preserve-env` for the non-secret
-  rootfs SHA and pass that value explicitly through the post-`sudo` `env`
-  command, with a source regression test. This is the only authorized next
-  variable.
+- Next hypothesis at the time: remove reliance on `sudo --preserve-env` for the
+  non-secret rootfs SHA. This hypothesis was later falsified by `CI-20260722-010`.
 - Stop line: any new collision, transaction drift, hash/ownership mismatch,
   hidden test failure, metadata leak, or missing log is a new failure. Do not
   rerun this commit unchanged after a failure.
@@ -979,13 +975,12 @@ References to earlier experiment IDs:
   rootfs SHA, the build reaches the Qualcomm package gates, rootfs and GRUB
   complete, and two artifacts upload without a Release.
 - Observed: the workflow source showed the new explicit
-  `env ARCH_ROOTFS_SHA256="$ARCH_ROOTFS_SHA256"` binding and the step environment
-  displayed the expected 64 hexadecimal characters, but the rootfs verifier
-  still stopped with `invalid rootfs SHA-256` before image creation.
-- Conclusion: `sudo --preserve-env` was not the sole cause; the
-  `SRC-20260722-011` hypothesis is falsified. The current log does not expose
-  argument length or hidden bytes, so another functional transport change is
-  forbidden until byte-level diagnostic evidence exists.
+  `env ARCH_ROOTFS_SHA256="$ARCH_ROOTFS_SHA256"` binding, but the dispatched
+  value was still malformed and the rootfs verifier stopped before image
+  creation.
+- Conclusion: `SRC-20260722-011` did not address the failure; the actual input
+  bytes were unknown at this point, so another transport change was forbidden
+  until byte-level diagnostic evidence existed.
 - Raw evidence: GitHub run
   `https://github.com/wzfh001/arch-y700-build-ci/actions/runs/29932470727`,
   failed job `88965492451`, zero artifacts.
@@ -1047,7 +1042,8 @@ References to earlier experiment IDs:
 
 ### CI-20260722-010 — Rootfs SHA diagnostic artifact-only authorization
 
-- Result: `AUTHORIZED/PENDING` at record creation.
+- Result: `FAIL` in diagnostic artifact-only workflow run `29933069005`; no
+  rootfs, GRUB, artifact, Release, or device write was produced.
 - Parent failure: `CI-20260722-009`, workflow run `29932470727`.
 - Source evidence: `SRC-20260722-012`, implementation commit
   `72c6bd539bc955fd436ec9bd532455fedfa73641`.
@@ -1057,5 +1053,50 @@ References to earlier experiment IDs:
 - Expected result: if the hidden-byte hypothesis is correct, the failed step
   will identify the exact length and escaped form; otherwise it will show that
   the invalid value originates elsewhere. The run remains artifact-only.
+- Observed: the verifier reported
+  `invalid rootfs SHA-256 (length=63, shell=3cf5764f...0404c56)`. The value is
+  an exact prefix of the pinned 64-character SHA and is missing its final `a`;
+  there is no hidden newline or `sudo` mutation.
+- Root cause: the dispatch command manually transcribed a 63-character SHA.
+  The pre-build lock step validated the profile's independent 64-character
+  value, so it did not catch the malformed workflow input. This is an operator
+  input error, not a repository or package-lock defect.
+- Raw evidence: GitHub run
+  `https://github.com/wzfh001/arch-y700-build-ci/actions/runs/29933069005`,
+  failed job `88967512094`, zero artifacts.
 - Stop line: record the new evidence before any transport or input fix; never
   rerun this commit unchanged after failure.
+
+### DEV-20260722-031 — Hand-dispatched rootfs SHA omitted the final character
+
+- Result: `FAIL` across three artifact-only dispatches (`29931623980`,
+  `29932470727`, and `29933069005`); no artifact or device state changed.
+- Primary variable: manually supply the pinned `arch_rootfs_sha256` workflow
+  input.
+- Observed: each command used the 63-character prefix ending in `c56`; the
+  committed lock profile ends in `c56a` and is 64 characters. The new verifier
+  diagnostic proved the omission.
+- Correction: derive the dispatch value from
+  `profiles/tablet-niri/pacman-lock.env`, assert exactly 64 lowercase
+  hexadecimal characters, and print the length before dispatch. Do not hand
+  type this value again.
+
+### CI-20260722-011 — Corrected pinned rootfs SHA artifact-only authorization
+
+- Result: `AUTHORIZED/PENDING` at record creation.
+- Parent failures: `CI-20260722-008`, `CI-20260722-009`, and
+  `CI-20260722-010`; the common root cause is `DEV-20260722-031`.
+- Source tree: branch `codex/tablet-rescue-20260720`, with the diagnostic and
+  package fixes already committed; no source functional change is introduced
+  by this authorization.
+- Primary and only functional variable: send the exact 64-character
+  `rootfs_sha256` read from `profiles/tablet-niri/pacman-lock.env` instead of
+  the previously truncated hand-written value.
+- Held constant: rootfs/boot/kernel/device/sensor/haptics inputs, pacman lock
+  seed `29921200387`, `tablet-niri`, `20G`, credentials policy, output prefix,
+  `release_tag` empty, and `prerelease=false`.
+- Expected result: the rootfs verifier accepts the selected SHA and the build
+  proceeds to the Qualcomm package/ownership gates; success still creates only
+  Actions artifacts and never a Release.
+- Stop line: any new failure is a distinct experiment; never rerun a malformed
+  dispatch or this corrected input unchanged after failure.

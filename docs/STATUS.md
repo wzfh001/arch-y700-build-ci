@@ -12,9 +12,9 @@ functionality.
 - Current branch: `codex/tablet-rescue-20260720`
 - Current device OS: recovered Kubuntu 26.04 ARM64 baseline
 - Last flashed Arch build: workflow run `29709555909`, commit `4edf3a4`
-- Last artifact-only build attempt: workflow run `29932470727`, commit
-  `10bc837`; failed before rootfs creation because the rootfs verifier still
-  received an invalid `ARCH_ROOTFS_SHA256` value after explicit binding
+- Last artifact-only build attempt: workflow run `29933069005`, commit
+  `bb85da3`; diagnostic output proved the dispatched rootfs SHA was 63
+  characters and omitted the final `a`
 - First post-handoff source fix: commit `d480039`
 - Evidence-governance baseline: commit `34de491`
 - Offline support-bundle implementation: commit `3a095ed`
@@ -96,19 +96,21 @@ image; they do not describe the currently running filesystem.
    with explicit replacement semantics. A new artifact-only build is required
    to prove the final rootfs.
 9. `CI-20260722-008` passed the immutable lock download and complete pre-build
-   verification, while the same SHA-256 was rejected immediately after the
-   `sudo` boundary inside `build-arch-rootfs-image.sh`. The run produced no
-   artifacts; the elevated environment transport must be fixed and tested
-   before another build.
+   verification, then rejected the workflow-selected rootfs SHA inside
+   `build-arch-rootfs-image.sh`. The earlier conclusion that the same value had
+   passed before `sudo` was incorrect: the pre-build step validated the
+   profile's 64-character lock value, while the dispatch input was 63
+   characters.
 10. `SRC-20260722-011` removes the rootfs SHA from the `sudo --preserve-env`
     dependency and binds it explicitly through the post-`sudo` `env` command.
     The workflow and lock regression gates reject restoration of the fragile
-    transport path. `CI-20260722-009` falsified the hypothesis that
-    `sudo --preserve-env` alone caused the invalid value; byte-level diagnostics
-    are now required before another functional fix.
+    transport path. `CI-20260722-009` showed that change did not address the
+    failure because the dispatched value itself was already truncated.
 11. `SRC-20260722-012` makes malformed lock-verifier input report its byte
-    length and shell-escaped form, and tests a trailing-newline fixture. This
-    is diagnostic evidence only; it does not weaken the fail-closed check.
+    length and shell-escaped form. `CI-20260722-010` used it to prove all three
+    failed dispatches supplied the 63-character prefix
+    `3cf5764f...0404c56`, missing the final `a` from the pinned 64-character
+    SHA. This is an operator-input failure, not lock corruption.
 
 ## Immediate release blockers
 
@@ -119,7 +121,8 @@ image; they do not describe the currently running filesystem.
 - Complete one artifact-only build using the audited pacman lock and the
   `SRC-20260722-009` sensor plus `SRC-20260722-010` `libssc` replacements; no
   unchanged retry of runs `29924934432`, `29928261179`, or `29931623980`
-- Run one diagnostic artifact-only build using `SRC-20260722-012`
+- Run one artifact-only build whose rootfs SHA is read and validated directly
+  from `profiles/tablet-niri/pacman-lock.env`, not manually transcribed
 - Complete rootfs/GRUB/boot/DTB offline audit
 - Device-specific GPT verification and Firehose bundle
 - At least two independent rescue paths verified on hardware
