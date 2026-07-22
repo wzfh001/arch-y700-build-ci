@@ -39,3 +39,17 @@ scripts/ci/audit-tb321fu-firmware-collisions.sh \
 ```
 
 The audit fails closed on any new path, owner, byte, symlink, or mode change.
+
+The complete device-archive audit (2,335 device members against all 723 locked
+Arch packages) is also reproducible offline:
+
+```text
+scripts/ci/audit-tb321fu-device-archive-collisions.sh \
+  /path/to/y700-device-debs-20260624-201420-compat1.tar.gz \
+  /path/to/TB321FU-tablet-niri-pacman-lock.tar
+```
+
+Its checked-in TSV records all 16 intersections, including the ten identical
+ALSA codec files and the six content/type mismatches. The tablet profile keeps
+the generic `alsa-ucm-conf` ownership and packages the TB321FU profile under
+`tb321fu-alsa-ucm`; no generic UCM file is overwritten.

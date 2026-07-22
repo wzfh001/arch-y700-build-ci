@@ -93,6 +93,13 @@ TB321FU_BLUETOOTH_FIRMWARE_MANIFEST="$REPO_ROOT/profiles/tablet-niri/bluetooth-f
 TB321FU_BLUETOOTH_FIRMWARE_PACKAGE='tb321fu-bluetooth-firmware'
 TB321FU_BLUETOOTH_FIRMWARE_SOURCE_PACKAGE='y700-daily-rootfs-overlay_0.1+20260624-201420_arm64.deb'
 TB321FU_BLUETOOTH_FIRMWARE_SOURCE_PACKAGE_SHA256='9b45ab04d455cfcc24ed40779e9522930543330151c254e87a2aee7f381db5bc'
+TB321FU_ALSA_UCM_SOURCE_MANIFEST="$REPO_ROOT/profiles/tablet-niri/alsa-ucm-source.sha256"
+TB321FU_ALSA_UCM_PACKAGE_MANIFEST="$REPO_ROOT/profiles/tablet-niri/alsa-ucm-package.sha256"
+TB321FU_ALSA_UCM_PACKAGE='tb321fu-alsa-ucm'
+TB321FU_ALSA_UCM_SOURCE_PACKAGE='y700-daily-rootfs-overlay_0.1+20260624-201420_arm64.deb'
+TB321FU_ALSA_UCM_SOURCE_PACKAGE_SHA256='9b45ab04d455cfcc24ed40779e9522930543330151c254e87a2aee7f381db5bc'
+TB321FU_ALSA_UCM_GENERIC_PACKAGE='alsa-ucm-conf-1.2.16.1-1-any'
+TB321FU_ALSA_UCM_GENERIC_PACKAGE_SHA256='7c8748eb29e8bdd1632071410aab1ed19edc0f48ffbe47375a51b5a4bdef8db8'
 TB321FU_SENSOR_PROXY_PACKAGE='qcom-sns-iio-sensor-proxy'
 TB321FU_SENSOR_PROXY_VERSION='20260627.1'
 TB321FU_SENSOR_PROXY_DEB='qcom-sns-iio-sensor-proxy_20260627.1_arm64.deb'
@@ -178,6 +185,10 @@ if [ "$DESKTOP_PROFILE" = tablet-niri ]; then
     ci_die "tablet-niri Wi-Fi firmware manifest is missing"
   [ -f "$TB321FU_BLUETOOTH_FIRMWARE_MANIFEST" ] || \
     ci_die "tablet-niri Bluetooth firmware manifest is missing"
+  [ -f "$TB321FU_ALSA_UCM_SOURCE_MANIFEST" ] || \
+    ci_die "tablet-niri ALSA UCM source manifest is missing"
+  [ -f "$TB321FU_ALSA_UCM_PACKAGE_MANIFEST" ] || \
+    ci_die "tablet-niri ALSA UCM package manifest is missing"
   [ -n "$PACMAN_PACKAGE_LOCK_DIR" ] || \
     ci_die "tablet-niri requires a verified pacman package lock directory"
   [[ $PACMAN_PACKAGE_LOCK_MANIFEST_SHA256 =~ ^[0-9a-f]{64}$ ]] || \
@@ -195,6 +206,7 @@ arch_import_stage="$work_dir/arch-import-stage"
 arch_import_sources="$work_dir/arch-import-sources.tsv"
 arch_camera_supplement_stage="$work_dir/arch-camera-supplement-stage"
 arch_bluetooth_firmware_stage="$work_dir/tb321fu-bluetooth-firmware-stage"
+arch_alsa_ucm_stage="$work_dir/tb321fu-alsa-ucm-stage"
 arch_sensor_proxy_stage="$work_dir/qcom-sns-iio-sensor-proxy-stage"
 arch_libssc_stage="$work_dir/qcom-sns-libssc-stage"
 rootfs_img="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.img"
@@ -541,6 +553,12 @@ verify_required_y700_payload() {
       usr/lib/firmware/tb321fu/qca/hmtnv20_Kirby_prc.bin
       usr/share/tb321fu-bluetooth-firmware/SHA256SUMS
       usr/share/tb321fu-bluetooth-firmware/SOURCE.txt
+      usr/share/alsa/ucm2/LenovoY700TB321/HiFi.conf
+      usr/share/alsa/ucm2/LenovoY700TB321/LenovoY700TB321.conf
+      usr/share/alsa/ucm2/codecs/tb321fu-wcd939x/HeadphoneEnableSeq.conf
+      usr/share/tb321fu-alsa-ucm/SHA256SUMS
+      usr/share/tb321fu-alsa-ucm/SOURCE-SHA256SUMS
+      usr/share/tb321fu-alsa-ucm/SOURCE.txt
       usr/lib/modules/$KERNEL_VERSION/kernel/drivers/net/wireless/ath/ath12k/wifi7/ath12k_wifi7.ko
       usr/lib/modules/$KERNEL_VERSION/kernel/drivers/soc/qcom/pmic_glink.ko
       usr/lib/modules/$KERNEL_VERSION/kernel/drivers/usb/typec/ucsi/ucsi_glink.ko
@@ -1431,6 +1449,145 @@ SOURCE
     bluetooth_dependencies bluetooth_provides bluetooth_conflicts bluetooth_replaces
 }
 
+install_tb321fu_alsa_ucm_package() {
+  [ "$DESKTOP_PROFILE" = tablet-niri ] || return 0
+
+  local source_profile_root="$arch_import_stage/usr/share/alsa/ucm2/LenovoY700TB321"
+  local source_codec_root="$arch_import_stage/usr/share/alsa/ucm2/codecs/wcd939x"
+  local stage="$arch_alsa_ucm_stage"
+  local package_manifest="$stage/usr/share/tb321fu-alsa-ucm/SHA256SUMS"
+  local source_manifest="$stage/usr/share/tb321fu-alsa-ucm/SOURCE-SHA256SUMS"
+  local source_line hash relative destination mode
+  local actual_source_files expected_source_files actual_package_files expected_package_files
+  local new_reference_count
+  local -a alsa_dependencies=(alsa-ucm-conf)
+  local -a alsa_provides=(tb321fu-alsa-ucm)
+  local -a alsa_conflicts=()
+  local -a alsa_replaces=()
+
+  [ -d "$source_profile_root" ] || \
+    ci_die "TB321FU Lenovo ALSA UCM source profile is missing from the fixed device archive"
+  [ -d "$source_codec_root" ] || \
+    ci_die "TB321FU WCD939x ALSA UCM source codec directory is missing from the fixed device archive"
+  [ -f "$TB321FU_ALSA_UCM_SOURCE_MANIFEST" ] || \
+    ci_die "TB321FU ALSA UCM source manifest is missing"
+  [ -f "$TB321FU_ALSA_UCM_PACKAGE_MANIFEST" ] || \
+    ci_die "TB321FU ALSA UCM transformed package manifest is missing"
+  [ "$(wc -l < "$TB321FU_ALSA_UCM_SOURCE_MANIFEST")" -eq 13 ] || \
+    ci_die "TB321FU ALSA UCM source manifest must contain exactly 13 files"
+  [ "$(wc -l < "$TB321FU_ALSA_UCM_PACKAGE_MANIFEST")" -eq 13 ] || \
+    ci_die "TB321FU ALSA UCM package manifest must contain exactly 13 files"
+
+  while read -r hash relative; do
+    [[ $hash =~ ^[0-9a-f]{64}$ ]] || \
+      ci_die "invalid TB321FU ALSA UCM source hash: $hash"
+    case "$relative" in
+      usr/share/alsa/ucm2/LenovoY700TB321/HiFi.conf|\
+      usr/share/alsa/ucm2/LenovoY700TB321/LenovoY700TB321.conf|\
+      usr/share/alsa/ucm2/codecs/wcd939x/*.conf) ;;
+      *) ci_die "unsafe TB321FU ALSA UCM source manifest path: $relative" ;;
+    esac
+    [ -f "$arch_import_stage/$relative" ] && [ ! -L "$arch_import_stage/$relative" ] || \
+      ci_die "TB321FU ALSA UCM source is missing or unsafe: $relative"
+    mode=$(stat -c '%a' "$arch_import_stage/$relative")
+    [ "$mode" = 644 ] || \
+      ci_die "TB321FU ALSA UCM source has unsafe mode $mode: $relative"
+  done < "$TB321FU_ALSA_UCM_SOURCE_MANIFEST"
+
+  actual_source_files=$(
+    cd "$arch_import_stage"
+    find usr/share/alsa/ucm2/LenovoY700TB321 -mindepth 1 -maxdepth 1 -type f -printf '%p\n'
+    find usr/share/alsa/ucm2/codecs/wcd939x -mindepth 1 -maxdepth 1 -type f -printf '%p\n'
+  )
+  actual_source_files=$(LC_ALL=C sort <<< "$actual_source_files")
+  expected_source_files=$(awk '{print $2}' "$TB321FU_ALSA_UCM_SOURCE_MANIFEST" | LC_ALL=C sort)
+  [ "$actual_source_files" = "$expected_source_files" ] || \
+    ci_die "fixed device archive ALSA UCM member list differs from the pinned source manifest"
+  [ -z "$(find "$source_profile_root" "$source_codec_root" -mindepth 1 -maxdepth 1 ! -type f -print -quit)" ] || \
+    ci_die "fixed device archive ALSA UCM directories contain a non-regular member"
+  (cd "$arch_import_stage" && sha256sum -c "$TB321FU_ALSA_UCM_SOURCE_MANIFEST") || \
+    ci_die "fixed device archive ALSA UCM content differs from the pinned source manifest"
+
+  source_line="deb:$TB321FU_ALSA_UCM_SOURCE_PACKAGE:$TB321FU_ALSA_UCM_SOURCE_PACKAGE_SHA256"
+  grep -Fxq "$source_line" "$arch_import_sources" || \
+    ci_die "TB321FU ALSA UCM did not originate from the pinned overlay package"
+
+  install -d -m 0755 "$stage"
+  while read -r hash relative; do
+    case "$relative" in
+      usr/share/alsa/ucm2/codecs/wcd939x/*)
+        destination=${relative/usr\/share\/alsa\/ucm2\/codecs\/wcd939x/usr\/share\/alsa\/ucm2\/codecs\/tb321fu-wcd939x}
+        ;;
+      *) destination=$relative ;;
+    esac
+    install -D -m 0644 "$arch_import_stage/$relative" "$stage/$destination"
+    rm -f -- "$arch_import_stage/$relative"
+  done < "$TB321FU_ALSA_UCM_SOURCE_MANIFEST"
+  find "$source_profile_root" "$source_codec_root" -depth -type d -empty -delete
+
+  sed -i 's#/codecs/wcd939x/#/codecs/tb321fu-wcd939x/#g' \
+    "$stage/usr/share/alsa/ucm2/LenovoY700TB321/HiFi.conf" \
+    "$stage/usr/share/alsa/ucm2/LenovoY700TB321/LenovoY700TB321.conf"
+  if grep -R -F -q '/codecs/wcd939x/' \
+    "$stage/usr/share/alsa/ucm2/LenovoY700TB321"; then
+    ci_die "TB321FU ALSA UCM transformation left a generic WCD939x include"
+  fi
+  new_reference_count=$(awk '
+    { count += gsub("/codecs/tb321fu-wcd939x/", "") }
+    END { print count + 0 }
+  ' "$stage/usr/share/alsa/ucm2/LenovoY700TB321/HiFi.conf" \
+    "$stage/usr/share/alsa/ucm2/LenovoY700TB321/LenovoY700TB321.conf")
+  [ "$new_reference_count" -eq 7 ] || \
+    ci_die "TB321FU ALSA UCM transformed include count is $new_reference_count, expected 7"
+  grep -Fxq $'\tcset "name=\x27CLSH Switch\x27 0"' \
+    "$stage/usr/share/alsa/ucm2/codecs/tb321fu-wcd939x/HeadphoneEnableSeq.conf" || \
+    ci_die "TB321FU ALSA UCM lost the device CLSH route"
+  grep -Fxq $'\tcset "name=\x27RX HPH Mode\x27 CLS_AB"' \
+    "$stage/usr/share/alsa/ucm2/codecs/tb321fu-wcd939x/HeadphoneEnableSeq.conf" || \
+    ci_die "TB321FU ALSA UCM lost the device headphone mode"
+
+  actual_package_files=$(
+    cd "$stage"
+    find usr/share/alsa/ucm2/LenovoY700TB321 -mindepth 1 -maxdepth 1 -type f -printf '%p\n'
+    find usr/share/alsa/ucm2/codecs/tb321fu-wcd939x -mindepth 1 -maxdepth 1 -type f -printf '%p\n'
+  )
+  actual_package_files=$(LC_ALL=C sort <<< "$actual_package_files")
+  expected_package_files=$(awk '{print $2}' "$TB321FU_ALSA_UCM_PACKAGE_MANIFEST" | LC_ALL=C sort)
+  [ "$actual_package_files" = "$expected_package_files" ] || \
+    ci_die "TB321FU ALSA UCM transformed member list differs from the package manifest"
+  (cd "$stage" && sha256sum -c "$TB321FU_ALSA_UCM_PACKAGE_MANIFEST") || \
+    ci_die "TB321FU ALSA UCM transformed content differs from the package manifest"
+
+  install -D -m 0644 "$TB321FU_ALSA_UCM_PACKAGE_MANIFEST" "$package_manifest"
+  install -D -m 0644 "$TB321FU_ALSA_UCM_SOURCE_MANIFEST" "$source_manifest"
+  cat > "$stage/usr/share/tb321fu-alsa-ucm/SOURCE.txt" <<SOURCE
+device=Lenovo Y700 2025 TB321FU
+source_archive=$TB321FU_DEVICE_ARCHIVE_URL
+source_archive_sha256=$TB321FU_DEVICE_ARCHIVE_SHA256
+source_package=$TB321FU_ALSA_UCM_SOURCE_PACKAGE
+source_package_sha256=$TB321FU_ALSA_UCM_SOURCE_PACKAGE_SHA256
+generic_arch_package=$TB321FU_ALSA_UCM_GENERIC_PACKAGE
+generic_arch_package_sha256=$TB321FU_ALSA_UCM_GENERIC_PACKAGE_SHA256
+source_profile=/usr/share/alsa/ucm2/LenovoY700TB321
+source_codec_path=/usr/share/alsa/ucm2/codecs/wcd939x
+package_codec_path=/usr/share/alsa/ucm2/codecs/tb321fu-wcd939x
+transformation=replace-all-/codecs/wcd939x/-includes-with-/codecs/tb321fu-wcd939x/
+transformed_include_count=7
+collision_policy=device-profile-independent-codec-path;generic-wcd939x-retained
+SOURCE
+
+  install_arch_native_stage_package \
+    "$TB321FU_ALSA_UCM_PACKAGE" \
+    'Pinned TB321FU ALSA UCM profile with an independent WCD939x codec path' \
+    "$stage" \
+    alsa_dependencies alsa_provides alsa_conflicts alsa_replaces
+
+  printf 'open LenovoY700TB321\ndump text\n' | \
+    arch_chroot /usr/bin/env ALSA_CONFIG_UCM2=/usr/share/alsa/ucm2 \
+      /usr/bin/alsaucm -n -b - >/dev/null || \
+    ci_die "final TB321FU ALSA UCM profile failed offline parser validation"
+}
+
 build_and_install_tablet_niri_source_package() {
   local package_name=$1
   local recipe_dir="$REPO_ROOT/packages/tablet-niri/$package_name"
@@ -1692,7 +1849,7 @@ apply_tablet_niri_profile() {
 
 freeze_tablet_niri_custom_packages() {
   local root=$1
-  local ignore_packages='noctalia wvkbd paru tb321fu-imported-release-payload qcom-sns-libssc qcom-sns-iio-sensor-proxy tb321fu-camera-stack tb321fu-wifi-firmware tb321fu-bluetooth-firmware tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli'
+  local ignore_packages='noctalia wvkbd paru tb321fu-imported-release-payload qcom-sns-libssc qcom-sns-iio-sensor-proxy tb321fu-camera-stack tb321fu-wifi-firmware tb321fu-bluetooth-firmware tb321fu-alsa-ucm tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli'
 
   if grep -Eq '^[[:space:]]*IgnorePkg[[:space:]]*=' "$root/etc/pacman.conf"; then
     ci_die "tablet-niri refuses to merge an existing IgnorePkg policy"
@@ -1729,7 +1886,8 @@ verify_tablet_niri_profile() {
   local package path mode hash_field target
   local -a required_packages=(
     noctalia wvkbd paru dnsmasq
-    tb321fu-wifi-firmware tb321fu-bluetooth-firmware qcom-sns-libssc qcom-sns-iio-sensor-proxy
+    tb321fu-wifi-firmware tb321fu-bluetooth-firmware tb321fu-alsa-ucm
+    qcom-sns-libssc qcom-sns-iio-sensor-proxy
     tb321fu-zen-browser tb321fu-cc-switch tb321fu-mihomo-party tb321fu-codex-cli
   )
   local -a forbidden_packages=(
@@ -2599,7 +2757,7 @@ GPU_HOOK
 verify_tb321fu_native_package_integrity() {
   local package path owner
   local -a packages=(
-    tb321fu-camera-stack tb321fu-wifi-firmware tb321fu-bluetooth-firmware
+    tb321fu-camera-stack tb321fu-wifi-firmware tb321fu-bluetooth-firmware tb321fu-alsa-ucm
     qcom-sns-libssc qcom-sns-iio-sensor-proxy
   )
   local -a camera_paths=(
@@ -2636,6 +2794,16 @@ verify_tb321fu_native_package_integrity() {
     /usr/lib/firmware/tb321fu/qca/hmtnv20_Kirby_row.bin
     /usr/share/tb321fu-bluetooth-firmware/SHA256SUMS
     /usr/share/tb321fu-bluetooth-firmware/SOURCE.txt
+  )
+  local -a alsa_ucm_paths=(
+    /usr/share/alsa/ucm2/LenovoY700TB321/HiFi.conf
+    /usr/share/alsa/ucm2/LenovoY700TB321/LenovoY700TB321.conf
+    /usr/share/alsa/ucm2/codecs/tb321fu-wcd939x/HeadphoneEnableSeq.conf
+    /usr/share/alsa/ucm2/codecs/tb321fu-wcd939x/HeadphoneDisableSeq.conf
+    /usr/share/alsa/ucm2/codecs/tb321fu-wcd939x/init.conf
+    /usr/share/tb321fu-alsa-ucm/SHA256SUMS
+    /usr/share/tb321fu-alsa-ucm/SOURCE-SHA256SUMS
+    /usr/share/tb321fu-alsa-ucm/SOURCE.txt
   )
   local -a sensor_proxy_paths=(
     /usr/bin/monitor-sensor
@@ -2686,6 +2854,12 @@ verify_tb321fu_native_package_integrity() {
       ci_die "TB321FU Bluetooth payload is not pacman-owned: $path"
     [ "$owner" = "$TB321FU_BLUETOOTH_FIRMWARE_PACKAGE" ] || \
       ci_die "TB321FU Bluetooth payload has wrong pacman owner $owner: $path"
+  done
+  for path in "${alsa_ucm_paths[@]}"; do
+    owner=$(arch_chroot /usr/bin/pacman -Qoq "$path") || \
+      ci_die "TB321FU ALSA UCM payload is not pacman-owned: $path"
+    [ "$owner" = "$TB321FU_ALSA_UCM_PACKAGE" ] || \
+      ci_die "TB321FU ALSA UCM payload has wrong pacman owner $owner: $path"
   done
   for path in "${sensor_proxy_paths[@]}"; do
     owner=$(arch_chroot /usr/bin/pacman -Qoq "$path") || \
@@ -2750,6 +2924,31 @@ verify_tb321fu_native_package_integrity() {
   [ -f "$rootfs_dir/usr/lib/firmware/tb321fu/qca/hmtnv20.b112" ] && \
     [ ! -L "$rootfs_dir/usr/lib/firmware/tb321fu/qca/hmtnv20.b112" ] || \
     ci_die "TB321FU custom QCA b112 member is missing or not a regular file"
+  (
+    cd "$rootfs_dir"
+    sha256sum -c ./usr/share/tb321fu-alsa-ucm/SHA256SUMS
+  ) || ci_die "TB321FU ALSA UCM package checksum mismatch"
+  if grep -R -F -q '/codecs/wcd939x/' \
+    "$rootfs_dir/usr/share/alsa/ucm2/LenovoY700TB321"; then
+    ci_die "final TB321FU ALSA UCM profile still references the generic WCD939x path"
+  fi
+  [ "$(awk '
+    { count += gsub("/codecs/tb321fu-wcd939x/", "") }
+    END { print count + 0 }
+  ' "$rootfs_dir/usr/share/alsa/ucm2/LenovoY700TB321/HiFi.conf" \
+    "$rootfs_dir/usr/share/alsa/ucm2/LenovoY700TB321/LenovoY700TB321.conf")" -eq 7 ] || \
+    ci_die "final TB321FU ALSA UCM transformed include count changed"
+  [ "$(sha256sum "$rootfs_dir/usr/share/alsa/ucm2/codecs/tb321fu-wcd939x/HeadphoneEnableSeq.conf" | awk '{print $1}')" = \
+    333c56a133d260f696fbc817dfb7760e7c75619d0540bf62128527dd9a7438f5 ] || \
+    ci_die "TB321FU ALSA UCM headphone route hash mismatch"
+  owner=$(arch_chroot /usr/bin/pacman -Qoq \
+    /usr/share/alsa/ucm2/codecs/wcd939x/HeadphoneEnableSeq.conf) || \
+    ci_die "generic Arch WCD939x UCM ownership is missing"
+  [ "$owner" = alsa-ucm-conf ] || \
+    ci_die "generic Arch WCD939x UCM has unexpected owner: $owner"
+  [ "$(sha256sum "$rootfs_dir/usr/share/alsa/ucm2/codecs/wcd939x/HeadphoneEnableSeq.conf" | awk '{print $1}')" = \
+    f8b856216adf46b1b6a7e9e3cbd85fd50a6446c77a9ac7bb0a60dfd189adbbc0 ] || \
+    ci_die "generic Arch WCD939x UCM was unexpectedly overwritten"
   if ci_bool "$BUILD_TB321FU_GPU_SENSOR"; then
     for path in "${gpu_paths[@]}"; do
       owner=$(arch_chroot /usr/bin/pacman -Qoq "$path") || \
@@ -3122,6 +3321,7 @@ apply_device_payloads
 apply_tb321fu_deb_payloads
 install_tb321fu_wifi_firmware_package
 install_tb321fu_bluetooth_firmware_package
+install_tb321fu_alsa_ucm_package
 install_arch_import_package
 install_tb321fu_libssc_package
 install_tb321fu_sensor_proxy_package
@@ -3268,6 +3468,10 @@ bluetooth_firmware_package=tb321fu-bluetooth-firmware
 bluetooth_firmware_search_path=/usr/lib/firmware/tb321fu
 bluetooth_hmtbtfw20_sha256=b4e7f61e7dd090e56811860a7781ff3b0ce8e87cc0480feaab34bf4f614308c5
 bluetooth_runtime_requests=qca/hmtbtfw20.tlv,qca/hmtnv20_Kirby_prc.bin
+alsa_ucm_package=tb321fu-alsa-ucm
+alsa_ucm_profile=/usr/share/alsa/ucm2/LenovoY700TB321
+alsa_ucm_codec_path=/usr/share/alsa/ucm2/codecs/tb321fu-wcd939x
+alsa_ucm_headphone_enable_sha256=333c56a133d260f696fbc817dfb7760e7c75619d0540bf62128527dd9a7438f5
 INFO
 fi
 

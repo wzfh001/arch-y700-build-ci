@@ -99,6 +99,15 @@ the kernel requests `qca/hmtbtfw20.tlv` and
 The four direct-root overlaps were audited byte-for-byte and by type/mode;
 the device files are intentionally not merged into the generic path.
 
+The fixed device archive also carries a TB321FU-specific ALSA UCM tree. The
+two `LenovoY700TB321` profile files and all eleven source WCD939x sequence files
+are content-locked, then installed by `tb321fu-alsa-ucm` under
+`/usr/share/alsa/ucm2/codecs/tb321fu-wcd939x`. The two profile files' includes
+are rewritten to that independent path (seven references), while the generic
+`alsa-ucm-conf` `codecs/wcd939x` tree remains installed and pacman-owned. The
+device headphone sequence is the verified 276-byte `CLS_AB`/`CLSH Switch=0`
+variant; the generic 282-byte sequence is retained unchanged.
+
 ### Input method and fonts
 
 ```text
