@@ -81,6 +81,11 @@ image; they do not describe the currently running filesystem.
 - Device-specific GPT verification and Firehose bundle
 - At least two independent rescue paths verified on hardware
 
+Local P2 search did not find the fixed device archive or a 202148-byte board
+file. Experiment `SRC-20260722-004` proved that the old raw's 33090-byte
+compressed member expands to a different 1,897,968-byte file; it is forbidden
+as a substitute.
+
 ## Safety boundary
 
 Do not flash a new device image from this repository until all relevant gates

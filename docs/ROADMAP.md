@@ -33,6 +33,11 @@ gate is complete; P7 still requires physical ACM/NCM/NAP acceptance.
 
 ## P2 — WCN7850 Wi-Fi
 
+Current stop: the fixed archive and Kubuntu-proven 202148-byte board file are
+not present locally. `SRC-20260722-004` rejected the old raw's compressed member
+as a substitute. No package/build work may claim P2 progress until exact source
+bytes and hashes are obtained.
+
 - Pin and verify the device archive.
 - Package the Kubuntu-proven device firmware with exact file hashes.
 - Use an independent firmware search path and verify the kernel bootarg.

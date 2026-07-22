@@ -151,3 +151,25 @@ References to earlier experiment IDs:
   regressions; and Issue-template YAML all returned PASS.
 - Boundary: no network build, artifact audit, device access, write, or hardware
   acceptance was performed.
+
+### SRC-20260722-004 — Old rootfs compressed board file is not the Kubuntu board
+
+- Result: `FAIL` for the hypothesis that the retained 33090-byte
+  `board-2.bin.zst` can recover the Kubuntu-proven 202148-byte board file.
+- Primary variable: read-only extraction and decompression of
+  `/usr/lib/firmware/ath12k/WCN7850/hw2.0/board-2.bin.zst` from the verified old
+  run `29709555909` rootfs raw.
+- Source raw identity: 20 GiB image with recorded SHA-256
+  `3540513595fce48afcbabcca4ead3c8f5697496df215b5b592455c3f9762eef8`.
+- Observed: the compressed member SHA-256 is
+  `0713e03f82a343d01b009ec78ce926869555e1ebd9ebb0d47f31a19ffd52b22d`;
+  decompression produced 1,897,968 bytes with SHA-256
+  `7ce00dc04735053c12c8268c3e82004175f0f108abd93c76bab95544e9e48bf8`,
+  not 202148 bytes.
+- Evidence: the imported-payload manifest hash matched the extracted member and
+  `zstd -t` passed, so corruption is not the explanation.
+- Permanent decision: do not retry this compressed member or infer device
+  firmware identity from its 33090-byte compressed size.
+- Next hypothesis: obtain and verify the fixed device archive itself, or
+  read-only copy/hash the 202148-byte file from the currently working Kubuntu
+  installation with explicit network/device authorization.
