@@ -6,6 +6,7 @@ config_root=${TB321FU_CONFIG_ROOT:-/sys/kernel/config}
 dev_root=${TB321FU_DEV_ROOT:-/dev}
 typec_port=${TB321FU_TYPEC_PORT:-port0}
 interval=${TB321FU_POLL_INTERVAL:-2}
+command_timeout=${TB321FU_COMMAND_TIMEOUT:-15}
 once=${TB321FU_ONCE:-0}
 max_iterations=${TB321FU_MAX_ITERATIONS:-0}
 modprobe_cmd=${TB321FU_MODPROBE:-modprobe}
@@ -13,6 +14,7 @@ nmcli_cmd=${TB321FU_NMCLI:-nmcli}
 ip_cmd=${TB321FU_IP:-ip}
 systemctl_cmd=${TB321FU_SYSTEMCTL:-systemctl}
 sleep_cmd=${TB321FU_SLEEP:-sleep}
+timeout_cmd=${TB321FU_TIMEOUT:-timeout}
 
 gadget="$config_root/usb_gadget/tb321fu-rescue"
 udc_class="$sys_root/class/udc"
@@ -28,6 +30,10 @@ iteration=0
 
 log() {
   printf 'tb321fu-usb-rescue: %s\n' "$*"
+}
+
+run_timed() {
+  "$timeout_cmd" --signal=TERM --kill-after=2s "${command_timeout}s" "$@"
 }
 
 write_value() {
@@ -51,7 +57,8 @@ write_if_changed() {
 load_modules() {
   local module
   for module in pmic_glink ucsi_glink libcomposite usb_f_acm usb_f_ncm; do
-    "$modprobe_cmd" "$module" >/dev/null 2>&1 || log "module load failed: $module"
+    run_timed "$modprobe_cmd" "$module" >/dev/null 2>&1 || \
+      log "module load failed or timed out: $module"
   done
 }
 
@@ -167,12 +174,12 @@ reconcile_network() {
     return 0
   fi
   ((network_ready == 0)) || return 0
-  "$nmcli_cmd" connection reload >/dev/null 2>&1 || true
-  if "$nmcli_cmd" connection up "$connection" ifname usb0 >/dev/null 2>&1; then
+  run_timed "$nmcli_cmd" connection reload >/dev/null 2>&1 || true
+  if run_timed "$nmcli_cmd" connection up "$connection" ifname usb0 >/dev/null 2>&1; then
     log "USB NCM ready at 10.77.0.1"
     network_ready=1
-  elif "$ip_cmd" address replace 10.77.0.1/24 dev usb0 >/dev/null 2>&1 && \
-    "$ip_cmd" link set usb0 up >/dev/null 2>&1; then
+  elif run_timed "$ip_cmd" address replace 10.77.0.1/24 dev usb0 >/dev/null 2>&1 && \
+    run_timed "$ip_cmd" link set usb0 up >/dev/null 2>&1; then
     log "NetworkManager failed; USB NCM has static fallback 10.77.0.1"
     network_ready=1
   else
@@ -186,7 +193,7 @@ reconcile_serial() {
     return 0
   fi
   ((serial_ready == 0)) || return 0
-  if "$systemctl_cmd" start serial-getty@ttyGS0.service >/dev/null 2>&1; then
+  if run_timed "$systemctl_cmd" start serial-getty@ttyGS0.service >/dev/null 2>&1; then
     log "USB ACM console ready at ttyGS0"
     serial_ready=1
   else
@@ -221,7 +228,7 @@ cleanup() {
     write_value '' "$gadget/UDC" || true
     log "gadget unbound during service stop"
   fi
-  "$nmcli_cmd" connection down "$connection" >/dev/null 2>&1 || true
+  run_timed "$nmcli_cmd" connection down "$connection" >/dev/null 2>&1 || true
 }
 
 trap 'stop_requested=1' TERM INT

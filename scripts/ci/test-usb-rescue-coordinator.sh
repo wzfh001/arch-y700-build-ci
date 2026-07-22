@@ -201,4 +201,23 @@ grep -Fq 'NetworkManager failed; USB NCM has static fallback 10.77.0.1' \
 grep -Fq 'ttyGS0 exists but serial getty failed' <<< "$failure_output" || \
   fail 'serial getty failure was not recorded without blocking'
 
+cat > "$fail_bin/hang" <<'EOF'
+#!/usr/bin/bash
+sleep 10
+EOF
+chmod 0755 "$fail_bin/hang"
+timeout_output=$(TB321FU_SYS_ROOT="$failure_sys" \
+  TB321FU_CONFIG_ROOT="$tmp/timeout-config" \
+  TB321FU_DEV_ROOT="$failure_dev" \
+  TB321FU_MODPROBE="$fake_bin/modprobe" \
+  TB321FU_NMCLI="$fail_bin/hang" \
+  TB321FU_IP="$fake_bin/ip" \
+  TB321FU_SYSTEMCTL="$fake_bin/systemctl" \
+  TB321FU_COMMAND_TIMEOUT=0.1 \
+  TB321FU_FAKE_COMMAND_LOG="$command_log" \
+  TB321FU_ONCE=1 \
+  timeout 3s "$coordinator") || fail 'hung NetworkManager command blocked the coordinator'
+grep -Fq 'NetworkManager failed; USB NCM has static fallback 10.77.0.1' \
+  <<< "$timeout_output" || fail 'timed-out NetworkManager command did not use fallback'
+
 printf 'USB_RESCUE_COORDINATOR=PASS\n'
