@@ -1172,3 +1172,159 @@ References to earlier experiment IDs:
 - Correction: use non-destructive inspection without deletion tokens (or let
   temporary directories expire) and do not treat this rejected command as an
   executed experiment.
+
+### DEV-20260722-035 — Bluetooth fixture asserted the wrong build token
+
+- Result: `FAIL` in the local source fixture; no CI, artifact, Release, or
+  device state changed.
+- Primary variable: add a static assertion for the independent Bluetooth
+  firmware destination.
+- Observed: the first assertion searched for a target string that the build
+  function does not emit because the destination is assembled from
+  `custom_relative`; the implementation was not the failing component.
+- Correction: assert the actual production expression and then execute the
+  extracted production function against the fixed archive fixture. Do not
+  restore the rejected string-only assertion.
+
+### DEV-20260722-036 — Bluetooth fixture omitted the package-name variable
+
+- Result: `FAIL` in the local source fixture; no external state changed.
+- Primary variable: execute `install_tb321fu_bluetooth_firmware_package()`
+  outside the complete rootfs build.
+- Observed: the fixture did not set
+  `TB321FU_BLUETOOTH_FIRMWARE_PACKAGE`, so strict undefined-variable handling
+  stopped before the package-call assertion.
+- Correction: set the same fixed package name used by production before
+  invoking the extracted function. Do not weaken `set -u`.
+
+### DEV-20260722-037 — QCA inventory mixed direct and recursive counts
+
+- Result: `FAIL` in interpretation only; immutable inputs were not changed.
+- Primary variable: count locked QCA members.
+- Observed: the first interpretation treated 136 direct directory entries as
+  136 regular files plus one symlink. The recursive package inventory is 95
+  regular files and 48 symlinks, or 143 non-directory members; only four
+  direct-root paths overlap the device payload.
+- Correction: count member types recursively and record direct-root overlap
+  separately. Do not reuse the rejected 136+1 claim.
+
+### DEV-20260722-038 — First overlap-table patch used literal backslash-t context
+
+- Result: `FAIL` before edit; the patch was rejected and no file changed.
+- Primary variable: add the four QCA overlap evidence rows.
+- Observed: the patch context contained the two literal characters `\\t`
+  while the file contained real tab separators.
+- Correction: patch against real TSV context or replace the exact complete
+  block. The rejected patch was not retried unchanged.
+
+### DEV-20260722-039 — Second overlap-table patch repeated invalid TSV context
+
+- Result: `FAIL` before edit; no repository or external state changed.
+- Primary variable: correct the same overlap evidence block after
+  `DEV-20260722-038`.
+- Observed: a second patch still matched literal `\\t` text and was rejected.
+- Correction: inspect the real file bytes first and apply a tab-correct patch;
+  no third attempt used the invalid context.
+
+### DEV-20260722-040 — ALSA lock lookup assumed the wrong repository
+
+- Result: `FAIL` in a read-only package lookup; no state changed.
+- Primary variable: identify the locked owner of the remaining UCM collision.
+- Observed: the first lookup assumed `alsa-ucm-conf` was in `core`; the fixed
+  lock stores `alsa-ucm-conf-1.2.16.1-1-any.pkg.tar.xz` in `extra`.
+- Correction: derive package paths from the lock archive inventory instead of
+  guessing the repository.
+
+### DEV-20260722-041 — First deferred-output wait targeted no resumable cell
+
+- Result: `FAIL` at the orchestration layer; no shell command or state change
+  occurred.
+- Primary variable: wait for output from an earlier inspection command.
+- Observed: the wait helper was called without a valid yielded cell identity.
+- Correction: call the wait helper only after an execution result explicitly
+  returns a resumable cell ID.
+
+### DEV-20260722-042 — Second deferred-output call mixed cell and shell sessions
+
+- Result: `FAIL` at the orchestration layer; no filesystem, GitHub, CI, or
+  device state changed.
+- Primary variable: retrieve the same pending inspection output.
+- Observed: the second call used the cell-wait mechanism where a shell session
+  poll was required.
+- Correction: distinguish yielded execution cells from PTY shell session IDs;
+  this invalid call is not evidence and must not be repeated.
+
+### DEV-20260722-043 — Expected zero old UCM references tripped pipefail
+
+- Result: `FAIL` at the end of a read-only temporary transformation check; no
+  repository, CI, or device state changed.
+- Primary variable: prove the transformed Lenovo UCM files contain zero
+  `/codecs/wcd939x/` references.
+- Observed: `rg` correctly found zero old references and returned status 1,
+  which `set -euo pipefail` treated as command failure before the remaining
+  display-only checks ran. The transformed hashes had already been printed.
+- Correction: use an explicit negative assertion for expected absence, then
+  count the seven required `/codecs/tb321fu-wcd939x/` references separately.
+
+### DEV-20260722-044 — Bluetooth source record guessed the full commit hash
+
+- Result: `FAIL` in documentation review; no source, CI, artifact, Release, or
+  device state changed.
+- Primary variable: record the full object identity for short commit
+  `782dd08`.
+- Observed: the first documentation patch expanded the short hash without
+  querying Git and wrote a nonexistent full object ID.
+- Correction: use `git rev-parse 782dd08` and record
+  `782dd08b94c111168294085a1c770c299fdad109`. Never infer the remainder of a
+  Git object ID from its short form.
+
+### AUDIT-20260722-003 — Full fixed-device archive versus pacman-lock overlap
+
+- Result: `PASS`; read-only offline audit, no CI, artifact, Release, or device
+  write.
+- Inputs: fixed device archive SHA-256
+  `047c1baccc420f1c28bf6d761cfc811dd7aeccfcbab6d03746ca01daf6cdfe04`
+  and pacman-lock archive SHA-256
+  `8c9328b682f13e9c518e28a6bcb7b3f0b620273ed94859dec7e4d9f4798c3fb0`.
+- Scope: enumerate all 2,335 regular files/symlinks from the three fixed device
+  payloads and every member of all 723 locked Arch packages; compare path,
+  owner package, owner-package SHA-256, member type, mode, size/target, and
+  content hash.
+- Observed: exactly 16 paths intersect. Ten WCD939x UCM members are identical;
+  six differ: WCN7850 `board-2.bin`, four direct-root QCA Bluetooth files, and
+  `/usr/share/alsa/ucm2/codecs/wcd939x/HeadphoneEnableSeq.conf`.
+- ALSA evidence: device file is 276 bytes / mode `0644` / SHA-256
+  `333c56a133d260f696fbc817dfb7760e7c75619d0540bf62128527dd9a7438f5`;
+  locked `alsa-ucm-conf-1.2.16.1-1` is 282 bytes / mode `0644` / SHA-256
+  `f8b856216adf46b1b6a7e9e3cbd85fd50a6446c77a9ac7bb0a60dfd189adbbc0`.
+  The device route uses `CLSH Switch=0` and `RX HPH Mode=CLS_AB`; the generic
+  route uses `CLSH Switch=1` and `RX HPH Mode=CLS_H_LOHIFI`.
+- Stop line: all six mismatches require explicit independent ownership or an
+  already approved transformation. Do not trigger a build that only fixes
+  QCA; it would deterministically stop at the UCM mismatch.
+
+### SRC-20260722-013 — Independent TB321FU QCA Bluetooth firmware source gate
+
+- Result: `SOURCE PASS`; source commit
+  `782dd08` (`782dd08b94c111168294085a1c770c299fdad109`); no new CI run,
+  artifact, Release, or device write.
+- Parent failure: `CI-20260722-011`, run `29933523257`.
+- Primary variable: carve all 62 fixed device QCA files out of the generic
+  imported payload and package them as `tb321fu-bluetooth-firmware` under
+  `/usr/lib/firmware/tb321fu/qca`, while retaining locked
+  `linux-firmware-atheros` at `/usr/lib/firmware/qca`.
+- Runtime evidence: the Kubuntu kernel log requests
+  `qca/hmtbtfw20.tlv` and `qca/hmtnv20_Kirby_prc.bin`; the existing fixed
+  `firmware_class.path=/usr/lib/firmware/tb321fu` bootarg resolves those names
+  against the device package first.
+- Offline audit: device QCA inventory is 62 regular files; locked generic QCA
+  inventory is 95 regular files plus 48 symlinks; four paths overlap and all
+  differ. `hmtnv20.b112` is deliberately a device regular file while the Arch
+  member is a symlink to `hmtnv20.b10f`.
+- Verification: Bluetooth archive fixture, native-package staging, manifest,
+  provenance, package ownership policy, workflow/profile gates, and the
+  independent QCA collision audit all pass. Final raw content and TB321FU
+  Bluetooth behavior remain `UNTESTED`.
+- Next hypothesis: isolate the device UCM profile and codec sequence under a
+  non-conflicting path before one combined artifact-only build. Do not rerun
+  `CI-20260722-011` with only this QCA change.

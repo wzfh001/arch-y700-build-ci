@@ -89,11 +89,18 @@ Exit gate: raw-image content, hashes, package ownership, path, and bootarg all
   `b4e7f61e7dd090e56811860a7781ff3b0ce8e87cc0480feaab34bf4f614308c5`, while
   locked `linux-firmware-atheros-20260622-1` is 270,120 bytes /
   `f1c00f4640a5c4e5dc36a2574d3d1d0afcfd1ab58a84f217dce4b1bb73cba981`.
-- Current stop: enumerate and audit every device-overlay `/usr/lib/firmware/qca`
-  member against every locked firmware package (path, owner, bytes, mode and
-  symlink type), then design one independent Bluetooth firmware package. Do
-  not discard, overwrite, or weaken the generic collision guard; do not rerun
-  `CI-20260722-011` unchanged.
+- `SOURCE PASS`: `SRC-20260722-013` / commit `782dd08` packages all 62 device
+  QCA members under `/usr/lib/firmware/tb321fu/qca`, retains generic Arch
+  ownership, and gates the four differing overlaps by content/type/mode.
+- `OFFLINE AUDIT`: `AUDIT-20260722-003` compared 2,335 device members against
+  723 locked packages: 16 paths intersect, ten are identical, and six differ.
+  The remaining unhandled mismatch is
+  `/usr/share/alsa/ucm2/codecs/wcd939x/HeadphoneEnableSeq.conf` from
+  `alsa-ucm-conf-1.2.16.1-1`.
+- Current stop: package the TB321FU UCM profile and its fixed WCD939x sequences
+  under an independent codec path, rewrite and hash-gate all device includes,
+  and retain the generic `alsa-ucm-conf` files and ownership. Do not run a
+  Bluetooth-only rebuild or weaken the generic collision guard.
 - Pin every remaining controllable input.
 - Validate niri, service behavior, credentials policy, final configuration
   paths, package ownership, and secret absence.
