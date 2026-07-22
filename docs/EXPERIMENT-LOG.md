@@ -1533,3 +1533,30 @@ References to earlier experiment IDs:
   artifact-only authorization. Dispatch exactly once with the rootfs SHA read
   from `profiles/tablet-niri/pacman-lock.env`; no Release or device write is
   authorized.
+
+### CI-20260723-001 — Exact-package-query artifact-only authorization
+
+- Result: `AUTHORIZED/PENDING`; no dispatch has occurred at record creation.
+- Parent failure: `CI-20260722-012`, run `29940159992`, which stopped on the
+  provider-sensitive `pacman -Q libssc` false positive and produced zero
+  artifacts.
+- Source evidence: `SRC-20260722-015`, implementation commit
+  `e31977c6f3385e83c1ea22fba537dd82fe7b1907`, with evidence/status commit
+  `621df8fbd9c9a5136af262be9e6b9175c51b126f` at the current branch head.
+- Primary experiment: build one candidate with the exact installed-package
+  name gate while holding the fixed rootfs, pacman lock, device archive,
+  kernel/boot inputs, QCA/WCN7850/ALSA policies, credentials policy, and
+  artifact-only release mode constant.
+- Dispatch policy: branch `codex/tablet-rescue-20260720`, output prefix
+  `TB321FU-archlinuxarm-tablet-niri-ci13-20260723`, profile `tablet-niri`,
+  rootfs size `20G`, empty rootfs/boot/source advanced configs, empty
+  `release_tag`, and `prerelease=false`.
+- Rootfs policy: read `rootfs_sha256` directly from the committed
+  `profiles/tablet-niri/pacman-lock.env`, require exactly 64 lowercase
+  hexadecimal characters, and pass that value without manual transcription.
+  The pinned package-lock seed remains run `29921200387`.
+- Expected result: one complete artifact set for P4 offline audit or one new
+  deterministic failure with raw logs. Success is not hardware verification;
+  no Release and no device write are authorized.
+- Stop line: dispatch exactly once. Any failure must become a new experiment
+  and may only be retried after new source/evidence changes.

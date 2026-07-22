@@ -121,10 +121,14 @@ Exit gate: raw-image content, hashes, package ownership, path, and bootarg all
   profile forbidden-package pass. Regressions reject provider-only and
   near-match false positives. The complete local P3 matrix and both offline
   collision audits pass again; final raw remains `UNTESTED`.
-- Current stop: push the source/evidence commits and record a separate
-  authorization. Only then trigger exactly one artifact-only build with the
-  rootfs SHA read from the committed lock profile. Do not publish a Release or
-  retry commit `3c46e74` unchanged.
+- `AUTHORIZED/PENDING`: `CI-20260723-001` binds the next candidate to source
+  evidence head `621df8f`, output prefix
+  `TB321FU-archlinuxarm-tablet-niri-ci13-20260723`, `tablet-niri`, `20G`,
+  empty advanced configs, no Release, and the rootfs SHA read from the lock
+  profile.
+- Current stop: dispatch that authorization exactly once, then perform the P4
+  offline audit. Do not publish a Release, flash a device, or retry commit
+  `3c46e74` unchanged.
 - Pin every remaining controllable input.
 - Validate niri, service behavior, credentials policy, final configuration
   paths, package ownership, and secret absence.

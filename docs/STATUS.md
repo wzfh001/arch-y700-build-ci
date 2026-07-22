@@ -40,6 +40,8 @@ functionality.
   commit `395175c`
 - Exact installed-package name source gate: `SRC-20260722-015`, commit
   `e31977c`
+- Current evidence/authorization head: `621df8f`; `CI-20260723-001` is
+  authorized for one artifact-only dispatch and is still pending.
 - Latest artifact-only attempt: `CI-20260722-012`, run `29940159992`, failed
   after the replacement transaction logged removal of stock `libssc` and
   installation of `qcom-sns-libssc`; `pacman -Q libssc` then resolved the
@@ -164,6 +166,10 @@ image; they do not describe the currently running filesystem.
     providers and a `libssc-tools` near-match do not imply either exact stock
     package. The complete local P3 matrix and both offline collision audits
     pass; final raw and hardware remain `UNTESTED`.
+17. `CI-20260723-001` binds the next candidate to output prefix
+    `TB321FU-archlinuxarm-tablet-niri-ci13-20260723`, `tablet-niri`, `20G`,
+    empty advanced configs, no Release, and the lock-profile rootfs SHA. No
+    dispatch, artifact, Release, or device write has occurred yet.
 
 ## Immediate release blockers
 
@@ -175,9 +181,9 @@ image; they do not describe the currently running filesystem.
   ownership, firmware path, and bootarg
 - Final-raw proof for `tb321fu-alsa-ucm`, all 13 transformed hashes, seven
   includes, package ownership, parser result, and unchanged generic UCM path
-- Push `SRC-20260722-015`, record a separate authorization, and complete
-  exactly one new artifact-only build; the rootfs SHA must be read and
-  validated from `profiles/tablet-niri/pacman-lock.env`
+- Dispatch the already recorded `CI-20260723-001` exactly once, then complete
+  the P4 offline audit before any flash preparation; the rootfs SHA must be
+  read and validated from `profiles/tablet-niri/pacman-lock.env`
 - Complete rootfs/GRUB/boot/DTB offline audit
 - Device-specific GPT verification and Firehose bundle
 - At least two independent rescue paths verified on hardware
