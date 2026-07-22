@@ -1,74 +1,244 @@
 #!/usr/bin/bash
-set -euo pipefail
+set -u -o pipefail
 
-gadget=/sys/kernel/config/usb_gadget/tb321fu-rescue
-udc_class=/sys/class/udc
+sys_root=${TB321FU_SYS_ROOT:-/sys}
+config_root=${TB321FU_CONFIG_ROOT:-/sys/kernel/config}
+dev_root=${TB321FU_DEV_ROOT:-/dev}
+typec_port=${TB321FU_TYPEC_PORT:-port0}
+interval=${TB321FU_POLL_INTERVAL:-2}
+once=${TB321FU_ONCE:-0}
+max_iterations=${TB321FU_MAX_ITERATIONS:-0}
+modprobe_cmd=${TB321FU_MODPROBE:-modprobe}
+nmcli_cmd=${TB321FU_NMCLI:-nmcli}
+ip_cmd=${TB321FU_IP:-ip}
+systemctl_cmd=${TB321FU_SYSTEMCTL:-systemctl}
+sleep_cmd=${TB321FU_SLEEP:-sleep}
+
+gadget="$config_root/usb_gadget/tb321fu-rescue"
+udc_class="$sys_root/class/udc"
+typec_class="$sys_root/class/typec"
+net_class="$sys_root/class/net"
 connection=tb321fu-rescue-usb
+network_ready=0
+serial_ready=0
+last_state=
+role_retry=0
+stop_requested=0
+iteration=0
 
 log() {
   printf 'tb321fu-usb-rescue: %s\n' "$*"
 }
 
-for module in pmic_glink ucsi_glink libcomposite usb_f_acm usb_f_ncm; do
-  modprobe "$module"
-done
-
-if ! mountpoint -q /sys/kernel/config; then
-  mount -t configfs configfs /sys/kernel/config
-fi
-
-mkdir -p \
-  "$gadget/strings/0x409" \
-  "$gadget/configs/c.1/strings/0x409" \
-  "$gadget/functions/acm.usb0" \
-  "$gadget/functions/ncm.usb0"
-
-bound_udc=$(cat "$gadget/UDC" 2>/dev/null || true)
-if [ -z "$bound_udc" ]; then
-  printf '0x1d6b\n' > "$gadget/idVendor"
-  printf '0x0104\n' > "$gadget/idProduct"
-  printf '0xEF\n' > "$gadget/bDeviceClass"
-  printf '0x02\n' > "$gadget/bDeviceSubClass"
-  printf '0x01\n' > "$gadget/bDeviceProtocol"
-  printf 'TB321FU-ARCH-RESCUE\n' > "$gadget/strings/0x409/serialnumber"
-  printf 'TB321FU Linux\n' > "$gadget/strings/0x409/manufacturer"
-  printf 'TB321FU NCM and serial rescue\n' > "$gadget/strings/0x409/product"
-  printf 'NCM network and ACM console\n' > "$gadget/configs/c.1/strings/0x409/configuration"
-  printf '250\n' > "$gadget/configs/c.1/MaxPower"
-  printf '02:54:42:32:1f:01\n' > "$gadget/functions/ncm.usb0/dev_addr"
-  printf '02:54:42:32:1f:02\n' > "$gadget/functions/ncm.usb0/host_addr"
-  [ -L "$gadget/configs/c.1/acm.usb0" ] || \
-    ln -s "$gadget/functions/acm.usb0" "$gadget/configs/c.1/acm.usb0"
-  [ -L "$gadget/configs/c.1/ncm.usb0" ] || \
-    ln -s "$gadget/functions/ncm.usb0" "$gadget/configs/c.1/ncm.usb0"
-
-  wait_seconds=0
-  while ! compgen -G "$udc_class/*" >/dev/null; do
-    if ((wait_seconds % 30 == 0)); then
-      log "waiting for a USB device controller"
-    fi
-    sleep 1
-    ((wait_seconds += 1))
-  done
-  udc=$(basename "$(find "$udc_class" -mindepth 1 -maxdepth 1 -print -quit)")
-  printf '%s\n' "$udc" > "$gadget/UDC"
-  log "bound gadget to $udc"
-fi
-
-for _ in {1..30}; do
-  [ -e /sys/class/net/usb0 ] && break
-  sleep 1
-done
-[ -e /sys/class/net/usb0 ] || {
-  log "usb0 did not appear after gadget binding"
-  exit 1
+write_value() {
+  local value=$1
+  local path=$2
+  if ! printf '%s' "$value" > "$path"; then
+    log "cannot write $path"
+    return 1
+  fi
 }
 
-nmcli connection reload
-if ! nmcli connection up "$connection" ifname usb0; then
-  log "NetworkManager shared mode failed; applying static fallback address"
-  ip address replace 10.77.0.1/24 dev usb0
-  ip link set usb0 up
-fi
-systemctl start serial-getty@ttyGS0.service
-log "USB rescue ready at 10.77.0.1 and ttyGS0"
+write_if_changed() {
+  local value=$1
+  local path=$2
+  local current=
+  [ -r "$path" ] && current=$(cat "$path" 2>/dev/null || true)
+  [ "$current" = "$value" ] && return 0
+  write_value "$value" "$path"
+}
+
+load_modules() {
+  local module
+  for module in pmic_glink ucsi_glink libcomposite usb_f_acm usb_f_ncm; do
+    "$modprobe_cmd" "$module" >/dev/null 2>&1 || log "module load failed: $module"
+  done
+}
+
+ensure_configfs() {
+  if [ "$config_root" != /sys/kernel/config ]; then
+    mkdir -p "$config_root"
+    return 0
+  fi
+  if ! mountpoint -q "$config_root"; then
+    mount -t configfs configfs "$config_root" || {
+      log "cannot mount configfs"
+      return 1
+    }
+  fi
+}
+
+ensure_function_link() {
+  local target=$1
+  local link=$2
+  if [ -L "$link" ]; then
+    [ "$(readlink "$link")" = "$target" ] && return 0
+    rm -- "$link" || return 1
+  elif [ -e "$link" ]; then
+    log "refusing to replace non-symlink $link"
+    return 1
+  fi
+  ln -s "$target" "$link"
+}
+
+ensure_gadget() {
+  ensure_configfs || return 1
+  mkdir -p \
+    "$gadget/strings/0x409" \
+    "$gadget/configs/c.1/strings/0x409" \
+    "$gadget/functions/acm.usb0" \
+    "$gadget/functions/ncm.usb0" || return 1
+
+  write_if_changed 0x1d6b "$gadget/idVendor" || return 1
+  write_if_changed 0x0104 "$gadget/idProduct" || return 1
+  write_if_changed 0xEF "$gadget/bDeviceClass" || return 1
+  write_if_changed 0x02 "$gadget/bDeviceSubClass" || return 1
+  write_if_changed 0x01 "$gadget/bDeviceProtocol" || return 1
+  write_if_changed TB321FU-ARCH-RESCUE "$gadget/strings/0x409/serialnumber" || return 1
+  write_if_changed 'TB321FU Linux' "$gadget/strings/0x409/manufacturer" || return 1
+  write_if_changed 'TB321FU NCM and serial rescue' "$gadget/strings/0x409/product" || return 1
+  write_if_changed 'NCM network and ACM console' \
+    "$gadget/configs/c.1/strings/0x409/configuration" || return 1
+  write_if_changed 250 "$gadget/configs/c.1/MaxPower" || return 1
+  write_if_changed 02:54:42:32:1f:01 "$gadget/functions/ncm.usb0/dev_addr" || return 1
+  write_if_changed 02:54:42:32:1f:02 "$gadget/functions/ncm.usb0/host_addr" || return 1
+  ensure_function_link "$gadget/functions/acm.usb0" \
+    "$gadget/configs/c.1/acm.usb0" || return 1
+  ensure_function_link "$gadget/functions/ncm.usb0" \
+    "$gadget/configs/c.1/ncm.usb0" || return 1
+  [ -e "$gadget/UDC" ] || : > "$gadget/UDC"
+}
+
+partner_present() {
+  [ -e "$typec_class/${typec_port}-partner" ] || \
+    [ -e "$typec_class/$typec_port/partner" ]
+}
+
+select_device_role() {
+  local role_path="$typec_class/$typec_port/data_role"
+  local current
+  if ! partner_present; then
+    role_retry=0
+    return 0
+  fi
+  [ -r "$role_path" ] || return 0
+  current=$(cat "$role_path" 2>/dev/null || true)
+  if [[ $current == *'[device]'* || $current == device ]]; then
+    role_retry=0
+    return 0
+  fi
+  ((role_retry += 1))
+  if ((role_retry == 1 || role_retry % 5 == 0)); then
+    if [ -w "$role_path" ] && write_value device "$role_path"; then
+      log "requested $typec_port data role device (was: ${current:-unknown})"
+    else
+      log "$typec_port data role remains ${current:-unknown}; role switch unavailable"
+    fi
+  fi
+}
+
+discover_udc() {
+  [ -d "$udc_class" ] || return 1
+  find "$udc_class" -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null | head -n 1
+}
+
+reconcile_binding() {
+  local bound=
+  local udc=
+  [ -r "$gadget/UDC" ] && bound=$(cat "$gadget/UDC" 2>/dev/null || true)
+  if [ -n "$bound" ] && [ ! -e "$udc_class/$bound" ]; then
+    write_value '' "$gadget/UDC" || true
+    log "unbound missing UDC $bound"
+    bound=
+  fi
+  if [ -z "$bound" ]; then
+    udc=$(discover_udc || true)
+    if [ -n "$udc" ] && write_value "$udc" "$gadget/UDC"; then
+      log "bound gadget to $udc"
+      bound=$udc
+    fi
+  fi
+  [ -n "$bound" ]
+}
+
+reconcile_network() {
+  if [ ! -e "$net_class/usb0" ]; then
+    network_ready=0
+    return 0
+  fi
+  ((network_ready == 0)) || return 0
+  "$nmcli_cmd" connection reload >/dev/null 2>&1 || true
+  if "$nmcli_cmd" connection up "$connection" ifname usb0 >/dev/null 2>&1; then
+    log "USB NCM ready at 10.77.0.1"
+    network_ready=1
+  elif "$ip_cmd" address replace 10.77.0.1/24 dev usb0 >/dev/null 2>&1 && \
+    "$ip_cmd" link set usb0 up >/dev/null 2>&1; then
+    log "NetworkManager failed; USB NCM has static fallback 10.77.0.1"
+    network_ready=1
+  else
+    log "usb0 exists but network setup failed"
+  fi
+}
+
+reconcile_serial() {
+  if [ ! -e "$dev_root/ttyGS0" ]; then
+    serial_ready=0
+    return 0
+  fi
+  ((serial_ready == 0)) || return 0
+  if "$systemctl_cmd" start serial-getty@ttyGS0.service >/dev/null 2>&1; then
+    log "USB ACM console ready at ttyGS0"
+    serial_ready=1
+  else
+    log "ttyGS0 exists but serial getty failed"
+  fi
+}
+
+report_state() {
+  local partner=no
+  local role=missing
+  local power_role=missing
+  local udcs=none
+  local bound=none
+  partner_present && partner=yes
+  [ -r "$typec_class/$typec_port/data_role" ] && \
+    role=$(tr '\n' ' ' < "$typec_class/$typec_port/data_role")
+  [ -r "$typec_class/$typec_port/power_role" ] && \
+    power_role=$(tr '\n' ' ' < "$typec_class/$typec_port/power_role")
+  udcs=$(discover_udc 2>/dev/null || true)
+  [ -n "$udcs" ] || udcs=none
+  [ -r "$gadget/UDC" ] && bound=$(cat "$gadget/UDC" 2>/dev/null || true)
+  [ -n "$bound" ] || bound=none
+  local state="partner=$partner data_role=$role power_role=$power_role udc=$udcs bound=$bound usb0=$([ -e "$net_class/usb0" ] && echo yes || echo no) ttyGS0=$([ -e "$dev_root/ttyGS0" ] && echo yes || echo no)"
+  if [ "$state" != "$last_state" ]; then
+    log "$state"
+    last_state=$state
+  fi
+}
+
+cleanup() {
+  if [ -r "$gadget/UDC" ] && [ -n "$(cat "$gadget/UDC" 2>/dev/null || true)" ]; then
+    write_value '' "$gadget/UDC" || true
+    log "gadget unbound during service stop"
+  fi
+  "$nmcli_cmd" connection down "$connection" >/dev/null 2>&1 || true
+}
+
+trap 'stop_requested=1' TERM INT
+
+load_modules
+while ((stop_requested == 0)); do
+  ((iteration += 1))
+  select_device_role
+  if ensure_gadget; then
+    reconcile_binding || true
+    reconcile_network
+    reconcile_serial
+    report_state
+  fi
+  if [ "$once" = 1 ] || ((max_iterations > 0 && iteration >= max_iterations)); then
+    break
+  fi
+  "$sleep_cmd" "$interval"
+done
+cleanup

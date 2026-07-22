@@ -4,12 +4,11 @@ Wants=NetworkManager.service sys-kernel-config.mount
 After=NetworkManager.service systemd-modules-load.service sys-kernel-config.mount
 
 [Service]
-Type=oneshot
+Type=simple
 ExecStart=/usr/local/libexec/tb321fu-usb-rescue
-RemainAfterExit=yes
-TimeoutStartSec=infinity
-Restart=on-failure
+Restart=always
 RestartSec=5s
+TimeoutStopSec=15s
 
 [Install]
 WantedBy=multi-user.target

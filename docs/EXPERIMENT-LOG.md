@@ -80,6 +80,20 @@ References to earlier experiment IDs:
 - Permanent decision: validate overlay programs with their declared
   interpreter instead of inferring one interpreter from executable mode.
 
+### DEV-20260722-001 — USB coordinator lost its executable mode
+
+- Result: `FAIL`; the immediate retry passed but is not treated as an isolated
+  mode-only experiment.
+- Primary variable: the uncommitted USB coordinator file mode.
+- Observed: `test-usb-rescue-coordinator.sh` stopped immediately with
+  `coordinator is not executable`; Git reported mode `0644`.
+- Evidence: local source test run on 2026-07-22 before any corrective retry.
+- Correction: mode `0755` was restored. Additional coordinator behavior had
+  already changed before the retry, so the retry cannot prove a single
+  mode-only variable and is not used as release evidence by itself.
+- Permanent decision: check executable modes before behavior edits and record
+  the complete coordinator candidate under a new source experiment.
+
 ## Source validation results
 
 ### SRC-20260721-001 — Offline support bundle and redaction
@@ -94,3 +108,17 @@ References to earlier experiment IDs:
   workflow semantics PASS.
 - Boundary: this does not prove privileged journal access, niri session access,
   or redaction coverage on the tablet's real logs.
+
+### SRC-20260722-001 — Persistent USB rescue coordinator
+
+- Result: `PASS` at source-test scope; TB321FU ACM/NCM remain `UNTESTED` for
+  this candidate.
+- Primary variable: replace the blocking USB oneshot with one persistent
+  role/UDC/ConfigFS/network/serial state coordinator. Role selection, binding,
+  hotplug recovery, and cleanup are coupled parts of that state transition and
+  cannot be tested as independent deployed services.
+- Evidence: `USB_RESCUE_COORDINATOR=PASS` after tests for missing UDC,
+  role request, correct ConfigFS links, UDC removal/reappearance, ACM/NCM
+  restoration, NetworkManager fallback, serial-getty failure, and clean stop.
+- Boundary: fake sysfs/configfs and commands do not prove that TB321FU `port0`
+  can enter device role or that a real UDC will appear.
