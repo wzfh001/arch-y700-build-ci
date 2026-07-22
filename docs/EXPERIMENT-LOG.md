@@ -311,10 +311,39 @@ References to earlier experiment IDs:
   rootfs SHA, matching request list, valid package signatures, and an exact
   post-transaction installed package set.
 - Tests: `PACMAN_PACKAGE_LOCK_SOURCE=PASS`, hostile lock tampering rejected,
-  both workflows pass actionlint and immutable-action checks, workflow
+  the existing dispatch workflow passes actionlint and immutable-action checks, workflow
   semantics pass, and the complete existing offline validation sequence passes.
 - Boundary: no seed workflow has run, no lock artifact has been pinned, and no
   rootfs/GRUB build has consumed the mechanism. The next action is a lock-only
   seed run; it is not a firmware candidate or Release.
 - References: `SRC-20260722-006`, `DEV-20260722-004`,
   `DEV-20260722-005`, `DEV-20260722-006`.
+
+### DEV-20260722-007 — New lock-only workflow path could not be dispatched
+
+- Result: `FAIL` before any runner started; no artifact, rootfs, release, or
+  device operation occurred.
+- Primary variable: dispatching the newly added
+  `seed-pacman-package-lock.yml` on the feature branch.
+- Observed: GitHub returned HTTP 404 because a `workflow_dispatch` workflow
+  file must already exist on the repository default branch, even when the
+  requested ref contains that new file.
+- Correction: move the lock-only job behind a boolean input in the existing
+  `build-rootfs-and-grub.yml` path, which already exists on the default branch;
+  the regular build job is explicitly skipped in seed-only mode.
+- Permanent decision: do not retry dispatching a new workflow path that is
+  absent from the default branch. Branch-only experiments must use an existing
+  dispatch workflow identity or wait for an intentional default-branch merge.
+
+### DEV-20260722-008 — Workflow input limit rejected a new seed boolean
+
+- Result: `FAIL`, then corrected and rerun to `PASS`.
+- Primary variable: adding `pacman_lock_seed_only` as an eleventh
+  `workflow_dispatch` input.
+- Observed: actionlint rejected the workflow because GitHub permits at most ten
+  inputs and the pre-existing build workflow already used all ten.
+- Correction: reserve the exact `release_tag=__PACMAN_LOCK_SEED__` sentinel for
+  the lock-only job; the normal build job is mutually exclusive with that
+  value, and release publication remains impossible in seed mode.
+- Permanent decision: preserve the platform input limit and use an explicit,
+  validated mode sentinel rather than silently dropping an existing input.

@@ -7,7 +7,6 @@ SEED_SCRIPT="$SCRIPT_DIR/build-pacman-package-lock.sh"
 VERIFY_SCRIPT="$SCRIPT_DIR/verify-pacman-package-lock.sh"
 BUILD_SCRIPT="$SCRIPT_DIR/build-arch-rootfs-image.sh"
 BUILD_WORKFLOW="$REPO_ROOT/.github/workflows/build-rootfs-and-grub.yml"
-SEED_WORKFLOW="$REPO_ROOT/.github/workflows/seed-pacman-package-lock.yml"
 LOCK_PROFILE="$REPO_ROOT/profiles/tablet-niri/pacman-lock.env"
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/tb321fu-pacman-lock-test.XXXXXX")
 trap 'rm -rf -- "$tmp"' EXIT
@@ -83,10 +82,11 @@ for token in \
 done
 grep -Fq 'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093' "$BUILD_WORKFLOW" ||
   fail 'build workflow does not use the pinned cross-run artifact downloader'
-grep -Fq 'name: tb321fu-pacman-lock-${{ github.run_id }}' "$SEED_WORKFLOW" ||
+grep -Fq "release_tag == '__PACMAN_LOCK_SEED__'" "$BUILD_WORKFLOW" ||
+  fail 'existing dispatch workflow lacks the reserved lock-only mode'
+grep -Fq 'name: tb321fu-pacman-lock-${{ github.run_id }}' "$BUILD_WORKFLOW" ||
   fail 'seed workflow artifact identity is not tied to the seed run'
 python3 "$SCRIPT_DIR/check-action-pins.py" "$BUILD_WORKFLOW" >/dev/null
-python3 "$SCRIPT_DIR/check-action-pins.py" "$SEED_WORKFLOW" >/dev/null
 
 if [ -f "$LOCK_PROFILE" ]; then
   for field in repository run_id artifact_name manifest_sha256 rootfs_sha256; do

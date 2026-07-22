@@ -63,7 +63,60 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  seed-pacman-lock:
+    if: ${{ inputs.release_tag == '__PACMAN_LOCK_SEED__' }}
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Validate lock source
+        run: |
+          set -euo pipefail
+          bash scripts/ci/run-actionlint.sh .github/workflows/build-rootfs-and-grub.yml
+          python3 scripts/ci/check-action-pins.py .github/workflows/build-rootfs-and-grub.yml
+          bash scripts/ci/test-pacman-package-lock.sh
+
+      - name: Install lock dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates curl e2fsprogs gawk tar util-linux
+
+      - name: Seed package lock
+        env:
+          INPUT_OUTPUT_PREFIX: ${{ inputs.output_prefix }}
+        run: |
+          set -euo pipefail
+          . scripts/ci/common.sh
+          ci_validate_output_prefix "$INPUT_OUTPUT_PREFIX"
+          mkdir -p out/pacman-lock
+          sudo --preserve-env=http_proxy,https_proxy,HTTP_PROXY,HTTPS_PROXY \
+            env OUTPUT_DIR=out/pacman-lock OUTPUT_PREFIX="$INPUT_OUTPUT_PREFIX" \
+              ARCH_ROOTFS_URL=https://de3.mirror.archlinuxarm.org/os/ArchLinuxARM-aarch64-latest.tar.gz \
+              ARCH_ROOTFS_SHA256=3cf5764fb6fec7bffdff98787e52ccd15d5d6390a2496c7028d7c4950404c56a \
+              ARCH_MIRROR='https://de3.mirror.archlinuxarm.org/$arch/$repo' \
+              DESKTOP_PROFILE=tablet-niri INSTALL_FCITX5_CHINESE=1 INSTALL_FIREFOX=1 \
+              INSTALL_CAMERA_APPS=0 BUILD_TB321FU_GPU_SENSOR=0 PACKAGE_LIST= \
+              SOURCE_DATE_EPOCH=0 GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_SHA="$GITHUB_SHA" \
+              bash scripts/ci/build-pacman-package-lock.sh
+
+      - name: Upload immutable package lock
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tb321fu-pacman-lock-${{ github.run_id }}
+          path: out/pacman-lock/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 90
+
   build:
+    if: ${{ inputs.release_tag != '__PACMAN_LOCK_SEED__' }}
     runs-on: ubuntu-24.04-arm
     permissions:
       actions: read
@@ -78,7 +131,6 @@ jobs:
       - name: Validate workflow input boundaries
         run: |
           bash scripts/ci/run-actionlint.sh .github/workflows/build-rootfs-and-grub.yml
-          bash scripts/ci/run-actionlint.sh .github/workflows/seed-pacman-package-lock.yml
           python3 scripts/ci/test-workflow-semantics.py --self-test
           python3 scripts/ci/test-workflow-semantics.py \
             .github/workflows/build-rootfs-and-grub.yml \
