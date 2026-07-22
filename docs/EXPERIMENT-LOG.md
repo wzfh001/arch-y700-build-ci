@@ -459,3 +459,186 @@ References to earlier experiment IDs:
 - Boundary: this only authorizes one new seed run that references
   `CI-20260722-004`; it does not authorize a firmware build, Release, or device
   write until the uploaded lock is downloaded and independently audited.
+
+### DEV-20260722-010 — Historical Kubuntu DHCP address is not reachable
+
+- Result: `FAIL` for a read-only SSH reachability check; no device command ran.
+- Primary variable: TCP/SSH connection to the last recorded Kubuntu address
+  `192.168.0.146` with batch authentication and strict host-key checking.
+- Observed: the local kernel returned `No route to host` before SSH host-key or
+  authentication negotiation. The address is DHCP-assigned and was already
+  documented as non-stable.
+- Recovery action: none required; no remote or local configuration changed.
+- Next hypothesis: obtain a current address from local neighbor/mDNS evidence
+  before any further SSH attempt. Do not retry `192.168.0.146` without new
+  reachability evidence.
+
+### DEV-20260722-011 — Ephemeral known-host process substitution was not read
+
+- Result: `FAIL` before remote authentication; no device command ran.
+- Primary variable: supply the newly verified host key to OpenSSH through a
+  process-substitution `UserKnownHostsFile` while keeping strict checking.
+- New evidence: mDNS resolved `GUF296.local` to `192.168.0.128`, and an
+  independent ED25519 scan matched the recorded device fingerprint
+  `SHA256:6X/qsZqT4F2DwGvhM9z13P31DwSrg9SaQiB8FImZ3T4`.
+- Observed: OpenSSH did not recognize the process-substitution entry and
+  stopped with `No ED25519 host key is known`; it did not attempt public-key
+  authentication.
+- Correction: retain the explicit fingerprint equality gate, then use an
+  isolated `/dev/null` known-host database for this one connection. Do not
+  repeat the failed process-substitution form unchanged.
+
+### DEV-20260722-012 — Kubuntu does not authorize the dedicated Codex key
+
+- Result: `FAIL` at SSH authentication; the verified device ran no command.
+- Primary variable: authenticate `GUF296@192.168.0.128` with the dedicated
+  local `id_ed25519_y700_codex` key after an explicit equality check against
+  the recorded ED25519 host fingerprint.
+- Observed: the server returned `Permission denied (publickey,password)`.
+  This agrees with the current handoff stating that the restored Kubuntu image
+  did not retain the earlier dedicated public key.
+- Recovery action: none required; the connection was read-only and no host-key
+  or remote configuration was persisted.
+- Permanent decision: do not guess passwords or cycle unrelated keys. Resume
+  SSH only with an explicitly known credential or after a separately
+  authorized key-injection path becomes available.
+
+### DEV-20260722-013 — gh api rejects binary artifact Accept header
+
+- Result: `FAIL` before any artifact bytes were accepted.
+- Primary variable: use `gh api` with `Accept: application/zip` to save the
+  Actions artifact ZIP directly.
+- Observed: GitHub returned HTTP 415 (`Unsupported 'Accept' header`) and the
+  shell, without fail-fast around that one command, left a 163-byte JSON error
+  body at the target path. No lock content was interpreted.
+- Recovery action: identify the file by its size/content as an error response
+  and remove only that explicit path before retrying with an authenticated
+  HTTP client; preserve the API-reported artifact digest as the authority.
+- Permanent decision: binary artifact downloads must fail closed on HTTP status
+  and verify both the declared size and GitHub digest before extraction.
+
+### DEV-20260722-014 — Safety layer rejected deleting the invalid download
+
+- Result: `FAIL` before execution; the 163-byte HTTP 415 response was not
+  removed.
+- Primary variable: use `rm -f` to discard the explicitly identified invalid
+  artifact path.
+- Observed: the local command guard rejected recursive/destructive-style
+  removal syntax even though the path was narrow.
+- Correction: move the response to the explicit quarantine file
+  `tb321fu-pacman-lock-29921200387.http-415.json`, preserving it as evidence
+  and freeing the intended ZIP pathname without deletion.
+- Permanent decision: quarantine failed downloads with a narrowly scoped move
+  before considering any cleanup; do not weaken the safety guard.
+
+### DEV-20260722-015 — Authenticated curl ZIP request still returns 415
+
+- Result: `FAIL` before artifact bytes were accepted.
+- Primary variable: use authenticated `curl --location` with
+  `Accept: application/zip` against the GitHub artifact archive endpoint.
+- Observed: GitHub returned HTTP 415 after 177 bytes; the expected 1,568,573,902
+  byte artifact ZIP was not created and no lock member was interpreted.
+- Correction: quarantine the partial response and use the GitHub CLI's
+  supported `gh run download` extraction path; retain the API-provided artifact
+  digest and verify all extracted members plus the deterministic inner tar.
+- Permanent decision: do not repeat the raw ZIP endpoint/Accept combination
+  until the API's current media-type behavior is independently established.
+
+### DEV-20260722-016 — Artifact endpoint requires its default media type
+
+- Result: `NOT TESTED` at the time of this record; a new download variable is
+  authorized based on header-only evidence.
+- Primary variable: omit a custom `Accept` header while retaining the
+  authenticated artifact endpoint request.
+- New evidence: header probes showed HTTP 302 and a signed blob `Location`
+  only when no custom `Accept` was sent; explicit `application/zip` and
+  `application/octet-stream` returned HTTP 415.
+- Expected result: a raw ZIP whose byte size equals the API declaration and
+  whose SHA-256 equals the recorded GitHub artifact digest.
+- References: `DEV-20260722-013`, `DEV-20260722-015`.
+
+### DEV-20260722-017 — Host GnuPG keyboxd polluted the first offline audit
+
+- Result: `FAIL` in the audit harness before any package signature was
+  accepted or rejected.
+- Primary variable: invoke `gpg`/`gpgv` with the extracted ARM keyring while
+  leaving the host's default GnuPG keyboxd configuration active.
+- Observed: `gpg` ignored the supplied keyring and listed unrelated host keys;
+  the trusted fingerprint comparison stopped the audit. No package result was
+  recorded from that run.
+- Correction: create an isolated temporary `GNUPGHOME`, disable inherited
+  keybox state, dearmor the lock's armored keyring explicitly, and require its
+  primary fingerprint to match `archlinuxarm-trusted` before running `gpgv`.
+- Permanent decision: offline signature audits must never consult the host
+  user's or system keybox; keyring provenance is a tested input.
+
+### DEV-20260722-018 — Repository desc parser rejected NUL padding
+
+- Result: `FAIL` in an independent audit harness; the authoritative lock
+  verifier and 723-package `gpgv` pass remain unchanged.
+- Primary variable: parse every frozen repository `desc` member as UTF-8
+  section blocks after stripping only text whitespace.
+- Observed: at least one member exposed a trailing NUL-padded block, which the
+  parser treated as a section header and rejected. No database/package binding
+  conclusion was emitted.
+- Correction: first identify every member containing NUL bytes and require all
+  NUL content to be trailing padding; strip only that verified suffix before
+  parsing sections. Do not weaken filename, SHA, signature, or metadata checks.
+
+### AUDIT-20260722-001 — Frozen extra.db has one unrelated NUL-only desc
+
+- Result: `FAIL` for the stronger hypothesis that every upstream database
+  `desc` member contains complete textual metadata; transaction audit remains
+  in progress.
+- Primary variable: inspect all four frozen repository databases independently
+  of the lock manifest.
+- Observed: `extra/findnewest-0.3-4/desc` is exactly 1,271 NUL bytes. GNU tar
+  and Python agree. `pacman -Sl extra` still parses 12,848 entries and reports
+  `findnewest 0.3-4`, but `pacman -Si` shows missing optional metadata. The
+  package is absent from `PACKAGE-FILES.tsv`, `requested-packages.txt`, and
+  `expected-installed-packages.txt`.
+- Decision boundary: do not claim that every unrelated upstream DB entry is
+  semantically complete. Continue only with a fail-closed audit requiring all
+  723 packages in the actual frozen transaction to have complete DB filename,
+  SHA-256, PGPSIG, architecture, name/version, matching detached signatures,
+  and matching package metadata. Any NUL-only entry in that locked set is a
+  release blocker.
+- References: `DEV-20260722-018`, `SRC-20260722-007`.
+
+### AUDIT-20260722-002 — Immutable pacman lock artifact and transaction
+
+- Result: `PASS` for the 723-package transaction represented by the seed
+  artifact; this is not a rootfs, GRUB, firmware candidate, Release, or device
+  test.
+- Workflow identity: run `29921200387`, commit
+  `bae626a0e9f19fcdc1be4d0522cc6aebc2eaff9f`, artifact ID `8530543371`, name
+  `tb321fu-pacman-lock-29921200387`.
+- GitHub artifact: declared size `1568573902`; server digest and independently
+  downloaded ZIP SHA-256 both
+  `aa922a284f9356c76d8746b79db466c53a27b711b10d2d9612468e775863384e`.
+- Inner transport: deterministic tar size `1568573440`, SHA-256
+  `8c9328b682f13e9c518e28a6bcb7b3f0b620273ed94859dec7e4d9f4798c3fb0`;
+  ZIP integrity passed, the CLI-extracted tar had the same digest, and bounded
+  extraction accepted exactly 1,462 members with no symlinks.
+- Lock identity: manifest SHA-256
+  `a2e554de57011255bc25dc86b7c388982fe4ccadfa5cd2131d0bc817eb996bfd`;
+  fixed rootfs SHA-256
+  `3cf5764fb6fec7bffdff98787e52ccd15d5d6390a2496c7028d7c4950404c56a`;
+  request-list SHA-256
+  `4ae00eac38b8e4991947873b432afd93abb7205c559c5a44427026efd7052b20`;
+  expected-installed SHA-256
+  `2ae31bbab24c3c416e26999c2ff7055331c3d7d16eb7dd5c5f62aeaf38540c35`.
+- Transaction evidence: 166 requested packages, 830 expected installed
+  packages, 723 locked package files (`core=93`, `extra=629`, `alarm=1`,
+  `aur=0`) and 52 epoch-bearing filenames. All member SHA256SUMS passed. All
+  723 detached signatures passed `gpgv` using only the artifact's dearmored
+  ARM primary key `68B3537F39A313B3E574D06777193F152BDBE6A6`.
+- Database/package binding: all 723 locked entries have matching repository
+  filename, SHA-256, PGPSIG, name, version, architecture, detached-signature
+  bytes, and package `.PKGINFO`; all locked versions exactly match the expected
+  installed set.
+- Known boundary: `AUDIT-20260722-001` remains an explicit upstream database
+  warning for the unrelated, unlocked `findnewest` entry; no locked entry has
+  NUL or missing metadata, and pacman parses all four databases successfully.
+- Evidence directory:
+  `/home/fuhao/002/y700-linux/builds/artifacts/TB321FU-pacman-lock-run-29921200387/`.
