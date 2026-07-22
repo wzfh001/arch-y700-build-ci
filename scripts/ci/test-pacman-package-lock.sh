@@ -5,6 +5,7 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 REPO_ROOT=$(cd -- "$SCRIPT_DIR/../.." && pwd -P)
 SEED_SCRIPT="$SCRIPT_DIR/build-pacman-package-lock.sh"
 VERIFY_SCRIPT="$SCRIPT_DIR/verify-pacman-package-lock.sh"
+PACK_SCRIPT="$SCRIPT_DIR/pack-pacman-package-lock.sh"
 BUILD_SCRIPT="$SCRIPT_DIR/build-arch-rootfs-image.sh"
 BUILD_WORKFLOW="$REPO_ROOT/.github/workflows/build-rootfs-and-grub.yml"
 LOCK_PROFILE="$REPO_ROOT/profiles/tablet-niri/pacman-lock.env"
@@ -38,7 +39,9 @@ printf 'fixture core db\n' > "$lock/repo/aarch64/core/core.db"
 printf 'fixture extra db\n' > "$lock/repo/aarch64/extra/extra.db"
 printf 'fixture alarm db\n' > "$lock/repo/aarch64/alarm/alarm.db"
 printf 'fixture aur db\n' > "$lock/repo/aarch64/aur/aur.db"
-package_name=fake-1-1-aarch64.pkg.tar.xz
+# A pacman epoch colon is valid here and is the filename class GitHub artifact
+# paths reject when the repository is uploaded member by member.
+package_name=fake-1:1.0-1-aarch64.pkg.tar.xz
 printf 'fixture package\n' > "$lock/repo/aarch64/core/$package_name"
 printf 'fixture signature\n' > "$lock/repo/aarch64/core/$package_name.sig"
 cp "$tmp/requested.txt" "$lock/requested-packages.txt"
@@ -61,6 +64,27 @@ manifest_sha=$(sha256sum "$lock/SHA256SUMS" | awk '{print $1}')
 bash "$VERIFY_SCRIPT" "$lock" "$manifest_sha" \
   3cf5764fb6fec7bffdff98787e52ccd15d5d6390a2496c7028d7c4950404c56a \
   "$tmp/requested.txt" >/dev/null || fail 'valid package lock fixture was rejected'
+
+archive="$tmp/fake-pacman-lock.tar"
+SOURCE_DATE_EPOCH=0 bash "$PACK_SCRIPT" "$lock" "$archive" >/dev/null ||
+  fail 'deterministic lock archive creation failed'
+[ -f "$archive" ] && [ -f "$archive.sha256" ] || fail 'lock archive sidecar is missing'
+(cd "$tmp" && sha256sum -c "$(basename "$archive.sha256")") >/dev/null ||
+  fail 'lock archive sidecar does not verify'
+archive_repeat="$tmp/fake-pacman-lock-repeat.tar"
+SOURCE_DATE_EPOCH=0 bash "$PACK_SCRIPT" "$lock" "$archive_repeat" >/dev/null ||
+  fail 'repeat lock archive creation failed'
+cmp -s "$archive" "$archive_repeat" || fail 'lock archive is not deterministic for identical input'
+expanded="$tmp/expanded"
+ci_extract_archive "$archive" "$expanded" >/dev/null || fail 'lock archive extraction failed'
+expanded_lock="$expanded/$(basename "$lock")"
+[ -f "$expanded_lock/repo/aarch64/core/$package_name" ] ||
+  fail 'epoch package filename was not preserved through lock transport'
+expanded_manifest=$(sha256sum "$expanded_lock/SHA256SUMS" | awk '{print $1}')
+bash "$VERIFY_SCRIPT" "$expanded_lock" "$expanded_manifest" \
+  3cf5764fb6fec7bffdff98787e52ccd15d5d6390a2496c7028d7c4950404c56a \
+  "$tmp/requested.txt" >/dev/null || fail 'extracted lock fixture was rejected'
+
 printf 'tamper\n' >> "$lock/repo/aarch64/core/$package_name"
 if bash "$VERIFY_SCRIPT" "$lock" "$manifest_sha" \
   3cf5764fb6fec7bffdff98787e52ccd15d5d6390a2496c7028d7c4950404c56a \
@@ -71,12 +95,22 @@ fi
 for token in \
   'pacman -Syu --print' \
   'url.sig' \
+  'pack-pacman-package-lock.sh' \
   'mount --bind "$rootfs_dir" "$rootfs_dir"' \
   'file:///run/tb321fu-pacman-lock/repo/$arch/$repo' \
   'arch_chroot_offline' \
   'expected-installed-packages.txt'; do
   grep -Fq "$token" "$SEED_SCRIPT" || fail "seed policy is missing: $token"
 done
+for token in \
+  'LOCK_ARCHIVE_SHA256' \
+  'ci_extract_archive "$lock_archive" "$expanded"' \
+  'out/pacman-lock/*-pacman-lock.tar'; do
+  grep -Fq "$token" "$BUILD_WORKFLOW" || fail "lock transport policy is missing: $token"
+done
+if grep -Fq 'path: out/pacman-lock/' "$BUILD_WORKFLOW"; then
+  fail 'workflow still uploads epoch package filenames as artifact paths'
+fi
 for token in \
   'PACMAN_PACKAGE_LOCK_MANIFEST_SHA256' \
   'verify-pacman-package-lock.sh' \
@@ -96,12 +130,13 @@ grep -Fq 'name: tb321fu-pacman-lock-${{ github.run_id }}' "$BUILD_WORKFLOW" ||
 python3 "$SCRIPT_DIR/check-action-pins.py" "$BUILD_WORKFLOW" >/dev/null
 
 if [ -f "$LOCK_PROFILE" ]; then
-  for field in repository run_id artifact_name manifest_sha256 rootfs_sha256; do
+  for field in repository run_id artifact_name manifest_sha256 archive_sha256 rootfs_sha256; do
     grep -Eq "^${field}=.+$" "$LOCK_PROFILE" || fail "pinned lock profile is missing: $field"
   done
   grep -Eq '^run_id=[0-9]+$' "$LOCK_PROFILE" || fail 'pinned lock run id is invalid'
   grep -Eq '^artifact_name=[A-Za-z0-9_.-]+$' "$LOCK_PROFILE" || fail 'pinned lock artifact name is invalid'
   grep -Eq '^manifest_sha256=[0-9a-f]{64}$' "$LOCK_PROFILE" || fail 'pinned lock manifest SHA-256 is invalid'
+  grep -Eq '^archive_sha256=[0-9a-f]{64}$' "$LOCK_PROFILE" || fail 'pinned lock archive SHA-256 is invalid'
   printf 'PACMAN_PACKAGE_LOCK_PIN=PASS\n'
 else
   printf 'PACMAN_PACKAGE_LOCK_PIN=UNSET\n'

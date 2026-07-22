@@ -110,7 +110,12 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: tb321fu-pacman-lock-${{ github.run_id }}
-          path: out/pacman-lock/
+          # Pacman epochs use ':' in package filenames. GitHub artifact paths
+          # reject that character, so transport the verified lock as one tar
+          # while preserving the repository filenames inside it.
+          path: |
+            out/pacman-lock/*-pacman-lock.tar
+            out/pacman-lock/*-pacman-lock.tar.sha256
           if-no-files-found: error
           compression-level: 0
           retention-days: 90
@@ -195,17 +200,20 @@ jobs:
           run_id=$(read_field run_id)
           artifact_name=$(read_field artifact_name)
           manifest_sha256=$(read_field manifest_sha256)
+          archive_sha256=$(read_field archive_sha256)
           rootfs_sha256=$(read_field rootfs_sha256)
           [[ $repository =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo 'invalid lock repository' >&2; exit 1; }
           [[ $run_id =~ ^[0-9]+$ ]] || { echo 'invalid lock run id' >&2; exit 1; }
           [[ $artifact_name =~ ^[A-Za-z0-9_.-]+$ ]] || { echo 'invalid lock artifact name' >&2; exit 1; }
           [[ $manifest_sha256 =~ ^[0-9a-f]{64}$ ]] || { echo 'invalid lock manifest SHA-256' >&2; exit 1; }
+          [[ $archive_sha256 =~ ^[0-9a-f]{64}$ ]] || { echo 'invalid lock archive SHA-256' >&2; exit 1; }
           [[ $rootfs_sha256 =~ ^[0-9a-f]{64}$ ]] || { echo 'invalid lock rootfs SHA-256' >&2; exit 1; }
           {
             printf 'repository=%s\n' "$repository"
             printf 'run_id=%s\n' "$run_id"
             printf 'artifact_name=%s\n' "$artifact_name"
             printf 'manifest_sha256=%s\n' "$manifest_sha256"
+            printf 'archive_sha256=%s\n' "$archive_sha256"
             printf 'rootfs_sha256=%s\n' "$rootfs_sha256"
           } >> "$GITHUB_OUTPUT"
 
@@ -224,14 +232,41 @@ jobs:
         env:
           LOCK_ROOT: ${{ runner.temp }}/tb321fu-pacman-lock
           LOCK_MANIFEST_SHA256: ${{ steps.package-lock.outputs.manifest_sha256 }}
+          LOCK_ARCHIVE_SHA256: ${{ steps.package-lock.outputs.archive_sha256 }}
           LOCK_ROOTFS_SHA256: ${{ steps.package-lock.outputs.rootfs_sha256 }}
         run: |
           set -euo pipefail
-          mapfile -t lock_info_files < <(find "$LOCK_ROOT" -type f -name LOCK-INFO.env -print | sort)
-          [ "${#lock_info_files[@]}" -eq 1 ] || { echo 'lock artifact must contain exactly one LOCK-INFO.env' >&2; exit 1; }
-          LOCK_DIR=$(dirname "${lock_info_files[0]}")
-          requested="$RUNNER_TEMP/tb321fu-requested-packages.txt"
+          if find "$LOCK_ROOT" -type l -print -quit | grep -q .; then
+            echo 'lock artifact contains a symlink' >&2
+            exit 1
+          fi
+          mapfile -t artifact_files < <(find "$LOCK_ROOT" -mindepth 1 -maxdepth 1 -type f -print | sort)
+          [ "${#artifact_files[@]}" -eq 2 ] || { echo 'lock artifact must contain exactly one archive and one sidecar' >&2; exit 1; }
+          mapfile -t lock_archives < <(find "$LOCK_ROOT" -mindepth 1 -maxdepth 1 -type f -name '*-pacman-lock.tar' -print | sort)
+          [ "${#lock_archives[@]}" -eq 1 ] || { echo 'lock artifact must contain exactly one lock tar archive' >&2; exit 1; }
+          lock_archive=${lock_archives[0]}
+          lock_sha_file="$lock_archive.sha256"
+          [ -f "$lock_sha_file" ] || { echo 'lock archive SHA-256 sidecar is missing' >&2; exit 1; }
+          (cd "$(dirname "$lock_archive")" && sha256sum -c "$(basename "$lock_sha_file")")
+          actual_archive_sha=$(sha256sum "$lock_archive" | awk '{ print $1 }')
+          [ "$actual_archive_sha" = "$LOCK_ARCHIVE_SHA256" ] || {
+            echo "lock archive SHA-256 differs from the pinned value: $actual_archive_sha" >&2
+            exit 1
+          }
+          expanded="$RUNNER_TEMP/tb321fu-pacman-lock-expanded"
+          [ ! -e "$expanded" ] || { echo 'lock extraction directory already exists' >&2; exit 1; }
           . scripts/ci/common.sh
+          ci_extract_archive "$lock_archive" "$expanded"
+          mapfile -t extracted_roots < <(find "$expanded" -mindepth 1 -maxdepth 1 -type d -print | sort)
+          [ "${#extracted_roots[@]}" -eq 1 ] || { echo 'lock archive must contain exactly one root directory' >&2; exit 1; }
+          if find "$expanded" -mindepth 1 -maxdepth 1 -type f -print -quit | grep -q .; then
+            echo 'lock archive contains unexpected top-level files' >&2
+            exit 1
+          fi
+          LOCK_DIR=${extracted_roots[0]}
+          mapfile -t lock_info_files < <(find "$LOCK_DIR" -type f -name LOCK-INFO.env -print | sort)
+          [ "${#lock_info_files[@]}" -eq 1 ] || { echo 'lock archive must contain exactly one LOCK-INFO.env' >&2; exit 1; }
+          requested="$RUNNER_TEMP/tb321fu-requested-packages.txt"
           . scripts/ci/package-list.sh
           DESKTOP_PROFILE=tablet-niri INSTALL_FCITX5_CHINESE=1 INSTALL_FIREFOX=1 \
             INSTALL_CAMERA_APPS=0 BUILD_TB321FU_GPU_SENSOR=0 PACKAGE_LIST='' \

@@ -401,3 +401,61 @@ References to earlier experiment IDs:
   pinned paths. Cleanup now uses the common deepest-first mount traversal.
 - Retry authorization: the next seed changes the repository model and cleanup
   traversal; do not repeat run `29918760462` unchanged.
+
+### CI-20260722-004 — GitHub artifact upload rejects epoch package filenames
+
+- Result: `FAIL`; the seed transaction and lock verification completed, but no
+  artifact was published.
+- Workflow run: `29919009433`, commit `5124ba6`, reserved lock-only mode.
+- Primary variable: upload the verified lock directory as individual artifact
+  members using `actions/upload-artifact`.
+- Observed: the action rejected
+  `repo/aarch64/core/fakeroot-1:1.37.2-2-aarch64.pkg.tar.xz` because GitHub
+  artifact paths cannot contain `:`. The package filename is valid and must be
+  preserved because the epoch is part of pacman identity; renaming it would
+  invalidate the repository transaction. The normal build job was skipped and
+  no rootfs, GRUB, release, or device operation occurred.
+- Raw evidence: GitHub job log for
+  `https://github.com/wzfh001/arch-y700-build-ci/actions/runs/29919009433`.
+- Correction: publish one deterministic tar archive of the verified lock
+  directory (preserving package filenames), then safely extract and verify it
+  in the consuming build job. Keep the manifest SHA and artifact/run identity
+  bound to the extracted lock.
+- Retry authorization: a new commit will change only the lock transport and
+  consumer extraction path; do not repeat run `29919009433` unchanged.
+- References: `CI-20260722-003`, `SRC-20260722-007`.
+
+### DEV-20260722-009 — Bulk lock-test patch used stale context
+
+- Result: `FAIL` before any file change, then corrected with a smaller patch.
+- Primary variable: one bulk `apply_patch` operation against
+  `test-pacman-package-lock.sh`.
+- Observed: the patch expected wording that was not present in the current
+  profile-validation block, so the patch engine rejected the complete edit;
+  no partial hunk was applied.
+- Correction: re-read the exact file, split the edit at stable surrounding
+  lines, and run the complete lock test afterward.
+- Permanent decision: after a long handoff or concurrent edit history, refresh
+  the exact target context before applying a multi-hunk patch.
+
+### SRC-20260722-008 — Deterministic epoch-safe package-lock transport
+
+- Result: `PASS` at source and hostile-fixture scope; no replacement seed run
+  has been dispatched yet.
+- Primary variable: replace direct artifact upload of repository members with
+  one deterministic GNU tar plus a SHA-256 sidecar, then safely extract and
+  verify it before the normal build consumes the lock.
+- Evidence: a fixture package named
+  `fake-1:1.0-1-aarch64.pkg.tar.xz` retained its exact epoch filename through
+  pack, SHA verification, bounded extraction, and complete lock verification.
+  Two archives made from identical input at `SOURCE_DATE_EPOCH=0` were byte
+  identical. The consumer also pins the archive SHA-256 in addition to the
+  existing manifest, run, artifact, repository, and rootfs identities.
+- Full local Gate: actionlint, immutable action pins, workflow semantics and
+  input boundaries, safe extraction, governance, support bundle, USB rescue,
+  Bluetooth NAP, Wi-Fi package, payload policy, tablet profile, audio, native
+  packages, OpenPGP, pacman signatures, overlay boundaries, publication
+  safety, shell syntax, and pacman lock tests all passed.
+- Boundary: this only authorizes one new seed run that references
+  `CI-20260722-004`; it does not authorize a firmware build, Release, or device
+  write until the uploaded lock is downloaded and independently audited.

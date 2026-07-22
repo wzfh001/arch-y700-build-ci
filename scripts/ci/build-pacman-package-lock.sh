@@ -188,8 +188,13 @@ INFO
 
 (cd "$lock_dir" && find . -type f ! -name SHA256SUMS -printf '%P\0' | LC_ALL=C sort -z | xargs -0 sha256sum) > "$lock_dir/SHA256SUMS"
 manifest_sha=$(sha256sum "$lock_dir/SHA256SUMS" | awk '{print $1}')
-printf 'manifest_sha256=%s\npackage_count=%s\n' "$manifest_sha" "$(($(wc -l < "$lock_dir/PACKAGE-FILES.tsv") - 1))" > \
-  "$OUTPUT_DIR/${OUTPUT_PREFIX}-pacman-lock.summary"
 
 bash "$SCRIPT_DIR/verify-pacman-package-lock.sh" "$lock_dir" "$manifest_sha" "$ARCH_ROOTFS_SHA256" "$lock_dir/requested-packages.txt"
+lock_archive="$OUTPUT_DIR/${OUTPUT_PREFIX}-pacman-lock.tar"
+bash "$SCRIPT_DIR/pack-pacman-package-lock.sh" "$lock_dir" "$lock_archive" >/dev/null
+archive_sha=$(awk '{ print $1 }' "$lock_archive.sha256")
+[[ $archive_sha =~ ^[0-9a-f]{64}$ ]] || ci_die "invalid lock archive SHA-256: $archive_sha"
+printf 'manifest_sha256=%s\narchive_sha256=%s\npackage_count=%s\n' \
+  "$manifest_sha" "$archive_sha" "$(($(wc -l < "$lock_dir/PACKAGE-FILES.tsv") - 1))" > \
+  "$OUTPUT_DIR/${OUTPUT_PREFIX}-pacman-lock.summary"
 ci_log "pacman package lock complete: $lock_dir"
