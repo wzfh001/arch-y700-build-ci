@@ -96,6 +96,7 @@ jobs:
           bash scripts/ci/test-pacman-signature-policy.sh
           bash scripts/ci/test-rootfs-overlay-boundary.sh
           bash scripts/ci/test-release-publication.sh
+          bash scripts/ci/update-project-status.sh --check
 
       - name: Validate release mode
         env:

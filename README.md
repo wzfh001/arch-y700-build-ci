@@ -4,6 +4,18 @@ Build Arch Linux ARM Plasma rootfs and GRUB images for Lenovo Y700 / TB321FU.
 
 This repository is intentionally separate from the Ubuntu/Kubuntu build. It reuses the verified Y700 boot/kernel/device payload sources, but builds an Arch Linux ARM userspace.
 
+> ## Project status
+>
+> | Kernel pipeline (K0–K9) | Main Arch pipeline (P0–P9) | Device |
+> |---|---|---|
+> | **K0–K7 PASS · K9 PASS · K8 BLOCKED** | **P0–P3 PASS · P4 BLOCKED** | Kubuntu 26.04 rollback baseline (VERIFIED) |
+>
+> - Kernel is reproducibly buildable on GitHub Actions (`REPRO-CLOSE`); a
+>   candidate GRUB boot image is hash-bound (`dade9ac5b2…`).
+> - The Arch rootfs candidate has **not passed P4 offline audit** and has
+>   **never been flashed**. Nothing here is a flashable release yet.
+> - Full status: [`docs/STATUS.md`](docs/STATUS.md) · roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md) · docs index: [`docs/README.md`](docs/README.md)
+
 ## Current Scope
 
 - Arch Linux ARM `aarch64` rootfs

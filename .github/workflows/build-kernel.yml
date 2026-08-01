@@ -36,6 +36,7 @@ jobs:
       - name: Validate action pins
         run: |
           set -euo pipefail
+          bash scripts/ci/update-project-status.sh --check
           python3 scripts/ci/check-action-pins.py --self-test || true
           bash scripts/ci/run-actionlint.sh .github/workflows/build-kernel.yml
 
