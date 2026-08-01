@@ -1,0 +1,131 @@
+name: Build TB321FU Kernel (Repro)
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_ref:
+        description: GUF296/linux ref to build (branch or commit).
+        required: true
+        default: TB321FU-7.1.1
+        type: string
+      build_config:
+        description: "Source of .config: baseline (pinned kernel.config) or defconfig."
+        required: true
+        default: baseline
+        type: choice
+        options:
+          - baseline
+          - defconfig
+
+concurrency:
+  group: kernel-repro-${{ github.ref_name }}-${{ inputs.build_config }}
+  cancel-in-progress: false
+
+jobs:
+  build-kernel:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    permissions:
+      contents: read
+    steps:
+      - name: Validate action pins
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/check-action-pins.py --self-test || true
+          bash scripts/ci/run-actionlint.sh .github/workflows/build-kernel.yml
+
+      - name: Checkout build-ci
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install cross toolchain (aligned with baseline GCC 13.3.0 / binutils 2.42)
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-13-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            libncurses-dev flex bison bc kmod cpio rsync python3 file
+          echo '--- toolchain versions ---'
+          aarch64-linux-gnu-gcc --version | head -1
+          aarch64-linux-gnu-ld --version | head -1
+
+      - name: Checkout kernel source (pinned)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: GUF296/linux
+          ref: ${{ inputs.kernel_ref }}
+          fetch-depth: 1
+          persist-credentials: false
+          path: kernel-src
+
+      - name: Verify pinned HEAD (baseline only)
+        if: inputs.build_config == 'baseline'
+        working-directory: kernel-src
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          expected=5df8e852ea722929f5359a5ef28ebcec0c4443fd
+          actual=$(git rev-parse HEAD)
+          if [ "$actual" != "$expected" ]; then
+            echo "ERROR: kernel HEAD $actual != expected $expected" >&2
+            exit 1
+          fi
+          echo "HEAD OK: $actual"
+
+      - name: Prepare .config
+        working-directory: kernel-src
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.build_config }}" = "baseline" ]; then
+            cp "$GITHUB_WORKSPACE/source/kernel/kernel.config" .config
+            echo 'Using pinned baseline kernel.config'
+          else
+            make ARCH=arm64 defconfig
+            echo 'Using in-tree defconfig'
+          fi
+          make ARCH=arm64 olddefconfig
+          grep '^CONFIG_CC_VERSION_TEXT' .config
+
+      - name: Build Image + dtb + modules
+        working-directory: kernel-src
+        run: |
+          set -euo pipefail
+          export ARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          make -j"$(nproc)" Image dtbs modules
+          make INSTALL_MOD_PATH="$GITHUB_WORKSPACE/modout" modules_install
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          cp arch/arm64/boot/Image "$GITHUB_WORKSPACE/out/Image"
+          cp arch/arm64/boot/dts/qcom/sm8650-lenovo-tb321fu.dtb "$GITHUB_WORKSPACE/out/sm8650-lenovo-tb321fu.dtb"
+          cp .config "$GITHUB_WORKSPACE/out/kernel.config"
+
+      - name: Package modules + build info
+        run: |
+          set -euo pipefail
+          tar -C modout -czf out/modules.tar.gz lib/modules
+          {
+            echo "kernel_ref=${{ inputs.kernel_ref }}"
+            echo "config_source=${{ inputs.build_config }}"
+            echo "git_sha=$GITHUB_SHA"
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "toolchain=$(aarch64-linux-gnu-gcc --version | head -1)"
+          } > out/BUILD-INFO.txt
+          sha256sum out/Image out/sm8650-lenovo-tb321fu.dtb out/kernel.config out/modules.tar.gz > out/SHA256SUMS
+          echo '--- artifacts ---'
+          ls -lh out/
+          cat out/SHA256SUMS
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tb321fu-kernel-repro-${{ inputs.kernel_ref }}-${{ inputs.build_config }}-${{ github.run_id }}
+          path: |
+            out/Image
+            out/sm8650-lenovo-tb321fu.dtb
+            out/kernel.config
+            out/modules.tar.gz
+            out/BUILD-INFO.txt
+            out/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 90
