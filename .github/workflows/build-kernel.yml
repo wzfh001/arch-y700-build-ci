@@ -44,7 +44,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y \
-            gcc-13-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
             libncurses-dev flex bison bc kmod cpio rsync python3 file
           echo '--- toolchain versions ---'
           aarch64-linux-gnu-gcc --version | head -1
