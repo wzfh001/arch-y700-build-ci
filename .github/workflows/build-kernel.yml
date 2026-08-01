@@ -28,16 +28,16 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout build-ci
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
       - name: Validate action pins
         run: |
           set -euo pipefail
           python3 scripts/ci/check-action-pins.py --self-test || true
           bash scripts/ci/run-actionlint.sh .github/workflows/build-kernel.yml
-
-      - name: Checkout build-ci
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          persist-credentials: false
 
       - name: Install cross toolchain (aligned with baseline GCC 13.3.0 / binutils 2.42)
         run: |
