@@ -4,7 +4,7 @@
 - 设备：Lenovo Y700 2025 / TB321FU，IP `192.168.0.156`（user fuhao）
 - 内核：`7.1.1-g5df8e852ea72`
 - bundle：`builds/flash-bundles/TB321FU-tablet-kde-run-30736975180/`（19/19 PASS）
-- 支持包：`tb321fu-support-20260802T091545Z.tar.zst`（SHA `b09f607d…f5590`，44 文件）
+- 支持包：`tb321fu-support-20260802T091545Z.tar.zst`（SHA `11c29ff5…e495ec`，44 文件）
 
 ## P7 首启救援和网络验收
 

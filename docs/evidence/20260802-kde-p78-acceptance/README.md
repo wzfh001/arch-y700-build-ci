@@ -12,4 +12,4 @@
 - `AUDIO-FIX-EVIDENCE.md` — 音频根因与修复证据
 - `SERVICE-FIX-EVIDENCE.md` — 3 个失败服务处置
 - `acceptance-snapshot.txt` — 实机快照（system/services/display/audio/battery/input/wifi/ucm）
-- `tb321fu-support-20260802T091545Z.tar.zst` — 设备 support bundle（44 文件，SHA b09f607d…f5590）
+- `tb321fu-support-20260802T091545Z.tar.zst` — 设备 support bundle（44 文件，SHA 11c29ff5…e495ec）
