@@ -1,0 +1,11 @@
+# Offline ownership/content/mode evidence for the immutable pacman lock.
+# The full recursive QCA package inventory is 95 regular members and 48 symlinks;
+# these are the four direct-root paths that overlap the device overlay.
+generic_package	linux-firmware-atheros-20260622-1-any.pkg.tar.xz
+generic_package_sha256	d000b5fe8765ccd757bee17d8537aaeb065eda9f58870ec40be9534c5c5745c2
+generic_package_owner	linux-firmware-atheros
+relative_path	device_type	device_mode	device_size	device_sha256	arch_type	arch_mode	arch_size_or_target	arch_sha256_or_target
+usr/lib/firmware/qca/hmtbtfw20.tlv	regular	0777	265528	b4e7f61e7dd090e56811860a7781ff3b0ce8e87cc0480feaab34bf4f614308c5	regular	0644	270120	f1c00f4640a5c4e5dc36a2574d3d1d0afcfd1ab58a84f217dce4b1bb73cba981
+usr/lib/firmware/qca/hmtnv20.b10f	regular	0777	9540	594885553fad67dfa4ea24f254f0760da284acc18dc9d190e175594651bbad1c	regular	0644	9556	f8d027c5f0ea54456d23b903c55e1a87b06df97ff26b83e3fd02ac6b265b5264
+usr/lib/firmware/qca/hmtnv20.b112	regular	0777	9540	594885553fad67dfa4ea24f254f0760da284acc18dc9d190e175594651bbad1c	symlink	0777	12->hmtnv20.b10f	hmtnv20.b10f
+usr/lib/firmware/qca/hmtnv20.bin	regular	0777	9492	4e6f5fb6a17eaf219be1c2ce6c9f8829ea4d079ca28496c1729f7ee62b052c17	regular	0644	9508	c26b340bbc8b617304610c774627ac4879194705eea7a7c7b13e3593903befd9

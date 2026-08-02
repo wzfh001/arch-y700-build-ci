@@ -1,0 +1,30 @@
+#!/usr/bin/bash
+set -euo pipefail
+
+state_dir=/var/lib/tb321fu-firstboot
+marker=$state_dir/rootfs-expanded
+[[ ! -e $marker ]] || exit 0
+
+root_source=$(findmnt --noheadings --output SOURCE /)
+root_type=$(findmnt --noheadings --output FSTYPE /)
+root_device=$(readlink -f "$root_source")
+
+[[ $root_type == ext4 ]] || {
+  echo "refusing rootfs growth for unexpected filesystem: $root_type" >&2
+  exit 1
+}
+[[ -b $root_device ]] || {
+  echo "refusing rootfs growth for non-block source: $root_source" >&2
+  exit 1
+}
+
+partlabel=$(lsblk --noheadings --nodeps --output PARTLABEL "$root_device" | xargs)
+[[ $partlabel == userdata ]] || {
+  echo "refusing rootfs growth for unexpected PARTLABEL: $partlabel" >&2
+  exit 1
+}
+
+resize2fs "$root_device"
+install -d -m 0755 "$state_dir"
+printf 'device=%s\ncompleted=%s\n' "$root_device" "$(date --iso-8601=seconds)" > "$marker"
+chmod 0644 "$marker"

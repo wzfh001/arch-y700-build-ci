@@ -78,6 +78,30 @@ ci_require_cmd depmod
 ci_require_cmd rsync
 
 REPO_ROOT=$(cd -- "$SCRIPT_DIR/../.." && pwd -P)
+TB321FU_DEVICE_ARCHIVE_URL='https://github.com/GUF296/ubuntu-y700-build-ci/releases/download/bootstrap-y700-20260625/y700-device-debs-20260624-201420-compat1.tar.gz'
+TB321FU_DEVICE_ARCHIVE_SHA256='047c1baccc420f1c28bf6d761cfc811dd7aeccfcbab6d03746ca01daf6cdfe04'
+TB321FU_WIFI_OVERLAY_DEB='y700-daily-rootfs-overlay_0.1+20260624-201420_arm64.deb'
+TB321FU_WIFI_OVERLAY_DEB_SHA256='9b45ab04d455cfcc24ed40779e9522930543330151c254e87a2aee7f381db5bc'
+TB321FU_WIFI_FIRMWARE_MANIFEST="$REPO_ROOT/profiles/tablet-kde/wifi-firmware.sha256"
+TB321FU_BLUETOOTH_FIRMWARE_MANIFEST="$REPO_ROOT/profiles/tablet-kde/bluetooth-firmware.sha256"
+TB321FU_BLUETOOTH_FIRMWARE_PACKAGE='tb321fu-bluetooth-firmware'
+TB321FU_BLUETOOTH_FIRMWARE_SOURCE_PACKAGE='y700-daily-rootfs-overlay_0.1+20260624-201420_arm64.deb'
+TB321FU_BLUETOOTH_FIRMWARE_SOURCE_PACKAGE_SHA256='9b45ab04d455cfcc24ed40779e9522930543330151c254e87a2aee7f381db5bc'
+TB321FU_ALSA_UCM_SOURCE_MANIFEST="$REPO_ROOT/profiles/tablet-kde/alsa-ucm-source.sha256"
+TB321FU_ALSA_UCM_PACKAGE_MANIFEST="$REPO_ROOT/profiles/tablet-kde/alsa-ucm-package.sha256"
+TB321FU_ALSA_UCM_PACKAGE='tb321fu-alsa-ucm'
+TB321FU_ALSA_UCM_SOURCE_PACKAGE='y700-daily-rootfs-overlay_0.1+20260624-201420_arm64.deb'
+TB321FU_ALSA_UCM_SOURCE_PACKAGE_SHA256='9b45ab04d455cfcc24ed40779e9522930543330151c254e87a2aee7f381db5bc'
+TB321FU_ALSA_UCM_GENERIC_PACKAGE='alsa-ucm-conf-1.2.16.1-1-any'
+TB321FU_ALSA_UCM_GENERIC_PACKAGE_SHA256='7c8748eb29e8bdd1632071410aab1ed19edc0f48ffbe47375a51b5a4bdef8db8'
+TB321FU_SENSOR_PROXY_PACKAGE='qcom-sns-iio-sensor-proxy'
+TB321FU_SENSOR_PROXY_VERSION='20260627.1'
+TB321FU_SENSOR_PROXY_DEB='qcom-sns-iio-sensor-proxy_20260627.1_arm64.deb'
+TB321FU_SENSOR_PROXY_DEB_SHA256='b010a9a783629c4e0fd4c404b1a34e14258fab8a674d0499d553d361cb59a843'
+TB321FU_LIBSSC_PACKAGE='qcom-sns-libssc'
+TB321FU_LIBSSC_VERSION='20260627.1'
+TB321FU_LIBSSC_DEB='qcom-sns-libssc_20260627.1_arm64.deb'
+TB321FU_LIBSSC_DEB_SHA256='4c6f84c266a2c6d588289b5a9700a59711f0a7824744c8a788c8adf7c5786f86'
 
 OUTPUT_DIR=${OUTPUT_DIR:-out/ci-rootfs}
 OUTPUT_PREFIX=${OUTPUT_PREFIX:-y700-archlinuxarm}
@@ -91,6 +115,7 @@ ROOTFS_PARTLABEL=${ROOTFS_PARTLABEL:-userdata}
 HOSTNAME_NAME=${HOSTNAME_NAME:-y700}
 DEFAULT_USER_NAME=${DEFAULT_USER_NAME:-y700}
 DEFAULT_USER_PASSWORD_HASH=${DEFAULT_USER_PASSWORD_HASH:-!}
+DEFAULT_USER_AUTHORIZED_KEYS=${DEFAULT_USER_AUTHORIZED_KEYS:-}
 ROOT_PASSWORD_MODE=${ROOT_PASSWORD_MODE:-locked}
 ROOT_PASSWORD_HASH=${ROOT_PASSWORD_HASH:-}
 USER_SUDO_MODE=${USER_SUDO_MODE:-password}
@@ -133,17 +158,53 @@ COMPRESS=${COMPRESS:-7z}
 CHUNK_SIZE=${CHUNK_SIZE:-}
 KEEP_RAW_IMAGE=${KEEP_RAW_IMAGE:-0}
 
+
+if [ "$DESKTOP_PROFILE" = tablet-kde ]; then
+  [ "$HOSTNAME_NAME" = fuhao ] || ci_die "tablet-kde profile requires HOSTNAME_NAME=fuhao"
+  [ "$DEFAULT_USER_NAME" = fuhao ] || ci_die "tablet-kde profile requires DEFAULT_USER_NAME=fuhao"
+  [ "$ROOTFS_PARTLABEL" = userdata ] || ci_die "tablet-kde profile requires ROOTFS_PARTLABEL=userdata"
+  [[ $DEFAULT_USER_PASSWORD_HASH == \$6\$* ]] || \
+    ci_die "tablet-kde profile requires a SHA-512 user password hash from a repository secret"
+  [ -n "$DEFAULT_USER_AUTHORIZED_KEYS" ] || \
+    ci_die "tablet-kde profile requires authorized SSH keys from a repository secret"
+  [ "$ROOT_PASSWORD_MODE" = locked ] || ci_die "tablet-kde profile requires a locked root password"
+  [ "$USER_SUDO_MODE" = password ] || ci_die "tablet-kde profile requires password-based sudo"
+  [ "$DEVICE_DEB_ARCHIVE" = "$TB321FU_DEVICE_ARCHIVE_URL" ] || \
+    ci_die "tablet-kde profile requires the fixed TB321FU device archive URL"
+  [ "$DEVICE_DEB_ARCHIVE_SHA256" = "$TB321FU_DEVICE_ARCHIVE_SHA256" ] || \
+    ci_die "tablet-kde profile requires the fixed TB321FU device archive SHA-256"
+  [ -z "$DEVICE_DEB_DIR" ] || ci_die "tablet-kde profile forbids an unpinned device payload directory"
+  [ -f "$TB321FU_WIFI_FIRMWARE_MANIFEST" ] || \
+    ci_die "tablet-kde Wi-Fi firmware manifest is missing"
+  [ -f "$TB321FU_BLUETOOTH_FIRMWARE_MANIFEST" ] || \
+    ci_die "tablet-kde Bluetooth firmware manifest is missing"
+  [ -f "$TB321FU_ALSA_UCM_SOURCE_MANIFEST" ] || \
+    ci_die "tablet-kde ALSA UCM source manifest is missing"
+  [ -f "$TB321FU_ALSA_UCM_PACKAGE_MANIFEST" ] || \
+    ci_die "tablet-kde ALSA UCM package manifest is missing"
+  INSTALL_FCITX5_CHINESE=1
+  INSTALL_FIREFOX=1
+  INSTALL_CAMERA_APPS=0
+  BUILD_TB321FU_GPU_SENSOR=1
+fi
+
 OUTPUT_DIR=$(ci_prepare_output_dir "$OUTPUT_DIR")
 work_dir=$(mktemp -d "$OUTPUT_DIR/.arch-rootfs-build.XXXXXX")
 rootfs_dir="$work_dir/rootfs"
 arch_import_stage="$work_dir/arch-import-stage"
 arch_import_sources="$work_dir/arch-import-sources.tsv"
 arch_camera_supplement_stage="$work_dir/arch-camera-supplement-stage"
+arch_bluetooth_firmware_stage="$work_dir/tb321fu-bluetooth-firmware-stage"
+arch_alsa_ucm_stage="$work_dir/tb321fu-alsa-ucm-stage"
+arch_sensor_proxy_stage="$work_dir/qcom-sns-iio-sensor-proxy-stage"
+arch_libssc_stage="$work_dir/qcom-sns-libssc-stage"
 rootfs_img="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.img"
 build_info="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.BUILD-INFO.txt"
 manifest="$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.manifest"
 mounted_rootfs=0
 bind_mounts=()
+tb321fu_sensor_proxy_staged=0
+tb321fu_libssc_staged=0
 
 cleanup() {
   set +e
@@ -285,6 +346,24 @@ arch_chroot() {
     HTTPS_PROXY="${HTTPS_PROXY:-}" \
     PATH=/usr/local/sbin:/usr/local/bin:/usr/bin \
     "$@"
+}
+
+arch_exact_package_installed() {
+  local expected=$1
+
+  arch_chroot /usr/bin/pacman -Qq |
+    awk -v expected="$expected" '
+      $0 == expected { found = 1 }
+      END { exit !found }
+    '
+}
+
+assert_aarch64_elf() {
+  local path=$1
+
+  [ -f "$path" ] || ci_die "expected AArch64 ELF is missing: $path"
+  readelf -h "$path" 2>/dev/null | grep -Eq 'Machine:[[:space:]]+AArch64$' || \
+    ci_die "file is not an AArch64 ELF: $path"
 }
 
 assert_pacman_remote_policy_tokens() {
@@ -1193,11 +1272,20 @@ apply_device_payloads() {
 extract_tb321fu_deb_payload_dir() {
   local payload_dir=$1
   local label=$2
-  local deb stage found=0
+  local deb stage package found=0
 
   while IFS= read -r -d '' deb; do
     found=1
     ci_log "extracting $label deb data: $(basename "$deb")"
+    package=$(dpkg-deb -f "$deb" Package)
+    if [ "$label" = sensor ] && [ "$package" = "$TB321FU_SENSOR_PROXY_PACKAGE" ]; then
+      stage_tb321fu_sensor_proxy_deb "$deb"
+      continue
+    fi
+    if [ "$label" = sensor ] && [ "$package" = "$TB321FU_LIBSSC_PACKAGE" ]; then
+      stage_tb321fu_libssc_deb "$deb"
+      continue
+    fi
     stage="$work_dir/${label}-stage-$(basename "$deb").d"
     rm -rf "$stage"
     mkdir -p "$stage"
@@ -1223,6 +1311,12 @@ apply_tb321fu_deb_payloads() {
   fi
   if [ -n "$SENSOR_DEB_DIR" ]; then
     extract_tb321fu_deb_payload_dir "$SENSOR_DEB_DIR" sensor
+  fi
+  if [ -n "$SENSOR_DEB_ARCHIVE" ] || [ -n "$SENSOR_DEB_DIR" ]; then
+    [ "$tb321fu_sensor_proxy_staged" = 1 ] || \
+      ci_die "TB321FU sensor payload did not provide the pinned Qualcomm sensor proxy"
+    [ "$tb321fu_libssc_staged" = 1 ] || \
+      ci_die "TB321FU sensor payload did not provide the pinned Qualcomm libssc"
   fi
 
   if [ -n "$HAPTICS_DEB_ARCHIVE" ]; then
@@ -1543,7 +1637,10 @@ GPU_HOOK
 
 verify_tb321fu_native_package_integrity() {
   local package path owner
-  local -a packages=(tb321fu-camera-stack)
+  local -a packages=(
+    tb321fu-camera-stack tb321fu-wifi-firmware tb321fu-bluetooth-firmware tb321fu-alsa-ucm
+    qcom-sns-libssc qcom-sns-iio-sensor-proxy
+  )
   local -a camera_paths=(
     /etc/ld.so.conf.d/y700-device.conf
     /opt/libcamera-y700/bin/cam
@@ -1561,6 +1658,53 @@ verify_tb321fu_native_package_integrity() {
     /usr/lib/tb321fu/disable-stock-ksystemstats-gpu
     /usr/share/libalpm/hooks/99-tb321fu-disable-stock-ksystemstats-gpu.hook
     /usr/share/tb321fu-ksystemstats-gpu/ksystemstats_plugin_tb321fu_gpu.so.sha256
+  )
+  local -a wifi_paths=(
+    /usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0/Notice.txt.zst
+    /usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0/amss.bin.zst
+    /usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0/board-2.bin
+    /usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0/board-2.bin.zst
+    /usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0/m3.bin.zst
+    /usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0/regdb.bin
+    /usr/share/tb321fu-wifi-firmware/SHA256SUMS
+    /usr/share/tb321fu-wifi-firmware/SOURCE.txt
+  )
+  local -a bluetooth_paths=(
+    /usr/lib/firmware/tb321fu/qca/hmtbtfw20.tlv
+    /usr/lib/firmware/tb321fu/qca/hmtnv20_Kirby_prc.bin
+    /usr/lib/firmware/tb321fu/qca/hmtnv20_Kirby_row.bin
+    /usr/share/tb321fu-bluetooth-firmware/SHA256SUMS
+    /usr/share/tb321fu-bluetooth-firmware/SOURCE.txt
+  )
+  local -a alsa_ucm_paths=(
+    /usr/share/alsa/ucm2/LenovoY700TB321/HiFi.conf
+    /usr/share/alsa/ucm2/LenovoY700TB321/LenovoY700TB321.conf
+    /usr/share/alsa/ucm2/codecs/tb321fu-wcd939x/HeadphoneEnableSeq.conf
+    /usr/share/alsa/ucm2/codecs/tb321fu-wcd939x/HeadphoneDisableSeq.conf
+    /usr/share/alsa/ucm2/codecs/tb321fu-wcd939x/init.conf
+    /usr/share/tb321fu-alsa-ucm/SHA256SUMS
+    /usr/share/tb321fu-alsa-ucm/SOURCE-SHA256SUMS
+    /usr/share/tb321fu-alsa-ucm/SOURCE.txt
+  )
+  local -a sensor_proxy_paths=(
+    /usr/bin/monitor-sensor
+    /usr/libexec/iio-sensor-proxy
+    /usr/lib/systemd/system/iio-sensor-proxy.service
+    /usr/lib/udev/rules.d/80-iio-sensor-proxy.rules
+    /usr/share/dbus-1/system-services/net.hadess.SensorProxy.service
+    /usr/share/dbus-1/system.d/net.hadess.SensorProxy.conf
+    /usr/share/polkit-1/actions/net.hadess.SensorProxy.policy
+    /usr/share/tb321fu-sensor-proxy/SHA256SUMS
+    /usr/share/tb321fu-sensor-proxy/SOURCE.txt
+  )
+  local -a libssc_paths=(
+    /usr/bin/ssccli
+    /usr/include/libssc/libssc.h
+    /usr/lib/aarch64-linux-gnu/libssc.so
+    /usr/lib/aarch64-linux-gnu/libssc.so.2
+    /usr/lib/aarch64-linux-gnu/pkgconfig/libssc.pc
+    /usr/share/tb321fu-libssc/SHA256SUMS
+    /usr/share/tb321fu-libssc/SOURCE.txt
   )
 
   if arch_chroot /usr/bin/pacman -Q tb321fu-imported-release-payload >/dev/null 2>&1; then
@@ -1580,6 +1724,112 @@ verify_tb321fu_native_package_integrity() {
     [ "$owner" = tb321fu-camera-stack ] || \
       ci_die "camera payload has wrong pacman owner $owner: $path"
   done
+  for path in "${wifi_paths[@]}"; do
+    owner=$(arch_chroot /usr/bin/pacman -Qoq "$path") || \
+      ci_die "TB321FU Wi-Fi payload is not pacman-owned: $path"
+    [ "$owner" = tb321fu-wifi-firmware ] || \
+      ci_die "TB321FU Wi-Fi payload has wrong pacman owner $owner: $path"
+  done
+  for path in "${bluetooth_paths[@]}"; do
+    owner=$(arch_chroot /usr/bin/pacman -Qoq "$path") || \
+      ci_die "TB321FU Bluetooth payload is not pacman-owned: $path"
+    [ "$owner" = "$TB321FU_BLUETOOTH_FIRMWARE_PACKAGE" ] || \
+      ci_die "TB321FU Bluetooth payload has wrong pacman owner $owner: $path"
+  done
+  for path in "${alsa_ucm_paths[@]}"; do
+    owner=$(arch_chroot /usr/bin/pacman -Qoq "$path") || \
+      ci_die "TB321FU ALSA UCM payload is not pacman-owned: $path"
+    [ "$owner" = "$TB321FU_ALSA_UCM_PACKAGE" ] || \
+      ci_die "TB321FU ALSA UCM payload has wrong pacman owner $owner: $path"
+  done
+  for path in "${sensor_proxy_paths[@]}"; do
+    owner=$(arch_chroot /usr/bin/pacman -Qoq "$path") || \
+      ci_die "TB321FU sensor proxy payload is not pacman-owned: $path"
+    [ "$owner" = qcom-sns-iio-sensor-proxy ] || \
+      ci_die "TB321FU sensor proxy payload has wrong pacman owner $owner: $path"
+  done
+  for path in "${libssc_paths[@]}"; do
+    owner=$(arch_chroot /usr/bin/pacman -Qoq "$path") || \
+      ci_die "TB321FU libssc payload is not pacman-owned: $path"
+    [ "$owner" = qcom-sns-libssc ] || \
+      ci_die "TB321FU libssc payload has wrong pacman owner $owner: $path"
+  done
+  if arch_exact_package_installed libssc; then
+    ci_die "stock libssc package remains installed"
+  fi
+  (
+    cd "$rootfs_dir"
+    sha256sum -c ./usr/share/tb321fu-libssc/SHA256SUMS
+  ) || ci_die "final TB321FU libssc checksum mismatch"
+  if arch_exact_package_installed iio-sensor-proxy; then
+    ci_die "stock iio-sensor-proxy package remains installed"
+  fi
+  [ ! -e "$rootfs_dir/usr/lib/iio-sensor-proxy" ] || \
+    ci_die "stock iio-sensor-proxy executable remains installed"
+  (
+    cd "$rootfs_dir"
+    sha256sum -c ./usr/share/tb321fu-sensor-proxy/SHA256SUMS
+  ) || ci_die "final TB321FU sensor proxy checksum mismatch"
+  owner=$(arch_chroot /usr/bin/pacman -Qoq \
+    /usr/lib/firmware/ath12k/WCN7850/hw2.0/board-2.bin) || \
+    ci_die "generic WCN7850 board file is not pacman-owned"
+  [ "$owner" = linux-firmware-atheros ] || \
+    ci_die "generic WCN7850 board file has unexpected owner: $owner"
+  [ "$(sha256sum "$rootfs_dir/usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0/board-2.bin" | awk '{print $1}')" = \
+    c896bc7782e252aa915849d5c9c47d109ecfe9f0fc5650fe771f7ba8f8eb77fb ] || \
+    ci_die "TB321FU WCN7850 board file hash mismatch"
+  (
+    cd "$rootfs_dir"
+    sha256sum -c ./usr/share/tb321fu-wifi-firmware/SHA256SUMS
+  ) || ci_die "TB321FU Wi-Fi firmware package checksum mismatch"
+  [ "$(sha256sum "$rootfs_dir/usr/lib/firmware/tb321fu/qca/hmtbtfw20.tlv" | awk '{print $1}')" = \
+    b4e7f61e7dd090e56811860a7781ff3b0ce8e87cc0480feaab34bf4f614308c5 ] || \
+    ci_die "TB321FU Bluetooth firmware controller image hash mismatch"
+  (
+    cd "$rootfs_dir"
+    sha256sum -c ./usr/share/tb321fu-bluetooth-firmware/SHA256SUMS
+  ) || ci_die "TB321FU Bluetooth firmware package checksum mismatch"
+  for path in \
+    /usr/lib/firmware/qca/hmtbtfw20.tlv \
+    /usr/lib/firmware/qca/hmtnv20.b10f \
+    /usr/lib/firmware/qca/hmtnv20.b112 \
+    /usr/lib/firmware/qca/hmtnv20.bin; do
+    owner=$(arch_chroot /usr/bin/pacman -Qoq "$path") || \
+      ci_die "generic Arch QCA firmware ownership is missing: $path"
+    [ "$owner" = linux-firmware-atheros ] || \
+      ci_die "generic Arch QCA firmware has unexpected owner $owner: $path"
+  done
+  [ "$(sha256sum "$rootfs_dir/usr/lib/firmware/qca/hmtbtfw20.tlv" | awk '{print $1}')" = \
+    f1c00f4640a5c4e5dc36a2574d3d1d0afcfd1ab58a84f217dce4b1bb73cba981 ] || \
+    ci_die "generic Arch QCA firmware was unexpectedly overwritten"
+  [ -f "$rootfs_dir/usr/lib/firmware/tb321fu/qca/hmtnv20.b112" ] && \
+    [ ! -L "$rootfs_dir/usr/lib/firmware/tb321fu/qca/hmtnv20.b112" ] || \
+    ci_die "TB321FU custom QCA b112 member is missing or not a regular file"
+  (
+    cd "$rootfs_dir"
+    sha256sum -c ./usr/share/tb321fu-alsa-ucm/SHA256SUMS
+  ) || ci_die "TB321FU ALSA UCM package checksum mismatch"
+  if grep -R -F -q '/codecs/wcd939x/' \
+    "$rootfs_dir/usr/share/alsa/ucm2/LenovoY700TB321"; then
+    ci_die "final TB321FU ALSA UCM profile still references the generic WCD939x path"
+  fi
+  [ "$(awk '
+    { count += gsub("/codecs/tb321fu-wcd939x/", "") }
+    END { print count + 0 }
+  ' "$rootfs_dir/usr/share/alsa/ucm2/LenovoY700TB321/HiFi.conf" \
+    "$rootfs_dir/usr/share/alsa/ucm2/LenovoY700TB321/LenovoY700TB321.conf")" -eq 7 ] || \
+    ci_die "final TB321FU ALSA UCM transformed include count changed"
+  [ "$(sha256sum "$rootfs_dir/usr/share/alsa/ucm2/codecs/tb321fu-wcd939x/HeadphoneEnableSeq.conf" | awk '{print $1}')" = \
+    333c56a133d260f696fbc817dfb7760e7c75619d0540bf62128527dd9a7438f5 ] || \
+    ci_die "TB321FU ALSA UCM headphone route hash mismatch"
+  owner=$(arch_chroot /usr/bin/pacman -Qoq \
+    /usr/share/alsa/ucm2/codecs/wcd939x/HeadphoneEnableSeq.conf) || \
+    ci_die "generic Arch WCD939x UCM ownership is missing"
+  [ "$owner" = alsa-ucm-conf ] || \
+    ci_die "generic Arch WCD939x UCM has unexpected owner: $owner"
+  [ "$(sha256sum "$rootfs_dir/usr/share/alsa/ucm2/codecs/wcd939x/HeadphoneEnableSeq.conf" | awk '{print $1}')" = \
+    f8b856216adf46b1b6a7e9e3cbd85fd50a6446c77a9ac7bb0a60dfd189adbbc0 ] || \
+    ci_die "generic Arch WCD939x UCM was unexpectedly overwritten"
   if ci_bool "$BUILD_TB321FU_GPU_SENSOR"; then
     for path in "${gpu_paths[@]}"; do
       owner=$(arch_chroot /usr/bin/pacman -Qoq "$path") || \
@@ -1705,7 +1955,7 @@ KWINRC
                     "width": 1600
                 },
                 "scale": 2.3,
-                "transform": "Rotated180",
+                "transform": "Rotated270",
                 "vrrPolicy": "Never"
             }
         ],
@@ -1715,6 +1965,765 @@ KWINRC
 KWINOUTPUTCONFIG
   chmod 0644 "$root/etc/skel/.config/kwinoutputconfig.json"
 }
+
+apply_tablet_kde_profile() {
+  local root=$1
+  local overlay="$REPO_ROOT/profiles/tablet-kde/rootfs-overlay"
+
+  [ -d "$overlay" ] || ci_die "tablet-kde rootfs overlay is missing"
+  ci_validate_rootfs_overlay_tree "$overlay"
+  rsync -aH --chown=0:0 "$overlay"/ "$root"/
+
+  chmod 0755 \
+    "$root/usr/local/bin/tb321fu-support-bundle" \
+    "$root/usr/local/libexec/tb321fu-bt-nap" \
+    "$root/usr/local/libexec/tb321fu-grow-rootfs" \
+    "$root/usr/local/libexec/tb321fu-pre-upgrade-snapshot" \
+    "$root/usr/local/libexec/tb321fu-redact-support-bundle" \
+    "$root/usr/local/libexec/tb321fu-usb-rescue" \
+    "$root/usr/lib/systemd/system-sleep/tb321fu-suspend-log"
+  chmod 0644 \
+    "$root/etc/systemd/system/tb321fu-bt-nap.service" \
+    "$root/etc/systemd/system/tb321fu-grow-rootfs.service" \
+    "$root/etc/systemd/system/tb321fu-usb-rescue.service" \
+    "$root/etc/modules-load.d/60-tb321fu-rescue.conf"
+  chmod 0600 \
+    "$root/etc/NetworkManager/system-connections/tb321fu-rescue-usb.nmconnection" \
+    "$root/etc/NetworkManager/system-connections/tb321fu-rescue-bt.nmconnection"
+
+  rm -f "$root"/etc/ssh/ssh_host_*
+  : > "$root/etc/machine-id"
+  rm -f "$root/var/lib/dbus/machine-id"
+  install -d -m 0755 "$root/var/lib/dbus"
+  ln -s /etc/machine-id "$root/var/lib/dbus/machine-id"
+  install -d -m 2755 "$root/var/log/journal"
+  arch_chroot /usr/bin/chown root:systemd-journal /var/log/journal
+}
+
+
+install_tb321fu_wifi_firmware_package() {
+  case "$DESKTOP_PROFILE" in
+    tablet-niri|tablet-kde) ;;
+    *) return 0 ;;
+  esac
+
+  local source_root="$arch_import_stage/usr/lib/firmware/ath12k/WCN7850/hw2.0"
+  local stage="$work_dir/tb321fu-wifi-firmware-stage"
+  local package_manifest="$stage/usr/share/tb321fu-wifi-firmware/SHA256SUMS"
+  local actual_files expected_files source_line hash relative custom_relative mode
+  local -a wifi_dependencies=()
+  local -a wifi_provides=(tb321fu-wifi-firmware)
+  local -a wifi_conflicts=()
+  local -a wifi_replaces=()
+
+  [ -d "$source_root" ] || ci_die "TB321FU WCN7850 source directory is missing from the fixed device archive"
+  [ -f "$TB321FU_WIFI_FIRMWARE_MANIFEST" ] || ci_die "TB321FU Wi-Fi firmware manifest is missing"
+  [ "$(wc -l < "$TB321FU_WIFI_FIRMWARE_MANIFEST")" -eq 6 ] || \
+    ci_die "TB321FU Wi-Fi firmware manifest must contain exactly six files"
+  while read -r hash relative; do
+    [[ $hash =~ ^[0-9a-f]{64}$ ]] || ci_die "invalid TB321FU Wi-Fi firmware hash: $hash"
+    [[ $relative =~ ^usr/lib/firmware/ath12k/WCN7850/hw2\.0/[A-Za-z0-9._-]+$ ]] || \
+      ci_die "unsafe TB321FU Wi-Fi firmware manifest path: $relative"
+    [ -f "$arch_import_stage/$relative" ] && [ ! -L "$arch_import_stage/$relative" ] || \
+      ci_die "TB321FU Wi-Fi firmware source is missing or unsafe: $relative"
+    mode=$(stat -c '%a' "$arch_import_stage/$relative")
+    [ "$mode" = 644 ] || ci_die "TB321FU Wi-Fi firmware has unsafe mode $mode: $relative"
+  done < "$TB321FU_WIFI_FIRMWARE_MANIFEST"
+
+  actual_files=$(cd "$arch_import_stage" && \
+    find usr/lib/firmware/ath12k/WCN7850/hw2.0 -mindepth 1 -maxdepth 1 -type f -printf '%p\n' | LC_ALL=C sort)
+  expected_files=$(awk '{print $2}' "$TB321FU_WIFI_FIRMWARE_MANIFEST" | LC_ALL=C sort)
+  [ "$actual_files" = "$expected_files" ] || \
+    ci_die "fixed device archive WCN7850 member list differs from the pinned manifest"
+  [ -z "$(find "$source_root" -mindepth 1 -maxdepth 1 ! -type f -print -quit)" ] || \
+    ci_die "fixed device archive WCN7850 directory contains a non-regular member"
+  (cd "$arch_import_stage" && sha256sum -c "$TB321FU_WIFI_FIRMWARE_MANIFEST") || \
+    ci_die "fixed device archive WCN7850 content differs from the pinned manifest"
+
+  source_line="deb:$TB321FU_WIFI_OVERLAY_DEB:$TB321FU_WIFI_OVERLAY_DEB_SHA256"
+  grep -Fxq "$source_line" "$arch_import_sources" || \
+    ci_die "TB321FU Wi-Fi firmware did not originate from the pinned overlay package"
+
+  install -d -m 0755 "$stage"
+  while read -r hash relative; do
+    custom_relative=${relative#usr/lib/firmware/}
+    install -D -m 0644 "$arch_import_stage/$relative" \
+      "$stage/usr/lib/firmware/tb321fu/$custom_relative"
+    rm -f -- "$arch_import_stage/$relative"
+  done < "$TB321FU_WIFI_FIRMWARE_MANIFEST"
+  find "$arch_import_stage/usr/lib/firmware/ath12k/WCN7850" -depth -type d -empty -delete
+
+  install -d -m 0755 "$(dirname "$package_manifest")"
+  (
+    cd "$stage"
+    find ./usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0 -type f -print0 | \
+      LC_ALL=C sort -z | xargs -0 sha256sum
+  ) > "$package_manifest"
+  cat > "$stage/usr/share/tb321fu-wifi-firmware/SOURCE.txt" <<SOURCE
+device=Lenovo Y700 2025 TB321FU
+source_archive=$TB321FU_DEVICE_ARCHIVE_URL
+source_archive_sha256=$TB321FU_DEVICE_ARCHIVE_SHA256
+source_package=$TB321FU_WIFI_OVERLAY_DEB
+source_package_sha256=$TB321FU_WIFI_OVERLAY_DEB_SHA256
+firmware_search_path=/usr/lib/firmware/tb321fu
+board_2_bin_sha256=c896bc7782e252aa915849d5c9c47d109ecfe9f0fc5650fe771f7ba8f8eb77fb
+SOURCE
+
+  install_arch_native_stage_package \
+    tb321fu-wifi-firmware \
+    'Pinned WCN7850 firmware from the TB321FU-verified Kubuntu payload' \
+    "$stage" \
+    wifi_dependencies wifi_provides wifi_conflicts wifi_replaces
+}
+
+install_tb321fu_bluetooth_firmware_package() {
+  case "$DESKTOP_PROFILE" in
+    tablet-niri|tablet-kde) ;;
+    *) return 0 ;;
+  esac
+
+  local source_root="$arch_import_stage/usr/lib/firmware/qca"
+  local stage="$arch_bluetooth_firmware_stage"
+  local package_manifest="$stage/usr/share/tb321fu-bluetooth-firmware/SHA256SUMS"
+  local actual_files expected_files source_line custom_relative mode
+  local -a bluetooth_dependencies=()
+  local -a bluetooth_provides=(tb321fu-bluetooth-firmware)
+  local -a bluetooth_conflicts=()
+  local -a bluetooth_replaces=()
+
+  [ -d "$source_root" ] || \
+    ci_die "TB321FU QCA Bluetooth source directory is missing from the fixed device archive"
+  [ -f "$TB321FU_BLUETOOTH_FIRMWARE_MANIFEST" ] || \
+    ci_die "TB321FU Bluetooth firmware manifest is missing"
+  [ "$(wc -l < "$TB321FU_BLUETOOTH_FIRMWARE_MANIFEST")" -eq 62 ] || \
+    ci_die "TB321FU Bluetooth firmware manifest must contain exactly 62 files"
+  while read -r hash relative; do
+    [[ $hash =~ ^[0-9a-f]{64}$ ]] || \
+      ci_die "invalid TB321FU Bluetooth firmware hash: $hash"
+    [[ $relative =~ ^usr/lib/firmware/qca/[A-Za-z0-9._-]+$ ]] || \
+      ci_die "unsafe TB321FU Bluetooth firmware manifest path: $relative"
+    [ -f "$arch_import_stage/$relative" ] && [ ! -L "$arch_import_stage/$relative" ] || \
+      ci_die "TB321FU Bluetooth firmware source is missing or unsafe: $relative"
+    mode=$(stat -c '%a' "$arch_import_stage/$relative")
+    [ "$mode" = 644 ] || \
+      ci_die "TB321FU Bluetooth firmware has unsafe mode $mode: $relative"
+  done < "$TB321FU_BLUETOOTH_FIRMWARE_MANIFEST"
+
+  actual_files=$(cd "$arch_import_stage" && \
+    find usr/lib/firmware/qca -mindepth 1 -maxdepth 1 -type f -printf '%p\n' | LC_ALL=C sort)
+  expected_files=$(awk '{print $2}' "$TB321FU_BLUETOOTH_FIRMWARE_MANIFEST" | LC_ALL=C sort)
+  [ "$actual_files" = "$expected_files" ] || \
+    ci_die "fixed device archive QCA Bluetooth member list differs from the pinned manifest"
+  [ -z "$(find "$source_root" -mindepth 1 -maxdepth 1 ! -type f -print -quit)" ] || \
+    ci_die "fixed device archive QCA Bluetooth directory contains a non-regular member"
+  (cd "$arch_import_stage" && sha256sum -c "$TB321FU_BLUETOOTH_FIRMWARE_MANIFEST") || \
+    ci_die "fixed device archive QCA Bluetooth content differs from the pinned manifest"
+
+  source_line="deb:$TB321FU_BLUETOOTH_FIRMWARE_SOURCE_PACKAGE:$TB321FU_BLUETOOTH_FIRMWARE_SOURCE_PACKAGE_SHA256"
+  grep -Fxq "$source_line" "$arch_import_sources" || \
+    ci_die "TB321FU Bluetooth firmware did not originate from the pinned overlay package"
+
+  install -d -m 0755 "$stage"
+  while read -r hash relative; do
+    custom_relative=${relative#usr/lib/firmware/}
+    install -D -m 0644 "$arch_import_stage/$relative" \
+      "$stage/usr/lib/firmware/tb321fu/$custom_relative"
+    rm -f -- "$arch_import_stage/$relative"
+  done < "$TB321FU_BLUETOOTH_FIRMWARE_MANIFEST"
+  find "$arch_import_stage/usr/lib/firmware/qca" -depth -type d -empty -delete
+
+  install -d -m 0755 "$(dirname "$package_manifest")"
+  (
+    cd "$stage"
+    find ./usr/lib/firmware/tb321fu/qca -type f -print0 | \
+      LC_ALL=C sort -z | xargs -0 sha256sum
+  ) > "$package_manifest"
+  cat > "$stage/usr/share/tb321fu-bluetooth-firmware/SOURCE.txt" <<SOURCE
+device=Lenovo Y700 2025 TB321FU
+source_archive=$TB321FU_DEVICE_ARCHIVE_URL
+source_archive_sha256=$TB321FU_DEVICE_ARCHIVE_SHA256
+source_package=$TB321FU_BLUETOOTH_FIRMWARE_SOURCE_PACKAGE
+source_package_sha256=$TB321FU_BLUETOOTH_FIRMWARE_SOURCE_PACKAGE_SHA256
+firmware_search_path=/usr/lib/firmware/tb321fu
+runtime_requests=qca/hmtbtfw20.tlv,qca/hmtnv20_Kirby_prc.bin
+generic_arch_package=linux-firmware-atheros-20260622-1-any
+collision_policy=independent-search-path;generic-qca-paths-retained
+SOURCE
+
+  install_arch_native_stage_package \
+    "$TB321FU_BLUETOOTH_FIRMWARE_PACKAGE" \
+    'Pinned QCA Bluetooth firmware from the TB321FU-verified Kubuntu payload' \
+    "$stage" \
+    bluetooth_dependencies bluetooth_provides bluetooth_conflicts bluetooth_replaces
+}
+
+install_tb321fu_alsa_ucm_package() {
+  case "$DESKTOP_PROFILE" in
+    tablet-niri|tablet-kde) ;;
+    *) return 0 ;;
+  esac
+
+  local source_profile_root="$arch_import_stage/usr/share/alsa/ucm2/LenovoY700TB321"
+  local source_codec_root="$arch_import_stage/usr/share/alsa/ucm2/codecs/wcd939x"
+  local stage="$arch_alsa_ucm_stage"
+  local package_manifest="$stage/usr/share/tb321fu-alsa-ucm/SHA256SUMS"
+  local source_manifest="$stage/usr/share/tb321fu-alsa-ucm/SOURCE-SHA256SUMS"
+  local source_line hash relative destination mode
+  local actual_source_files expected_source_files actual_package_files expected_package_files
+  local new_reference_count
+  local -a alsa_dependencies=(alsa-ucm-conf)
+  local -a alsa_provides=(tb321fu-alsa-ucm)
+  local -a alsa_conflicts=()
+  local -a alsa_replaces=()
+
+  [ -d "$source_profile_root" ] || \
+    ci_die "TB321FU Lenovo ALSA UCM source profile is missing from the fixed device archive"
+  [ -d "$source_codec_root" ] || \
+    ci_die "TB321FU WCD939x ALSA UCM source codec directory is missing from the fixed device archive"
+  [ -f "$TB321FU_ALSA_UCM_SOURCE_MANIFEST" ] || \
+    ci_die "TB321FU ALSA UCM source manifest is missing"
+  [ -f "$TB321FU_ALSA_UCM_PACKAGE_MANIFEST" ] || \
+    ci_die "TB321FU ALSA UCM transformed package manifest is missing"
+  [ "$(wc -l < "$TB321FU_ALSA_UCM_SOURCE_MANIFEST")" -eq 13 ] || \
+    ci_die "TB321FU ALSA UCM source manifest must contain exactly 13 files"
+  [ "$(wc -l < "$TB321FU_ALSA_UCM_PACKAGE_MANIFEST")" -eq 13 ] || \
+    ci_die "TB321FU ALSA UCM package manifest must contain exactly 13 files"
+
+  while read -r hash relative; do
+    [[ $hash =~ ^[0-9a-f]{64}$ ]] || \
+      ci_die "invalid TB321FU ALSA UCM source hash: $hash"
+    case "$relative" in
+      usr/share/alsa/ucm2/LenovoY700TB321/HiFi.conf|\
+      usr/share/alsa/ucm2/LenovoY700TB321/LenovoY700TB321.conf|\
+      usr/share/alsa/ucm2/codecs/wcd939x/*.conf) ;;
+      *) ci_die "unsafe TB321FU ALSA UCM source manifest path: $relative" ;;
+    esac
+    [ -f "$arch_import_stage/$relative" ] && [ ! -L "$arch_import_stage/$relative" ] || \
+      ci_die "TB321FU ALSA UCM source is missing or unsafe: $relative"
+    mode=$(stat -c '%a' "$arch_import_stage/$relative")
+    [ "$mode" = 644 ] || \
+      ci_die "TB321FU ALSA UCM source has unsafe mode $mode: $relative"
+  done < "$TB321FU_ALSA_UCM_SOURCE_MANIFEST"
+
+  actual_source_files=$(
+    cd "$arch_import_stage"
+    find usr/share/alsa/ucm2/LenovoY700TB321 -mindepth 1 -maxdepth 1 -type f -printf '%p\n'
+    find usr/share/alsa/ucm2/codecs/wcd939x -mindepth 1 -maxdepth 1 -type f -printf '%p\n'
+  )
+  actual_source_files=$(LC_ALL=C sort <<< "$actual_source_files")
+  expected_source_files=$(awk '{print $2}' "$TB321FU_ALSA_UCM_SOURCE_MANIFEST" | LC_ALL=C sort)
+  [ "$actual_source_files" = "$expected_source_files" ] || \
+    ci_die "fixed device archive ALSA UCM member list differs from the pinned source manifest"
+  [ -z "$(find "$source_profile_root" "$source_codec_root" -mindepth 1 -maxdepth 1 ! -type f -print -quit)" ] || \
+    ci_die "fixed device archive ALSA UCM directories contain a non-regular member"
+  (cd "$arch_import_stage" && sha256sum -c "$TB321FU_ALSA_UCM_SOURCE_MANIFEST") || \
+    ci_die "fixed device archive ALSA UCM content differs from the pinned source manifest"
+
+  source_line="deb:$TB321FU_ALSA_UCM_SOURCE_PACKAGE:$TB321FU_ALSA_UCM_SOURCE_PACKAGE_SHA256"
+  grep -Fxq "$source_line" "$arch_import_sources" || \
+    ci_die "TB321FU ALSA UCM did not originate from the pinned overlay package"
+
+  install -d -m 0755 "$stage"
+  while read -r hash relative; do
+    case "$relative" in
+      usr/share/alsa/ucm2/codecs/wcd939x/*)
+        destination=${relative/usr\/share\/alsa\/ucm2\/codecs\/wcd939x/usr\/share\/alsa\/ucm2\/codecs\/tb321fu-wcd939x}
+        ;;
+      *) destination=$relative ;;
+    esac
+    install -D -m 0644 "$arch_import_stage/$relative" "$stage/$destination"
+    rm -f -- "$arch_import_stage/$relative"
+  done < "$TB321FU_ALSA_UCM_SOURCE_MANIFEST"
+  find "$source_profile_root" "$source_codec_root" -depth -type d -empty -delete
+
+  sed -i 's#/codecs/wcd939x/#/codecs/tb321fu-wcd939x/#g' \
+    "$stage/usr/share/alsa/ucm2/LenovoY700TB321/HiFi.conf" \
+    "$stage/usr/share/alsa/ucm2/LenovoY700TB321/LenovoY700TB321.conf"
+  if grep -R -F -q '/codecs/wcd939x/' \
+    "$stage/usr/share/alsa/ucm2/LenovoY700TB321"; then
+    ci_die "TB321FU ALSA UCM transformation left a generic WCD939x include"
+  fi
+  new_reference_count=$(awk '
+    { count += gsub("/codecs/tb321fu-wcd939x/", "") }
+    END { print count + 0 }
+  ' "$stage/usr/share/alsa/ucm2/LenovoY700TB321/HiFi.conf" \
+    "$stage/usr/share/alsa/ucm2/LenovoY700TB321/LenovoY700TB321.conf")
+  [ "$new_reference_count" -eq 7 ] || \
+    ci_die "TB321FU ALSA UCM transformed include count is $new_reference_count, expected 7"
+  grep -Fxq $'\tcset "name=\x27CLSH Switch\x27 0"' \
+    "$stage/usr/share/alsa/ucm2/codecs/tb321fu-wcd939x/HeadphoneEnableSeq.conf" || \
+    ci_die "TB321FU ALSA UCM lost the device CLSH route"
+  grep -Fxq $'\tcset "name=\x27RX HPH Mode\x27 CLS_AB"' \
+    "$stage/usr/share/alsa/ucm2/codecs/tb321fu-wcd939x/HeadphoneEnableSeq.conf" || \
+    ci_die "TB321FU ALSA UCM lost the device headphone mode"
+
+  actual_package_files=$(
+    cd "$stage"
+    find usr/share/alsa/ucm2/LenovoY700TB321 -mindepth 1 -maxdepth 1 -type f -printf '%p\n'
+    find usr/share/alsa/ucm2/codecs/tb321fu-wcd939x -mindepth 1 -maxdepth 1 -type f -printf '%p\n'
+  )
+  actual_package_files=$(LC_ALL=C sort <<< "$actual_package_files")
+  expected_package_files=$(awk '{print $2}' "$TB321FU_ALSA_UCM_PACKAGE_MANIFEST" | LC_ALL=C sort)
+  [ "$actual_package_files" = "$expected_package_files" ] || \
+    ci_die "TB321FU ALSA UCM transformed member list differs from the package manifest"
+  (cd "$stage" && sha256sum -c "$TB321FU_ALSA_UCM_PACKAGE_MANIFEST") || \
+    ci_die "TB321FU ALSA UCM transformed content differs from the package manifest"
+
+  install -D -m 0644 "$TB321FU_ALSA_UCM_PACKAGE_MANIFEST" "$package_manifest"
+  install -D -m 0644 "$TB321FU_ALSA_UCM_SOURCE_MANIFEST" "$source_manifest"
+  cat > "$stage/usr/share/tb321fu-alsa-ucm/SOURCE.txt" <<SOURCE
+device=Lenovo Y700 2025 TB321FU
+source_archive=$TB321FU_DEVICE_ARCHIVE_URL
+source_archive_sha256=$TB321FU_DEVICE_ARCHIVE_SHA256
+source_package=$TB321FU_ALSA_UCM_SOURCE_PACKAGE
+source_package_sha256=$TB321FU_ALSA_UCM_SOURCE_PACKAGE_SHA256
+generic_arch_package=$TB321FU_ALSA_UCM_GENERIC_PACKAGE
+generic_arch_package_sha256=$TB321FU_ALSA_UCM_GENERIC_PACKAGE_SHA256
+source_profile=/usr/share/alsa/ucm2/LenovoY700TB321
+source_codec_path=/usr/share/alsa/ucm2/codecs/wcd939x
+package_codec_path=/usr/share/alsa/ucm2/codecs/tb321fu-wcd939x
+transformation=replace-all-/codecs/wcd939x/-includes-with-/codecs/tb321fu-wcd939x/
+transformed_include_count=7
+collision_policy=device-profile-independent-codec-path;generic-wcd939x-retained
+SOURCE
+
+  install_arch_native_stage_package \
+    "$TB321FU_ALSA_UCM_PACKAGE" \
+    'Pinned TB321FU ALSA UCM profile with an independent WCD939x codec path' \
+    "$stage" \
+    alsa_dependencies alsa_provides alsa_conflicts alsa_replaces
+
+  printf 'open LenovoY700TB321\ndump text\n' | \
+    arch_chroot /usr/bin/env ALSA_CONFIG_UCM2=/usr/share/alsa/ucm2 \
+      /usr/bin/alsaucm -n -b - >/dev/null || \
+    ci_die "final TB321FU ALSA UCM profile failed offline parser validation"
+}
+
+write_tb321fu_sensor_proxy_checksums() {
+  cat <<'SENSOR_PROXY_SHA256'
+aba9db5ea5c8768a1ab9f531a418caa815b824b54cfe6b85266ad9a7df54dea7  ./usr/bin/monitor-sensor
+c95c921c82fffbd340fa68f2c32c7959b0b7fb0ad2a3ca6e5d9978958ba04922  ./usr/lib/systemd/system/iio-sensor-proxy.service
+3d50c919f17e5140921fd6629f7d51ed89daef3a345e6ebaf70610c6299397d6  ./usr/lib/udev/rules.d/80-iio-sensor-proxy.rules
+7d7689708c5951b97df79814ea6a06d18f4d5bb7b40765afd3d5a880c05aabd5  ./usr/libexec/iio-sensor-proxy
+563750af5136988426bb3b615fbc91d57b712c4638b6b160338bbc92498ec11a  ./usr/share/dbus-1/system-services/net.hadess.SensorProxy.service
+33c9d5ee47c839a640ce549c57ef91b85ccab7dd4a8097c3225662655030fb25  ./usr/share/dbus-1/system.d/net.hadess.SensorProxy.conf
+035194978c2d9f3ca53af81e1936334ffd97f6efeabdf44420f52e74dc8fcea9  ./usr/share/polkit-1/actions/net.hadess.SensorProxy.policy
+SENSOR_PROXY_SHA256
+}
+write_tb321fu_libssc_checksums() {
+  cat <<'LIBSSC_SHA256'
+b6d36d0ac4e83078b8c6024ebc741eddd3dd8b8e84847ca90775276109dbe9db  ./usr/bin/ssccli
+9bd3cb0821a115f57960f3893b3e3d38987aa73e00254de94f3b9e78744a4f57  ./usr/include/libssc/libssc-sensor-accelerometer.h
+e523d1517848816b2c8e14b60d4419242fd078f7100dfc424d4d70eba6ea93ad  ./usr/include/libssc/libssc-sensor-compass.h
+4749f32e68def1cc9f18b525e21ee519fcdc6fb21ed5dd44ed0add0b2588ccd1  ./usr/include/libssc/libssc-sensor-gyroscope.h
+da7da1b56cfa4f46b2a834ae234a59b1fd7f4289172270e9f21680fe96ae45a4  ./usr/include/libssc/libssc-sensor-light.h
+720ab9807d9c8f9d1942964ee0bdd433cff511534c9aa45f98e57d55f6b5f661  ./usr/include/libssc/libssc-sensor-magnetometer.h
+a66ee1327b3de41f60aabd6f6e0247d0e8bd74e134912f9d839a19af26e25754  ./usr/include/libssc/libssc-sensor-proximity.h
+44f106d680e16046a8e55cfc9459271e9d36456908ffb4c45322b085f84ccfb0  ./usr/include/libssc/libssc-sensor.h
+9eeeafae1c9331263809d6a061b49df058a8358a79031dba606377a1294120de  ./usr/include/libssc/libssc-version-private.h
+0e471d9c815b6d7272e4023943799c3aa528b3c80927addb90aa5a63a4d69c4c  ./usr/include/libssc/libssc.h
+3d4c31f72b2d642fcc5c05b45c8cd34a69ddf84e7973dd30342bee6c70a61fcf  ./usr/include/libssc/ssc-common.pb-c.h
+ddaaf179aeb1ae760c0c34f9fdf16fe3e6b47239587fee543180d27fd598c2af  ./usr/include/libssc/ssc-sensor-accelerometer.pb-c.h
+5378a2074d11fa88ef605f72027254d8ba53346a826c361c53be86e7d9f8fd7b  ./usr/include/libssc/ssc-sensor-gyroscope.pb-c.h
+1e46ce0b0bed354895673338904442a4acb64abce1673e96201fb89c8a4161af  ./usr/include/libssc/ssc-sensor-light.pb-c.h
+82cdcd90fe1408a9c4258eaf8e9b89bd051ff471ea0b7172b44ac421b4591d73  ./usr/include/libssc/ssc-sensor-magnetometer.pb-c.h
+10cc0c8775b07cdcc22be96535ddbe697b831c7b037713f8bea49c25592f1a58  ./usr/include/libssc/ssc-sensor-proximity.pb-c.h
+21e53930a2eab3fc6135668d9227c015ff82c1d9b7b45fb8d8ae708f116b29a9  ./usr/include/libssc/ssc-sensor-rotationvector.pb-c.h
+c476bc31dae1d4f306de5284a53a3c107c789046a78a22ba80a6a9a54165fa31  ./usr/include/libssc/ssc-sensor-suid.pb-c.h
+eb975ae142a5e648622ad218674895bb169b972f21cec6e511e9afc27b5bb7ae  ./usr/lib/aarch64-linux-gnu/libssc.so.2
+dd6979002c00b67ad2ef8fb15fd9b68674caf22838464d7d3d86e205ad18c5d8  ./usr/lib/aarch64-linux-gnu/pkgconfig/libssc.pc
+LIBSSC_SHA256
+}
+validate_tb321fu_libssc_payload() {
+  local stage=$1
+  local actual_files expected_files actual_links expected_links special path mode
+
+  [ -d "$stage" ] || ci_die "TB321FU libssc stage is missing: $stage"
+  special=$(find "$stage" -mindepth 1 ! -type d ! -type f ! -type l -print -quit)
+  [ -z "$special" ] || ci_die "unsupported TB321FU libssc member: $special"
+  actual_files=$(cd "$stage" && find . -type f -printf '%p\n' | LC_ALL=C sort)
+  expected_files=$(cat <<'LIBSSC_FILES'
+./usr/bin/ssccli
+./usr/include/libssc/libssc-sensor-accelerometer.h
+./usr/include/libssc/libssc-sensor-compass.h
+./usr/include/libssc/libssc-sensor-gyroscope.h
+./usr/include/libssc/libssc-sensor-light.h
+./usr/include/libssc/libssc-sensor-magnetometer.h
+./usr/include/libssc/libssc-sensor-proximity.h
+./usr/include/libssc/libssc-sensor.h
+./usr/include/libssc/libssc-version-private.h
+./usr/include/libssc/libssc.h
+./usr/include/libssc/ssc-common.pb-c.h
+./usr/include/libssc/ssc-sensor-accelerometer.pb-c.h
+./usr/include/libssc/ssc-sensor-gyroscope.pb-c.h
+./usr/include/libssc/ssc-sensor-light.pb-c.h
+./usr/include/libssc/ssc-sensor-magnetometer.pb-c.h
+./usr/include/libssc/ssc-sensor-proximity.pb-c.h
+./usr/include/libssc/ssc-sensor-rotationvector.pb-c.h
+./usr/include/libssc/ssc-sensor-suid.pb-c.h
+./usr/lib/aarch64-linux-gnu/libssc.so.2
+./usr/lib/aarch64-linux-gnu/pkgconfig/libssc.pc
+LIBSSC_FILES
+)
+  [ "$actual_files" = "$expected_files" ] || \
+    ci_die "TB321FU libssc payload file list mismatch"
+  actual_links=$(cd "$stage" && find . -type l -printf '%p\n' | LC_ALL=C sort)
+  expected_links='./usr/lib/aarch64-linux-gnu/libssc.so'
+  [ "$actual_links" = "$expected_links" ] || \
+    ci_die "TB321FU libssc payload symlink list mismatch"
+  [ "$(readlink "$stage/usr/lib/aarch64-linux-gnu/libssc.so")" = libssc.so.2 ] || \
+    ci_die "TB321FU libssc ABI symlink has an unsafe target"
+
+  (
+    cd "$stage"
+    write_tb321fu_libssc_checksums | sha256sum -c -
+  ) || ci_die "TB321FU libssc payload checksum mismatch"
+  mode=$(stat -c '%a' "$stage/usr/bin/ssccli")
+  [ "$mode" = 755 ] || ci_die "TB321FU libssc executable has wrong mode $mode: /usr/bin/ssccli"
+  assert_aarch64_elf "$stage/usr/bin/ssccli"
+  mode=$(stat -c '%a' "$stage/usr/lib/aarch64-linux-gnu/libssc.so.2")
+  [ "$mode" = 644 ] || ci_die "TB321FU libssc ABI has wrong mode $mode: /usr/lib/aarch64-linux-gnu/libssc.so.2"
+  assert_aarch64_elf "$stage/usr/lib/aarch64-linux-gnu/libssc.so.2"
+  while IFS= read -r path; do
+    mode=$(stat -c '%a' "$stage/$path")
+    [ "$mode" = 644 ] || ci_die "TB321FU libssc data has wrong mode $mode: /$path"
+  done <<'LIBSSC_DATA_FILES'
+usr/include/libssc/libssc-sensor-accelerometer.h
+usr/include/libssc/libssc-sensor-compass.h
+usr/include/libssc/libssc-sensor-gyroscope.h
+usr/include/libssc/libssc-sensor-light.h
+usr/include/libssc/libssc-sensor-magnetometer.h
+usr/include/libssc/libssc-sensor-proximity.h
+usr/include/libssc/libssc-sensor.h
+usr/include/libssc/libssc-version-private.h
+usr/include/libssc/libssc.h
+usr/include/libssc/ssc-common.pb-c.h
+usr/include/libssc/ssc-sensor-accelerometer.pb-c.h
+usr/include/libssc/ssc-sensor-gyroscope.pb-c.h
+usr/include/libssc/ssc-sensor-light.pb-c.h
+usr/include/libssc/ssc-sensor-magnetometer.pb-c.h
+usr/include/libssc/ssc-sensor-proximity.pb-c.h
+usr/include/libssc/ssc-sensor-rotationvector.pb-c.h
+usr/include/libssc/ssc-sensor-suid.pb-c.h
+usr/lib/aarch64-linux-gnu/pkgconfig/libssc.pc
+LIBSSC_DATA_FILES
+  grep -Fxq 'prefix=/usr' "$stage/usr/lib/aarch64-linux-gnu/pkgconfig/libssc.pc" || \
+    ci_die "TB321FU libssc pkg-config prefix is not Arch-compatible"
+}
+stage_tb321fu_libssc_deb() {
+  local deb=$1
+  local package version architecture deb_sha
+
+  [ "$tb321fu_libssc_staged" = 0 ] || ci_die "multiple TB321FU libssc packages were supplied"
+  [ "$(basename "$deb")" = "$TB321FU_LIBSSC_DEB" ] || \
+    ci_die "unexpected TB321FU libssc package filename: $(basename "$deb")"
+  deb_sha=$(sha256sum "$deb" | awk '{print $1}')
+  [ "$deb_sha" = "$TB321FU_LIBSSC_DEB_SHA256" ] || \
+    ci_die "TB321FU libssc package checksum mismatch: $deb_sha"
+  package=$(dpkg-deb -f "$deb" Package)
+  version=$(dpkg-deb -f "$deb" Version)
+  architecture=$(dpkg-deb -f "$deb" Architecture)
+  [ "$package" = "$TB321FU_LIBSSC_PACKAGE" ] || \
+    ci_die "unexpected TB321FU libssc package identity: $package"
+  [ "$version" = "$TB321FU_LIBSSC_VERSION" ] || \
+    ci_die "unexpected TB321FU libssc package version: $version"
+  [ "$architecture" = arm64 ] || \
+    ci_die "unexpected TB321FU libssc package architecture: $architecture"
+  [ ! -e "$arch_libssc_stage" ] || ci_die "TB321FU libssc stage already exists"
+
+  mkdir -p "$arch_libssc_stage"
+  dpkg-deb -x "$deb" "$arch_libssc_stage"
+  remove_legacy_y700_payload "$arch_libssc_stage"
+  remove_legacy_camera_payload "$arch_libssc_stage"
+  ci_normalize_system_payload_modes "$arch_libssc_stage"
+  ci_assert_normalized_system_payload_modes "$arch_libssc_stage"
+  validate_tb321fu_libssc_payload "$arch_libssc_stage"
+
+  install -d -m 0755 "$arch_libssc_stage/usr/share/tb321fu-libssc"
+  write_tb321fu_libssc_checksums > \
+    "$arch_libssc_stage/usr/share/tb321fu-libssc/SHA256SUMS"
+  cat > "$arch_libssc_stage/usr/share/tb321fu-libssc/SOURCE.txt" <<SOURCE
+device=Lenovo Y700 2025 TB321FU
+source_archive=${SENSOR_DEB_ARCHIVE:-local-directory}
+source_archive_sha256=${SENSOR_DEB_ARCHIVE_SHA256:-not-applicable}
+source_package=$TB321FU_LIBSSC_DEB
+source_package_sha256=$TB321FU_LIBSSC_DEB_SHA256
+source_package_identity=$TB321FU_LIBSSC_PACKAGE
+source_package_version=$TB321FU_LIBSSC_VERSION
+replacement_policy=provides-conflicts-replaces:libssc
+SOURCE
+  tb321fu_libssc_staged=1
+  ci_log "staged pinned Qualcomm libssc for native Arch replacement"
+}
+validate_tb321fu_sensor_proxy_payload() {
+  local stage=$1
+  local actual_files expected_files special path mode
+
+  [ -d "$stage" ] || ci_die "TB321FU sensor proxy stage is missing: $stage"
+  special=$(find "$stage" -mindepth 1 ! -type d ! -type f -print -quit)
+  [ -z "$special" ] || ci_die "unsupported TB321FU sensor proxy member: $special"
+  actual_files=$(cd "$stage" && find . -type f -printf '%p\n' | LC_ALL=C sort)
+  expected_files=$(cat <<'SENSOR_PROXY_FILES'
+./usr/bin/monitor-sensor
+./usr/lib/systemd/system/iio-sensor-proxy.service
+./usr/lib/udev/rules.d/80-iio-sensor-proxy.rules
+./usr/libexec/iio-sensor-proxy
+./usr/share/dbus-1/system-services/net.hadess.SensorProxy.service
+./usr/share/dbus-1/system.d/net.hadess.SensorProxy.conf
+./usr/share/polkit-1/actions/net.hadess.SensorProxy.policy
+SENSOR_PROXY_FILES
+)
+  [ "$actual_files" = "$expected_files" ] || \
+    ci_die "TB321FU sensor proxy payload member list mismatch"
+
+  (
+    cd "$stage"
+    write_tb321fu_sensor_proxy_checksums | sha256sum -c -
+  ) || ci_die "TB321FU sensor proxy payload checksum mismatch"
+
+  for path in usr/bin/monitor-sensor usr/libexec/iio-sensor-proxy; do
+    mode=$(stat -c '%a' "$stage/$path")
+    [ "$mode" = 755 ] || ci_die "TB321FU sensor proxy executable has wrong mode $mode: /$path"
+    assert_aarch64_elf "$stage/$path"
+  done
+  while IFS= read -r path; do
+    mode=$(stat -c '%a' "$stage/$path")
+    [ "$mode" = 644 ] || ci_die "TB321FU sensor proxy data has wrong mode $mode: /$path"
+  done <<'SENSOR_PROXY_DATA_FILES'
+usr/lib/systemd/system/iio-sensor-proxy.service
+usr/lib/udev/rules.d/80-iio-sensor-proxy.rules
+usr/share/dbus-1/system-services/net.hadess.SensorProxy.service
+usr/share/dbus-1/system.d/net.hadess.SensorProxy.conf
+usr/share/polkit-1/actions/net.hadess.SensorProxy.policy
+SENSOR_PROXY_DATA_FILES
+  grep -Fxq 'ExecStart=/usr/libexec/iio-sensor-proxy' \
+    "$stage/usr/lib/systemd/system/iio-sensor-proxy.service" || \
+    ci_die "TB321FU sensor proxy service does not use the Qualcomm SSC binary"
+  grep -Fxq 'Exec=/usr/libexec/iio-sensor-proxy' \
+    "$stage/usr/share/dbus-1/system-services/net.hadess.SensorProxy.service" || \
+    ci_die "TB321FU sensor proxy D-Bus activation does not use the Qualcomm SSC binary"
+}
+stage_tb321fu_sensor_proxy_deb() {
+  local deb=$1
+  local package version architecture deb_sha
+
+  [ "$tb321fu_sensor_proxy_staged" = 0 ] || \
+    ci_die "multiple TB321FU sensor proxy packages were supplied"
+  [ "$(basename "$deb")" = "$TB321FU_SENSOR_PROXY_DEB" ] || \
+    ci_die "unexpected TB321FU sensor proxy package filename: $(basename "$deb")"
+  deb_sha=$(sha256sum "$deb" | awk '{print $1}')
+  [ "$deb_sha" = "$TB321FU_SENSOR_PROXY_DEB_SHA256" ] || \
+    ci_die "TB321FU sensor proxy package checksum mismatch: $deb_sha"
+  package=$(dpkg-deb -f "$deb" Package)
+  version=$(dpkg-deb -f "$deb" Version)
+  architecture=$(dpkg-deb -f "$deb" Architecture)
+  [ "$package" = "$TB321FU_SENSOR_PROXY_PACKAGE" ] || \
+    ci_die "unexpected TB321FU sensor proxy package identity: $package"
+  [ "$version" = "$TB321FU_SENSOR_PROXY_VERSION" ] || \
+    ci_die "unexpected TB321FU sensor proxy package version: $version"
+  [ "$architecture" = arm64 ] || \
+    ci_die "unexpected TB321FU sensor proxy package architecture: $architecture"
+  [ ! -e "$arch_sensor_proxy_stage" ] || \
+    ci_die "TB321FU sensor proxy stage already exists"
+
+  mkdir -p "$arch_sensor_proxy_stage"
+  dpkg-deb -x "$deb" "$arch_sensor_proxy_stage"
+  remove_legacy_y700_payload "$arch_sensor_proxy_stage"
+  remove_legacy_camera_payload "$arch_sensor_proxy_stage"
+  ci_normalize_system_payload_modes "$arch_sensor_proxy_stage"
+  ci_assert_normalized_system_payload_modes "$arch_sensor_proxy_stage"
+  validate_tb321fu_sensor_proxy_payload "$arch_sensor_proxy_stage"
+
+  install -d -m 0755 "$arch_sensor_proxy_stage/usr/share/tb321fu-sensor-proxy"
+  write_tb321fu_sensor_proxy_checksums > \
+    "$arch_sensor_proxy_stage/usr/share/tb321fu-sensor-proxy/SHA256SUMS"
+  cat > "$arch_sensor_proxy_stage/usr/share/tb321fu-sensor-proxy/SOURCE.txt" <<SOURCE
+device=Lenovo Y700 2025 TB321FU
+source_archive=${SENSOR_DEB_ARCHIVE:-local-directory}
+source_archive_sha256=${SENSOR_DEB_ARCHIVE_SHA256:-not-applicable}
+source_package=$TB321FU_SENSOR_PROXY_DEB
+source_package_sha256=$TB321FU_SENSOR_PROXY_DEB_SHA256
+source_package_identity=$TB321FU_SENSOR_PROXY_PACKAGE
+source_package_version=$TB321FU_SENSOR_PROXY_VERSION
+replacement_policy=provides-conflicts-replaces:iio-sensor-proxy
+SOURCE
+  tb321fu_sensor_proxy_staged=1
+  ci_log "staged pinned Qualcomm SSC sensor proxy for native Arch replacement"
+}
+install_tb321fu_libssc_package() {
+  local owner
+  local -a libssc_dependencies=(glibc glib2 protobuf-c libqmi libqrtr-glib)
+  local -a libssc_provides=(libssc)
+  local -a libssc_conflicts=(libssc)
+  local -a libssc_replaces=(libssc)
+
+  [ "$tb321fu_libssc_staged" = 1 ] || return 0
+  owner=$(arch_chroot /usr/bin/pacman -Qoq /usr/bin/ssccli 2>/dev/null || true)
+  [ "$owner" = libssc ] || \
+    ci_die "locked stock libssc has unexpected owner before replacement: $owner"
+  arch_exact_package_installed libssc || \
+    ci_die "locked stock libssc package is missing before replacement"
+
+  install_arch_native_stage_package \
+    "$TB321FU_LIBSSC_PACKAGE" \
+    'Pinned Qualcomm Sensor Core library from the TB321FU sensor payload' \
+    "$arch_libssc_stage" \
+    libssc_dependencies libssc_provides libssc_conflicts libssc_replaces
+
+  if arch_exact_package_installed libssc; then
+    ci_die "stock libssc package remains after Qualcomm replacement"
+  fi
+  owner=$(arch_chroot /usr/bin/pacman -Qoq /usr/bin/ssccli)
+  [ "$owner" = "$TB321FU_LIBSSC_PACKAGE" ] || \
+    ci_die "Qualcomm ssccli has wrong package owner: $owner"
+  owner=$(arch_chroot /usr/bin/pacman -Qoq /usr/lib/aarch64-linux-gnu/libssc.so.2)
+  [ "$owner" = "$TB321FU_LIBSSC_PACKAGE" ] || \
+    ci_die "Qualcomm libssc ABI has wrong package owner: $owner"
+  (
+    cd "$rootfs_dir"
+    sha256sum -c ./usr/share/tb321fu-libssc/SHA256SUMS
+  ) || ci_die "installed Qualcomm libssc checksum mismatch"
+  tb321fu_libssc_staged=2
+}
+install_tb321fu_sensor_proxy_package() {
+  local owner
+  local -a sensor_proxy_dependencies=(
+    glibc dbus glib2 libgudev polkit qcom-sns-libssc
+  )
+  local -a sensor_proxy_provides=(iio-sensor-proxy)
+  local -a sensor_proxy_conflicts=(iio-sensor-proxy)
+  local -a sensor_proxy_replaces=(iio-sensor-proxy)
+
+  [ "$tb321fu_sensor_proxy_staged" = 1 ] || return 0
+  owner=$(arch_chroot /usr/bin/pacman -Qoq /usr/bin/monitor-sensor 2>/dev/null || true)
+  [ "$owner" = iio-sensor-proxy ] || \
+    ci_die "locked stock sensor proxy has unexpected owner before replacement: $owner"
+  arch_exact_package_installed iio-sensor-proxy || \
+    ci_die "locked stock iio-sensor-proxy package is missing before replacement"
+
+  install_arch_native_stage_package \
+    "$TB321FU_SENSOR_PROXY_PACKAGE" \
+    'Pinned Qualcomm SSC sensor proxy from the TB321FU sensor payload' \
+    "$arch_sensor_proxy_stage" \
+    sensor_proxy_dependencies sensor_proxy_provides sensor_proxy_conflicts sensor_proxy_replaces
+
+  if arch_exact_package_installed iio-sensor-proxy; then
+    ci_die "stock iio-sensor-proxy package remains after Qualcomm replacement"
+  fi
+  [ ! -e "$rootfs_dir/usr/lib/iio-sensor-proxy" ] || \
+    ci_die "stock iio-sensor-proxy executable remains after Qualcomm replacement"
+  owner=$(arch_chroot /usr/bin/pacman -Qoq /usr/bin/monitor-sensor)
+  [ "$owner" = "$TB321FU_SENSOR_PROXY_PACKAGE" ] || \
+    ci_die "Qualcomm monitor-sensor has wrong package owner: $owner"
+  owner=$(arch_chroot /usr/bin/pacman -Qoq /usr/libexec/iio-sensor-proxy)
+  [ "$owner" = "$TB321FU_SENSOR_PROXY_PACKAGE" ] || \
+    ci_die "Qualcomm sensor proxy daemon has wrong package owner: $owner"
+  (
+    cd "$rootfs_dir"
+    sha256sum -c ./usr/share/tb321fu-sensor-proxy/SHA256SUMS
+  ) || ci_die "installed Qualcomm sensor proxy checksum mismatch"
+  tb321fu_sensor_proxy_staged=2
+}
+
+install_tablet_kde_authorized_keys() {
+  local root=$1
+  local user_home="$root/home/$DEFAULT_USER_NAME"
+  local group_name line
+
+  [ -n "$DEFAULT_USER_AUTHORIZED_KEYS" ] || \
+    ci_die "tablet-kde requires DEFAULT_USER_AUTHORIZED_KEYS from a repository secret"
+  while IFS= read -r line || [ -n "$line" ]; do
+    line=${line%$'\r'}
+    [ -n "$line" ] || continue
+    [[ $line =~ ^(ssh-ed25519|sk-ssh-ed25519@openssh.com|ecdsa-sha2-nistp256|sk-ecdsa-sha2-nistp256@openssh.com|ssh-rsa)[[:space:]]+[A-Za-z0-9+/=]+([[:space:]].*)?$ ]] || \
+      ci_die "DEFAULT_USER_AUTHORIZED_KEYS contains an unsupported public-key line"
+  done <<< "$DEFAULT_USER_AUTHORIZED_KEYS"
+
+  group_name=$(arch_chroot id -gn "$DEFAULT_USER_NAME")
+  install -d -m 0700 "$user_home/.ssh"
+  printf '%s\n' "$DEFAULT_USER_AUTHORIZED_KEYS" | sed '/^[[:space:]]*$/d' > \
+    "$user_home/.ssh/authorized_keys"
+  chmod 0600 "$user_home/.ssh/authorized_keys"
+  chroot "$root" chown -R "$DEFAULT_USER_NAME:$group_name" "/home/$DEFAULT_USER_NAME/.ssh"
+}
+
+verify_tablet_kde_profile() {
+  local root=$1
+  local path mode
+  local -a required_packages=(
+    plasma-meta sddm sddm-kcm plasma-keyboard
+    tb321fu-wifi-firmware tb321fu-bluetooth-firmware tb321fu-alsa-ucm
+    qcom-sns-libssc qcom-sns-iio-sensor-proxy
+  )
+  local -a forbidden_packages=(greetd niri noctalia wvkbd paru)
+  local -a custom_executables=(
+    /usr/local/bin/tb321fu-support-bundle
+    /usr/local/libexec/tb321fu-usb-rescue
+    /usr/local/libexec/tb321fu-bt-nap
+    /usr/local/libexec/tb321fu-grow-rootfs
+  )
+
+  for package in "${required_packages[@]}"; do
+    arch_chroot /usr/bin/pacman -Q "$package" >/dev/null || \
+      ci_die "required tablet-kde package is missing: $package"
+  done
+  for package in "${forbidden_packages[@]}"; do
+    if arch_exact_package_installed "$package"; then
+      ci_die "forbidden package is installed in tablet-kde: $package"
+    fi
+  done
+  for path in "${custom_executables[@]}"; do
+    [ -x "$root$path" ] || ci_die "required tablet-kde executable is missing: $path"
+    mode=$(stat -c '%a' "$root$path")
+    case "$mode" in
+      4???|2???|6???|7???) ci_die "tablet-kde executable has a privilege bit: $path ($mode)" ;;
+    esac
+  done
+
+  hash_field=$(arch_chroot /usr/bin/awk -F: -v user="$DEFAULT_USER_NAME" \
+    '$1 == user { print substr($2, 1, 3); exit }' /etc/shadow)
+  [ "$hash_field" = '$6$' ] || ci_die "tablet-kde user password is not a SHA-512 hash"
+  target=$(arch_chroot /usr/bin/awk -F: '$1 == "root" { print $2; exit }' /etc/shadow)
+  [[ $target == '!'* ]] || ci_die "tablet-kde root account is not locked"
+
+  path="$root/home/$DEFAULT_USER_NAME/.ssh/authorized_keys"
+  [ -s "$path" ] || ci_die "tablet-kde authorized_keys is missing"
+  [ "$(stat -c '%a' "$path")" = 600 ] || ci_die "tablet-kde authorized_keys mode is not 0600"
+  [ -z "$(find "$root/etc/ssh" -maxdepth 1 -type f -name 'ssh_host_*_key' -print -quit)" ] || \
+    ci_die "private SSH host key leaked into tablet-kde image"
+
+  local connection_dir="$root/etc/NetworkManager/system-connections"
+  local unexpected_connection
+  unexpected_connection=$(find "$connection_dir" -maxdepth 1 -type f \
+    ! -name tb321fu-rescue-usb.nmconnection \
+    ! -name tb321fu-rescue-bt.nmconnection -print -quit 2>/dev/null)
+  [ -z "$unexpected_connection" ] || \
+    ci_die "unexpected NetworkManager profile leaked into tablet-kde image: $unexpected_connection"
+  for path in \
+    "$connection_dir/tb321fu-rescue-usb.nmconnection" \
+    "$connection_dir/tb321fu-rescue-bt.nmconnection"; do
+    [ -f "$path" ] || ci_die "required rescue connection is missing: $path"
+    [ "$(stat -c '%a' "$path")" = 600 ] || \
+      ci_die "rescue connection mode is not 0600: $path"
+  done
+  grep -Fxq 'address1=10.77.0.1/24' \
+    "$connection_dir/tb321fu-rescue-usb.nmconnection" || \
+    ci_die "USB rescue address is missing"
+  grep -Fxq 'address1=10.78.0.1/24' \
+    "$connection_dir/tb321fu-rescue-bt.nmconnection" || \
+    ci_die "Bluetooth rescue address is missing"
+  grep -Fxq 'type=nap' "$connection_dir/tb321fu-rescue-bt.nmconnection" || \
+    ci_die "Bluetooth rescue profile is not a NAP"
+
+  for target in sleep.target suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target; do
+    path="$root/etc/systemd/system/$target"
+    if [ -L "$path" ] && [ "$(readlink "$path")" = /dev/null ]; then
+      ci_die "tablet-kde must not mask manual sleep target: $target"
+    fi
+  done
+  unshare --net -- chroot "$root" /usr/bin/nft --check --file /etc/nftables.conf
+}
+
 
 copy_skel_to_user() {
   local root=$1
@@ -1750,7 +2759,7 @@ build_package_list() {
     base bash-completion sudo openssh rsync curl wget ca-certificates gnupg fakeroot
     nano vim less which file htop usbutils pciutils iproute2 inetutils
     networkmanager bluez bluez-utils power-profiles-daemon udisks2 upower
-    linux-firmware
+    linux-firmware nftables
     alsa-ucm-conf alsa-utils iio-sensor-proxy feedbackd
     glib2 libgudev polkit protobuf-c libqmi libqrtr-glib
     libevent libyaml gstreamer gst-plugins-base gst-plugins-base-libs gst-plugins-good gst-plugin-libcamera gtk3 gdk-pixbuf2 libunwind elfutils gnutls libglvnd
@@ -1776,7 +2785,7 @@ build_package_list() {
     minimal)
       packages+=(plasma-desktop plasma-workspace sddm plasma-keyboard konsole dolphin noto-fonts-cjk)
       ;;
-    standard)
+    standard|tablet-kde)
       packages+=("${desktop_standard[@]}")
       ;;
     full)
@@ -1885,6 +2894,13 @@ if [ -n "$DEFAULT_USER_PASSWORD_HASH" ] && [ "$DEFAULT_USER_PASSWORD_HASH" != '!
 else
   arch_chroot /usr/bin/passwd -l "$DEFAULT_USER_NAME" || true
 fi
+if [ "$DESKTOP_PROFILE" = tablet-kde ]; then
+  install_tablet_kde_authorized_keys "$rootfs_dir"
+  install -d -m 0755     "$rootfs_dir/home/$DEFAULT_USER_NAME/Pictures"     "$rootfs_dir/home/$DEFAULT_USER_NAME/Pictures/Screenshots"
+  default_user_group=$(arch_chroot id -gn "$DEFAULT_USER_NAME")
+  chroot "$rootfs_dir" chown -R "$DEFAULT_USER_NAME:$default_user_group" \
+    "/home/$DEFAULT_USER_NAME/Pictures"
+fi
 
 case "$ROOT_PASSWORD_MODE" in
   locked)
@@ -1923,10 +2939,23 @@ if ci_bool "$INSTALL_FCITX5_CHINESE"; then
   write_fcitx5_config "$rootfs_dir"
 fi
 copy_skel_to_user "$rootfs_dir"
+if [ "$DESKTOP_PROFILE" = tablet-kde ]; then
+  apply_tablet_kde_profile "$rootfs_dir"
+fi
 
 ci_log "enabling system services"
 required_system_units=(NetworkManager.service sshd.service sddm.service bluetooth.service)
 required_user_units=(pipewire.socket pipewire-pulse.socket wireplumber.service)
+if [ "$DESKTOP_PROFILE" = tablet-kde ]; then
+  required_system_units+=(
+    nftables.service tb321fu-grow-rootfs.service tb321fu-usb-rescue.service
+    tb321fu-bt-nap.service serial-getty@ttyGS0.service systemd-timesyncd.service
+  )
+  required_user_units+=(fcitx5-tablet.service)
+  systemctl --root="$rootfs_dir" set-default graphical.target
+  [ "$(systemctl --root="$rootfs_dir" get-default)" = graphical.target ] || \
+    ci_die "tablet-kde default target is not graphical.target"
+fi
 systemctl --root="$rootfs_dir" enable "${required_system_units[@]}"
 systemctl --root="$rootfs_dir" --global enable "${required_user_units[@]}"
 for required_unit in "${required_system_units[@]}"; do
@@ -1951,7 +2980,12 @@ fi
 
 apply_device_payloads
 apply_tb321fu_deb_payloads
+install_tb321fu_wifi_firmware_package
+install_tb321fu_bluetooth_firmware_package
+install_tb321fu_alsa_ucm_package
 install_arch_import_package
+install_tb321fu_libssc_package
+install_tb321fu_sensor_proxy_package
 apply_tb321fu_camera_stack
 
 overlay_stage=
@@ -2016,6 +3050,9 @@ ci_assert_privileged_payload_security "$rootfs_dir" \
   usr/local/bin/y700-camera-cam \
   usr/local/bin/y700-camera-preview
 verify_tb321fu_native_package_integrity
+if [ "$DESKTOP_PROFILE" = tablet-kde ]; then
+  verify_tablet_kde_profile "$rootfs_dir"
+fi
 arch_chroot /usr/bin/pacman -Q | LC_ALL=C sort > \
   "$OUTPUT_DIR/${OUTPUT_PREFIX}-rootfs.packages"
 

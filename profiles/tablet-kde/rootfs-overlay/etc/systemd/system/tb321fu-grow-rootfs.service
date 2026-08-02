@@ -1,0 +1,13 @@
+[Unit]
+Description=Expand the TB321FU userdata ext4 filesystem
+Documentation=man:resize2fs(8)
+After=local-fs.target
+Before=graphical.target
+ConditionPathExists=!/var/lib/tb321fu-firstboot/rootfs-expanded
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/tb321fu-grow-rootfs
+
+[Install]
+WantedBy=multi-user.target

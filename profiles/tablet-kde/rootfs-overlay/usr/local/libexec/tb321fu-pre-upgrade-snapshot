@@ -1,0 +1,37 @@
+#!/usr/bin/bash
+set -euo pipefail
+
+stamp=$(date -u +%Y%m%dT%H%M%SZ)
+snapshot_dir="/var/lib/tb321fu-maintenance/pre-upgrade/$stamp"
+install -d -m 0700 "$snapshot_dir"
+
+pacman -Q > "$snapshot_dir/packages-all.txt"
+pacman -Qqe > "$snapshot_dir/packages-explicit.txt"
+pacman -Qm > "$snapshot_dir/packages-foreign.txt" || true
+
+paths=(
+  /etc/pacman.conf
+  /etc/pacman.d/mirrorlist
+  /etc/nftables.conf
+  /etc/ssh/sshd_config.d
+  /etc/systemd/logind.conf.d
+  /etc/systemd/journald.conf.d
+  /etc/systemd/zram-generator.conf.d
+  /etc/sddm.conf.d
+  /home/fuhao/.config/kwinrc
+  /home/fuhao/.config/kwinoutputconfig.json
+  /home/fuhao/.config/plasma-workspace
+  /home/fuhao/.config/fcitx5
+)
+
+existing=()
+for path in "${paths[@]}"; do
+  [[ -e $path ]] && existing+=("${path#/}")
+done
+
+if ((${#existing[@]})); then
+  tar --zstd -C / -cf "$snapshot_dir/configs.tar.zst" -- "${existing[@]}"
+fi
+
+sha256sum "$snapshot_dir"/* > "$snapshot_dir/SHA256SUMS"
+chmod -R go-rwx "$snapshot_dir"

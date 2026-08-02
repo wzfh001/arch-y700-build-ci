@@ -1,0 +1,122 @@
+#!/usr/bin/bash
+set -u -o pipefail
+
+sys_root=${TB321FU_SYS_ROOT:-/sys}
+interval=${TB321FU_POLL_INTERVAL:-5}
+command_timeout=${TB321FU_COMMAND_TIMEOUT:-15}
+once=${TB321FU_ONCE:-0}
+max_iterations=${TB321FU_MAX_ITERATIONS:-0}
+modprobe_cmd=${TB321FU_MODPROBE:-modprobe}
+systemctl_cmd=${TB321FU_SYSTEMCTL:-systemctl}
+bluetoothctl_cmd=${TB321FU_BLUETOOTHCTL:-bluetoothctl}
+nmcli_cmd=${TB321FU_NMCLI:-nmcli}
+sleep_cmd=${TB321FU_SLEEP:-sleep}
+timeout_cmd=${TB321FU_TIMEOUT:-timeout}
+connection=${TB321FU_BT_CONNECTION:-tb321fu-rescue-bt}
+
+attempt=0
+iteration=0
+last_state=
+stop_requested=0
+
+log() {
+  printf 'tb321fu-bt-nap: %s\n' "$*"
+}
+
+run_timed() {
+  "$timeout_cmd" --signal=TERM --kill-after=2s "${command_timeout}s" "$@"
+}
+
+service_active() {
+  run_timed "$systemctl_cmd" is-active --quiet "$1" >/dev/null 2>&1
+}
+
+adapter_present() {
+  compgen -G "$sys_root/class/bluetooth/hci*" >/dev/null
+}
+
+adapter_report() {
+  run_timed "$bluetoothctl_cmd" show 2>/dev/null || true
+}
+
+ensure_adapter_powered() {
+  local report
+  report=$(adapter_report)
+  grep -Fq 'Powered: yes' <<< "$report" && return 0
+  if run_timed "$bluetoothctl_cmd" power on >/dev/null 2>&1; then
+    log 'requested Bluetooth adapter power on'
+    return 0
+  fi
+  return 1
+}
+
+profile_exists() {
+  run_timed "$nmcli_cmd" connection show "$connection" >/dev/null 2>&1
+}
+
+profile_active() {
+  run_timed "$nmcli_cmd" -t -f NAME connection show --active 2>/dev/null | \
+    grep -Fxq "$connection"
+}
+
+activate_profile() {
+  profile_active && {
+    attempt=0
+    return 0
+  }
+  ((attempt += 1))
+  if run_timed "$nmcli_cmd" connection up "$connection" >/dev/null 2>&1; then
+    log "activated Bluetooth NAP profile $connection"
+    attempt=0
+    return 0
+  fi
+  if ((attempt == 1 || attempt % 5 == 0)); then
+    log "Bluetooth NAP activation failed (attempt $attempt); will retry"
+  fi
+  return 1
+}
+
+report_state() {
+  local adapter=no
+  local powered=no
+  local nap_uuid=no
+  local active=no
+  local bnep0=no
+  local report
+  adapter_present && adapter=yes
+  report=$(adapter_report)
+  grep -Fq 'Powered: yes' <<< "$report" && powered=yes
+  grep -Eqi 'Network Access Point|00001116-0000-1000-8000-00805f9b34fb' <<< "$report" && \
+    nap_uuid=yes
+  profile_active && active=yes
+  [ -e "$sys_root/class/net/bnep0" ] && bnep0=yes
+  local state="adapter=$adapter powered=$powered profile_active=$active nap_uuid=$nap_uuid bnep0=$bnep0"
+  if [ "$state" != "$last_state" ]; then
+    log "$state"
+    last_state=$state
+  fi
+}
+
+cleanup() {
+  run_timed "$nmcli_cmd" connection down "$connection" >/dev/null 2>&1 || true
+}
+
+trap 'stop_requested=1' TERM INT
+
+run_timed "$modprobe_cmd" bnep >/dev/null 2>&1 || \
+  log 'module load failed or timed out: bnep'
+while ((stop_requested == 0)); do
+  ((iteration += 1))
+  if service_active bluetooth.service && service_active NetworkManager.service && \
+    adapter_present && ensure_adapter_powered && profile_exists; then
+    activate_profile || true
+  else
+    attempt=0
+  fi
+  report_state
+  if [ "$once" = 1 ] || ((max_iterations > 0 && iteration >= max_iterations)); then
+    break
+  fi
+  "$sleep_cmd" "$interval"
+done
+cleanup
