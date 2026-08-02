@@ -32,6 +32,11 @@ v0.1.0          Stable          (multi-round wake/suspend, network reconnect, ap
 ## Kernel-side backlog (after P4 unblocks)
 
 - [ ] K8 device validation (independent EXP ID + recovery path)
+- [ ] Custom kernel options via `build_config=fragment`
+      (`source/kernel/fragments/`: `10-tablet-perf` HZ=1000/PREEMPT_DYNAMIC,
+      `20-tablet-memory` zram/zswap/PSI, `30-tablet-network`
+      wireguard/nftables) — single-variable EXP per fragment, rollback to
+      baseline unit
 - [ ] First patch through the K9 queue (`patches/001-<topic>/`), e.g. UCLAMP or
       scheduler experiments, each as a single-variable EXP
 - [ ] Optional CI end-to-end dry run: point `build-rootfs-and-grub.yml`

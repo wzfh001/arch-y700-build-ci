@@ -9,16 +9,22 @@ on:
         default: TB321FU-7.1.1
         type: string
       build_config:
-        description: "Source of .config: baseline (pinned kernel.config) or defconfig."
+        description: "Source of .config: baseline (pinned kernel.config), defconfig, or fragment."
         required: true
         default: baseline
         type: choice
         options:
           - baseline
           - defconfig
+          - fragment
+      fragments:
+        description: "Comma-separated fragment names (source/kernel/fragments/*.config), used when build_config=fragment. Example: 10-tablet-perf,20-tablet-memory"
+        required: false
+        default: ""
+        type: string
 
 concurrency:
-  group: kernel-repro-${{ github.ref_name }}-${{ inputs.build_config }}
+  group: kernel-repro-${{ github.ref_name }}-${{ inputs.build_config }}-${{ inputs.fragments }}
   cancel-in-progress: false
 
 jobs:
@@ -76,15 +82,45 @@ jobs:
 
       - name: Prepare .config
         working-directory: kernel-src
+        env:
+          INPUT_BUILD_CONFIG: ${{ inputs.build_config }}
+          INPUT_FRAGMENTS: ${{ inputs.fragments }}
         run: |
           set -euo pipefail
-          if [ "${{ inputs.build_config }}" = "baseline" ]; then
-            cp "$GITHUB_WORKSPACE/source/kernel/kernel.config" .config
-            echo 'Using pinned baseline kernel.config'
-          else
-            make ARCH=arm64 defconfig
-            echo 'Using in-tree defconfig'
-          fi
+          case "$INPUT_BUILD_CONFIG" in
+            baseline)
+              cp "$GITHUB_WORKSPACE/source/kernel/kernel.config" .config
+              echo 'Using pinned baseline kernel.config'
+              ;;
+            defconfig)
+              make ARCH=arm64 defconfig
+              echo 'Using in-tree defconfig'
+              ;;
+            fragment)
+              cp "$GITHUB_WORKSPACE/source/kernel/kernel.config" .config
+              if [ -z "$INPUT_FRAGMENTS" ]; then
+                echo "ERROR: build_config=fragment requires fragments input (e.g. 10-tablet-perf,20-tablet-memory)" >&2
+                exit 1
+              fi
+              args=""
+              IFS=',' read -ra names <<< "$INPUT_FRAGMENTS"
+              for name in "${names[@]}"; do
+                frag="$GITHUB_WORKSPACE/source/kernel/fragments/$name.config"
+                if [ ! -f "$frag" ]; then
+                  echo "ERROR: fragment '$name' not found at $frag" >&2
+                  exit 1
+                fi
+                args="$args $frag"
+              done
+              echo "Merging fragments: $INPUT_FRAGMENTS"
+              # shellcheck disable=SC2086
+              scripts/kconfig/merge_config.sh -m -O . .config $args
+              ;;
+            *)
+              echo "ERROR: unknown build_config '$INPUT_BUILD_CONFIG'" >&2
+              exit 1
+              ;;
+          esac
           make ARCH=arm64 olddefconfig
           grep '^CONFIG_CC_VERSION_TEXT' .config
 
@@ -102,12 +138,17 @@ jobs:
           cp .config "$GITHUB_WORKSPACE/out/kernel.config"
 
       - name: Package modules + build info
+        env:
+          INPUT_KERNEL_REF: ${{ inputs.kernel_ref }}
+          INPUT_BUILD_CONFIG: ${{ inputs.build_config }}
+          INPUT_FRAGMENTS: ${{ inputs.fragments }}
         run: |
           set -euo pipefail
           tar -C modout -czf out/modules.tar.gz lib/modules
           {
-            echo "kernel_ref=${{ inputs.kernel_ref }}"
-            echo "config_source=${{ inputs.build_config }}"
+            echo "kernel_ref=$INPUT_KERNEL_REF"
+            echo "config_source=$INPUT_BUILD_CONFIG"
+            echo "fragments=$INPUT_FRAGMENTS"
             echo "git_sha=$GITHUB_SHA"
             echo "run_id=$GITHUB_RUN_ID"
             echo "toolchain=$(aarch64-linux-gnu-gcc --version | head -1)"
@@ -120,7 +161,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: tb321fu-kernel-repro-${{ inputs.kernel_ref }}-${{ inputs.build_config }}-${{ github.run_id }}
+          name: tb321fu-kernel-repro-${{ inputs.kernel_ref }}-${{ inputs.build_config }}-${{ inputs.fragments }}-${{ github.run_id }}
           path: |
             out/Image
             out/sm8650-lenovo-tb321fu.dtb

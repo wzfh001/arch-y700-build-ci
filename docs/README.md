@@ -7,7 +7,9 @@ Y700 2025 (TB321FU / SM8650). Start here if you are new.
 |---|---|
 | [`STATUS.md`](STATUS.md) | **Start here.** Current project status: P0–P9 phases, kernel K0–K9 phases, firmware reality, and what is blocked. |
 | [`ROADMAP.md`](ROADMAP.md) | Milestones, releases and the dependency-ordered execution path. |
-| [`BUILD.md`](BUILD.md) | How the two GitHub Actions workflows build the kernel and the rootfs/GRUB images, plus inputs and pins. |
+| [`BUILD.md`](BUILD.md) |
+| [`KERNEL-CUSTOMIZATION.md`](KERNEL-CUSTOMIZATION.md) | Kernel config fragments (`build_config=fragment`) vs ALARM/defconfig; what we adopt and why. |
+ How the two GitHub Actions workflows build the kernel and the rootfs/GRUB images, plus inputs and pins. |
 | [`FLASHING.md`](FLASHING.md) | Flash discipline and safety red lines. Read before touching a device. |
 | [`RECOVERY.md`](RECOVERY.md) | Rescue channels and rollback paths (Kubuntu baseline, Fastboot, Firehose). |
 | [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | Known root causes: Wi-Fi, USB/UDC, Bluetooth NAP, and how to verify each. |
