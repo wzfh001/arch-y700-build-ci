@@ -13,9 +13,12 @@ Updated: 2026-08-02
 - The **Arch rootfs pipeline** builds successfully (artifact-only) but the
   current candidate has **passed the full offline audit (P4 PASS)** and
   has **not been flashed to the device**.
-- The device is currently running the **verified Kubuntu rollback baseline**
-  (kernel `7.1.1-g5df8e852ea72`); Wi-Fi/USB/BT/audio/touch on the *Arch*
-  candidates remain `UNTESTED` on hardware.
+- The device currently runs the **author-created Arch Linux ARM** (kernel
+  `7.1.1-g5df8e852ea72`, host key `SHA256:GlYCjnc…` matches known device,
+  rootfs `/dev/sda16` 456.8G label `ArchLinux`, observed 2026-08-02 at
+  `192.168.0.220`); Wi-Fi/USB/BT/audio/touch on the *tablet-niri* Arch
+  candidate remain `UNTESTED` on hardware. The verified Kubuntu rollback
+  baseline remains historical (2026-07-21).
 
 ## Phase status (main project P0–P9)
 
@@ -26,7 +29,7 @@ Updated: 2026-08-02
 | P2 WCN7850 Wi-Fi fix | SOURCE PASS | Pinned device archive + native firmware package + independent path + bootargs; **final raw/hardware UNTESTED** |
 | P3 Deterministic build & CI gates | PASS | Full local gate suite PASS; artifact-only CI run `29966711103` SUCCESS |
 | P4 Candidate offline audit | **PASS** | Main ZIP downloaded + full offline audit PASS (`AUDIT-20260723-001` closed 2026-08-02; `AUDIT-20260802` evidence) |
-| P5 Recovery & flash prep | PARTIAL | Run 29966711103 Firehose bundle + 10-point readback plan generated (2026-08-02); pending live GPT re-read + user go |
+| P5 Recovery & flash prep | **READY** | Run 29966711103 bundle completed (images+known-gpt+read-gpts XML+BUNDLE-SHA256SUMS, local verify PASS); live GPT re-read VERIFIED matches baseline (2026-08-02, device now runs author Arch); **pending user go** |
 | P6 Controlled flash & readback | BLOCKED | Requires P5; `sparse=false` single program + 10-point readback 10/10 |
 | P7 First-boot rescue & network | BLOCKED | Requires P6; ACM/NCM/NAP then Wi-Fi |
 | P8 Desktop & daily hardware acceptance | BLOCKED | Requires P7; display/touch/audio/haptics/battery |
@@ -51,7 +54,7 @@ Updated: 2026-08-02
 
 | Item | Status | Verified evidence |
 |---|---|---|
-| Current device OS | Kubuntu 26.04 ARM64 (VERIFIED) | SSH/Wi-Fi/NetworkManager/SDDM observed 2026-07-21 |
+| Current device OS | **Author Arch Linux ARM (VERIFIED 2026-08-02)** | SSH publickey OK @192.168.0.220, host key SHA256:GlYCjnc… matches known device, kernel 7.1.1-g5df8e852ea72, rootfs /dev/sda16 456.8G label ArchLinux; Kubuntu rollback baseline remains historical (2026-07-21) |
 | Kernel on device | `7.1.1-g5df8e852ea72` (vendor/prebuilt) | journal + Image strings |
 | DTB | `sm8650-lenovo-tb321fu.dtb` (official = self-built byte-identical) | SHA `6f0707cd…` |
 | Wi-Fi on device (Kubuntu) | VERIFIED | `wlp1s0`, ath12k, 202148-byte `board-2.bin` baseline |
