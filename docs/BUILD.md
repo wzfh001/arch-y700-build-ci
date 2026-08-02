@@ -94,6 +94,7 @@ unit):
 | `10-tablet-perf` | `HZ=1000`, `PREEMPT_DYNAMIC=y` | KDE touch/scroll responsiveness; slight power cost | ALARM linux-aarch64 |
 | `20-tablet-memory` | `ZRAM=m`, `ZSWAP=y`, `PSI=y` | 16 GiB RAM swap backstop; earlyoom/systemd-oomd pressure signals | ALARM linux-aarch64 |
 | `30-tablet-network` | `WIREGUARD=m`, `NF_TABLES=m`, `CFS_BANDWIDTH=y` | VPN/nftables support; clears nftables service failed state | ALARM linux-aarch64 |
+| `40-arch-compat` | `SECURITY_LANDLOCK=y`, `BINFMT_MISC=y` | pacman filesystem sandbox (Landlock) + binfmt_misc; fixes `DisableSandboxFilesystem` workaround | ALARM linux-aarch64 |
 
 Fragments only set explicit symbols; everything else stays byte-identical to
 the baseline. The merged `.config` is uploaded as `kernel.config` and recorded

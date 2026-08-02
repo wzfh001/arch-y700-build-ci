@@ -41,6 +41,7 @@ everything else stays byte-identical to baseline.
 | `10-tablet-perf` | `HZ=1000` (+ `HZ_1000=y`, `HZ_250` unset), `PREEMPT_DYNAMIC=y` | KDE touch/scroll latency; slight power cost |
 | `20-tablet-memory` | `ZRAM=m`, `ZSWAP=y`, `PSI=y` | 16 GiB RAM swap backstop; systemd/earlyoom pressure signals |
 | `30-tablet-network` | `WIREGUARD=m`, `NF_TABLES=m`, `CFS_BANDWIDTH=y` | VPN/nftables; clears the `nftables` service failed state on the device |
+| `40-arch-compat` | `SECURITY_LANDLOCK=y` (auto-selects `SECURITY_NETWORK`/`SECURITY_PATH`), `BINFMT_MISC=y` | **pacman 7.1.x filesystem sandbox 依赖 Landlock**（作者内核未开 → 设备曾用 `DisableSandboxFilesystem` 绕过）；ALARM 官方 config 已开此两项 |
 
 All candidates are **off-device** until an EXP ID + explicit user go. Device
 kernel today: `7.1.1-g5df8e852ea72` (vendor). Version bump (e.g. 7.1.1 → 7.1.5)
