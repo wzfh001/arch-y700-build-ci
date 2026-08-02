@@ -24,7 +24,7 @@ now=$(TZ=Asia/Shanghai date +%Y-%m-%d)
 # --- Pinned facts (single source of truth for generated docs) ---------------
 # Keep in sync with .github/workflows/build-kernel.yml and
 # build-rootfs-and-grub.yml and the kernel project plan.
-export P4_STATUS="${P4_STATUS:-BLOCKED}"
+export P4_STATUS="${P4_STATUS:-PASS}"
 export K8_STATUS="${K8_STATUS:-BLOCKED}"
 export KERNEL_RUN="${KERNEL_RUN:-30704468188}"
 export KERNEL_IMAGE_SHA="${KERNEL_IMAGE_SHA:-6e6d939eb25eb497c705d9779cfedbb165f708507741407e4b2bf8b86e5dc819}"

@@ -11,7 +11,7 @@ Updated: 2026-08-02
   Image identity aligned. A candidate GRUB boot image was dry-run assembled and
   hash-bound to the K4 inputs.
 - The **Arch rootfs pipeline** builds successfully (artifact-only) but the
-  current candidate has **not passed the full offline audit (P4 BLOCKED)** and
+  current candidate has **passed the full offline audit (P4 PASS)** and
   has **not been flashed to the device**.
 - The device is currently running the **verified Kubuntu rollback baseline**
   (kernel `7.1.1-g5df8e852ea72`); Wi-Fi/USB/BT/audio/touch on the *Arch*
@@ -25,7 +25,7 @@ Updated: 2026-08-02
 | P1 Rescue & auto evidence | SOURCE PASS | USB/BT coordinators + support bundle implemented and locally tested; **hardware UNTESTED** |
 | P2 WCN7850 Wi-Fi fix | SOURCE PASS | Pinned device archive + native firmware package + independent path + bootargs; **final raw/hardware UNTESTED** |
 | P3 Deterministic build & CI gates | PASS | Full local gate suite PASS; artifact-only CI run `29966711103` SUCCESS |
-| P4 Candidate offline audit | **BLOCKED** | Main ZIP not fully downloaded; `AUDIT-20260723-001` remains `PARTIAL/BLOCKED` |
+| P4 Candidate offline audit | **PASS** | Main ZIP downloaded + full offline audit PASS (`AUDIT-20260723-001` closed 2026-08-02; `AUDIT-20260802` evidence) |
 | P5 Recovery & flash prep | BLOCKED | Requires P4 PASS; GPT re-read + device-specific Firehose bundle + readback plan + user confirmation |
 | P6 Controlled flash & readback | BLOCKED | Requires P5; `sparse=false` single program + 10-point readback 10/10 |
 | P7 First-boot rescue & network | BLOCKED | Requires P6; ACM/NCM/NAP then Wi-Fi |

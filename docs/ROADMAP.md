@@ -14,7 +14,7 @@ v0.1.0          Stable          (multi-round wake/suspend, network reconnect, ap
 ## Current position
 
 - Kernel pipeline: **K0–K7 PASS, K9 PASS, K8 BLOCKED** (device validation).
-- Main Arch pipeline: **P0–P3 PASS, P4 BLOCKED** (offline audit), P5–P9 gated.
+- Main Arch pipeline: **P0–P3 PASS, P4 PASS** (offline audit), P5–P9 gated.
 
 ## Dependency-ordered execution path
 
