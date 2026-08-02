@@ -86,9 +86,20 @@ ma=$(cat_ok /home/fuhao/.config/mimeapps.list 2>/dev/null || true)
 printf '%s\n' "$ma" | grep -oE '[A-Za-z0-9._-]+\.desktop' | sort -u || true
 
 echo "== firmware =="
+echo "-- tb321fu search-path copy --"
 debugfs -R 'ls -l /usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0' "$raw" 2>/dev/null | awk 'NR>2 && $9 !~ /^\./ {print $9}' || echo "MISSING wifi firmware dir"
 board=$(dump_sha /usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0/board-2.bin 2>/dev/null || echo MISSING)
-echo "board-2.bin sha256: $board"
+echo "tb321fu board-2.bin sha256: $board"
+echo "-- standard ath12k path (must be board-specific, not generic) --"
+std_board=$(dump_sha /usr/lib/firmware/ath12k/WCN7850/hw2.0/board-2.bin 2>/dev/null || echo MISSING)
+std_board_size=$(debugfs -R 'stat /usr/lib/firmware/ath12k/WCN7850/hw2.0/board-2.bin' "$raw" 2>/dev/null | awk '/Size:/{print $2; exit}')
+echo "standard board-2.bin sha256: $std_board"
+echo "standard board-2.bin size: $std_board_size"
+if [ "$std_board" = c896bc7782e252aa915849d5c9c47d109ecfe9f0fc5650fe771f7ba8f8eb77fb ]; then
+  echo "STD_PATH_WCN7850_BOARD=OK"
+else
+  echo "STD_PATH_WCN7850_BOARD=FAIL (expected c896bc77...)"
+fi
 qca_count=$(debugfs -R 'ls -l /usr/lib/firmware/tb321fu/qca' "$raw" 2>/dev/null | awk 'NR>2 && $9!="." && $9!=".." {n++} END{print n+0}')
 echo "qca entries: $qca_count"
 
