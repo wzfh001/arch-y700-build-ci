@@ -1770,11 +1770,15 @@ verify_tb321fu_native_package_integrity() {
     cd "$rootfs_dir"
     sha256sum -c ./usr/share/tb321fu-sensor-proxy/SHA256SUMS
   ) || ci_die "final TB321FU sensor proxy checksum mismatch"
-  owner=$(arch_chroot /usr/bin/pacman -Qoq \
-    /usr/lib/firmware/ath12k/WCN7850/hw2.0/board-2.bin) || \
-    ci_die "generic WCN7850 board file is not pacman-owned"
-  [ "$owner" = linux-firmware-atheros ] || \
-    ci_die "generic WCN7850 board file has unexpected owner: $owner"
+  # The standard WCN7850 firmware path must contain the board-specific
+  # board-2.bin (overriding the generic linux-firmware one), matching the
+  # upstream-verified layout. ath12k probes this path by default.
+  [ "$(sha256sum "$rootfs_dir/usr/lib/firmware/ath12k/WCN7850/hw2.0/board-2.bin" | awk '{print $1}')" = \
+    c896bc7782e252aa915849d5c9c47d109ecfe9f0fc5650fe771f7ba8f8eb77fb ] || \
+    ci_die "standard WCN7850 board file is not the TB321FU board-specific firmware (c896bc77...)"
+  [ "$(stat -c '%s' "$rootfs_dir/usr/lib/firmware/ath12k/WCN7850/hw2.0/board-2.bin")" = 202148 ] || \
+    ci_die "standard WCN7850 board file has unexpected size (expected 202148)"
+  # tb321fu/ search-path backup copy must also be the board-specific firmware.
   [ "$(sha256sum "$rootfs_dir/usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0/board-2.bin" | awk '{print $1}')" = \
     c896bc7782e252aa915849d5c9c47d109ecfe9f0fc5650fe771f7ba8f8eb77fb ] || \
     ci_die "TB321FU WCN7850 board file hash mismatch"
@@ -2074,6 +2078,18 @@ SOURCE
     'Pinned WCN7850 firmware from the TB321FU-verified Kubuntu payload' \
     "$stage" \
     wifi_dependencies wifi_provides wifi_conflicts wifi_replaces
+
+  # Match the upstream-verified layout: the board-specific WCN7850 firmware
+  # must also live at the standard firmware path that ath12k probes by default.
+  # We keep the tb321fu/ copy as a search-path backup, but the standard path
+  # must contain the board-specific files (not the generic linux-firmware ones).
+  local std_wifi_dir="$rootfs_dir/usr/lib/firmware/ath12k/WCN7850/hw2.0"
+  install -d -m 0755 "$std_wifi_dir"
+  while read -r _ relative; do
+    install -m 0644 "$stage/usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0/${relative##*/}" \
+      "$std_wifi_dir/${relative##*/}"
+  done < "$TB321FU_WIFI_FIRMWARE_MANIFEST"
+  ci_log "TB321FU WCN7850 board firmware installed at standard path (board-2.bin=$(stat -c '%s' "$std_wifi_dir/board-2.bin")B)"
 }
 
 install_tb321fu_bluetooth_firmware_package() {
