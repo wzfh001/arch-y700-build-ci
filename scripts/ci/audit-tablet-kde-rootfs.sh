@@ -102,9 +102,27 @@ for p in /usr/bin/ssccli /usr/libexec/iio-sensor-proxy /usr/lib/systemd/system/i
   if exists "$p"; then echo "OK  $p"; else echo "MISS $p"; fi
 done
 
-echo "== services (multi-user.wants) =="
+echo "== services (enabled) =="
+# A unit is "enabled" if any of the standard enable locations contains a
+# link for it. Different units use different targets:
+#   sddm -> display-manager.service (graphical.target Wants=display-manager)
+#   bluetooth -> bluetooth.target.wants (dbus-activated via dbus-org.bluez alias)
+#   systemd-timesyncd -> sysinit.target.wants
+#   serial-getty@ttyGS0 -> getty.target.wants
+#   NetworkManager/sshd/nftables/rescue -> multi-user.target.wants
+service_enabled() {
+  local name="$1" path
+  case "$name" in
+    sddm.service)                 path=/etc/systemd/system/display-manager.service ;;
+    bluetooth.service)            path=/etc/systemd/system/bluetooth.target.wants/bluetooth.service ;;
+    systemd-timesyncd.service)    path=/etc/systemd/system/sysinit.target.wants/systemd-timesyncd.service ;;
+    serial-getty@ttyGS0.service)  path=/etc/systemd/system/getty.target.wants/serial-getty@ttyGS0.service ;;
+    *)                            path=/etc/systemd/system/multi-user.target.wants/$name ;;
+  esac
+  exists "$path"
+}
 for s in sddm.service NetworkManager.service sshd.service bluetooth.service nftables.service tb321fu-grow-rootfs.service tb321fu-usb-rescue.service tb321fu-bt-nap.service systemd-timesyncd.service serial-getty@ttyGS0.service; do
-  if exists "/etc/systemd/system/multi-user.target.wants/$s"; then
+  if service_enabled "$s"; then
     echo "OK  $s"
   else
     echo "MISS $s"
