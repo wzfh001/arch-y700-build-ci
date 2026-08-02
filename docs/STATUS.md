@@ -27,9 +27,9 @@ Updated: 2026-08-02
 | P0 Governance / baseline freeze | PASS | Branch/HEAD/diff/artifact identities recorded; governance commits in main |
 | P1 Rescue & auto evidence | SOURCE PASS | USB/BT coordinators + support bundle implemented and locally tested; **hardware UNTESTED** |
 | P2 WCN7850 Wi-Fi fix | SOURCE PASS | Pinned device archive + native firmware package + independent path + bootargs; **final raw/hardware UNTESTED** |
-| P3 Deterministic build & CI gates | PASS | Full local gate suite PASS; tablet-kde CI run `30730513005` SUCCESS |
-| P4 Candidate offline audit | **PASS** | tablet-kde run `30730513005` artifact audited (`P4-AUDIT-20260802` evidence; e2fsck 0 errors, KDE configs 6/6 incl. Rotated270, firmware board-2.bin c896bc77…7fb, services 10/10 + user units 4/4) |
-| P5 Recovery & flash prep | **READY** | tablet-kde bundle complete (19 members, `BUNDLE-SHA256SUMS` 19/19 PASS, readback 10/10 MATCH from KDE raw; reuse verified GPT: userdata LBA 3613096..123365370, program XML start=3613096/count=5242880/LUN0/4096/sparse=false); live GPT re-read VERIFIED matches baseline (2026-08-02, device runs author Arch); **pending user go** |
+| P3 Deterministic build & CI gates | PASS | Full local gate suite PASS; tablet-kde CI run `30736975180` SUCCESS (Wi-Fi firmware layout fixed) |
+| P4 Candidate offline audit | **PASS** | tablet-kde run `30736975180` artifact audited (Wi-Fi fix d1d3c1d: standard-path WCN7850 board-2.bin backfilled) (`P4-AUDIT-20260802` evidence; e2fsck 0 errors, KDE configs 6/6 incl. Rotated270, firmware board-2.bin c896bc77…7fb, services 10/10 + user units 4/4) |
+| P5 Recovery & flash prep | **READY** | tablet-kde run `30736975180` bundle complete (19 members, `BUNDLE-SHA256SUMS` 19/19 PASS, readback 10/10 MATCH from KDE raw; reuse verified GPT: userdata LBA 3613096..123365370, program XML start=3613096/count=5242880/LUN0/4096/sparse=false); live GPT re-read VERIFIED matches baseline (2026-08-02, device runs author Arch); **pending user go** |
 | P6 Controlled flash & readback | BLOCKED | Requires P5; `sparse=false` single program + 10-point readback 10/10 |
 | P7 First-boot rescue & network | BLOCKED | Requires P6; ACM/NCM/NAP then Wi-Fi |
 | P8 Desktop & daily hardware acceptance | BLOCKED | Requires P7; display/touch/audio/haptics/battery |
@@ -74,14 +74,14 @@ Updated: 2026-08-02
 | Kernel config (self-built) | same run | `36997050c94bd8bfd91cd8d850cc602a24c59f561b55010a6eccfcf43817f40f` |
 | Modules tarball | same run | `a3e5c0ce420997a873b42810d0ed932a48be113671ba98cccfbf4c1e92b89542` |
 | Candidate GRUB/boot FAT image | K7 dry-run EXP-20260801-002 | `dade9ac5b2de4673cbe7eb248c918efd534de8f8a2281fdbb24cfdca3610a7a5` |
-| Arch tablet-kde rootfs raw | run `30730513005` (metadata) | `c4efa7ce73ef33ff63551992a56b0e82c115e965d74e5ec7f7345fbb2a2e98a8` |
-| Arch tablet-kde GRUB raw | run `30730513005` (metadata) | `7378dc11fd597890e4130f9f62f607828086ef9c9cd4395169c566f437ff41cc` |
+| Arch tablet-kde rootfs raw | run `30736975180` (metadata) | `3a472fbca5ac591794ea238d27225029836919f9c23215db16ba562956d78ae2` |
+| Arch tablet-kde GRUB raw | run `30736975180` (metadata) | `f54035fd298b6f81ad7a26893b6007e3e7b62a03372899f8b49573be2ba09945` |
 
 ## What is blocked and why
 
 1. **P6/P7/P8 execution (controlled flash onward)** – P4 offline audit is
-   **PASS** (tablet-kde run `30730513005`) and P5 flash prep is **READY**
-   (tablet-kde bundle complete 2026-08-02: 19/19 checksums + readback 10/10
+   **PASS** (tablet-kde run `30736975180`) and P5 flash prep is **READY**
+   (tablet-kde bundle complete 2026-08-02: 19/19 checksums + readback 10/10 (run `30736975180`)
    MATCH; live GPT re-read VERIFIED 2026-08-02). The remaining blocker is the
    **explicit user go** for the destructive flash (target/scope/image
    SHA/recovery boundary). Nothing has been flashed.
@@ -92,11 +92,11 @@ Updated: 2026-08-02
 ## How to unblock
 
 1. ~~Obtain the main ZIP and finish the tablet-kde P4 audit~~ – DONE (run
-   `30730513005`; e2fsck 0 errors, FAT, boot, accounts, KDE configs, services,
+   `30736975180`; e2fsck 0 errors, FAT, boot, accounts, KDE configs, services,
    firmware all audited; `P4-AUDIT-20260802` evidence).
 2. ~~Finish the tablet-kde P5 Firehose bundle~~ – DONE (19 members,
    `BUNDLE-SHA256SUMS` 19/19 PASS; readback expectations 10/10 MATCH from KDE
-   raw `c4efa7ce…`; live GPT re-read VERIFIED 2026-08-02).
+   raw `3a472fbc…`; live GPT re-read VERIFIED 2026-08-02).
 3. **Get the explicit user go** (target/scope/image SHA/recovery boundary), then
    flash (P6), then run P7/P8 acceptance in order.
 4. Kernel side: on release, run K8 with an independent experiment ID; update
