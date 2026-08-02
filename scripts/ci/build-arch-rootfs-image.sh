@@ -607,9 +607,14 @@ apply_y700_audio_policy_fixes() {
   local route_conf="$conf_dir/52-tb321fu-headset-route-reconcile.conf"
   local route_script="$root/usr/share/wireplumber/scripts/tb321fu/headset-route-reconcile.lua"
 
-  ci_log "installing Y700 WirePlumber ALSA policy fix"
+  ci_log "installing Y700 WirePlumber ALSA policy fix (use-acp=false: UCM device naming)"
   install -d -m 0755 "$conf_dir"
   cat > "$conf" <<'CONF'
+# use-acp=false: ACP backend fails to map UCM devices to profiles (only off/pro-audio),
+# leaving the default profile off and the tablet silent. With use-ucm=true the UCM
+# Speaker device is exposed directly as alsa_output.platform-sound.playback.*.
+# Note: headset-route-reconcile.lua keys off UCM HiFi__* names; it is a no-op under
+# this naming (jack-based UCM switching still works). Verified on device 2026-08-02.
 monitor.alsa.rules = [
   {
     matches = [
@@ -619,10 +624,8 @@ monitor.alsa.rules = [
     ]
     actions = {
       update-props = {
-        api.alsa.use-acp = true
+        api.alsa.use-acp = false
         api.alsa.use-ucm = true
-        api.acp.auto-profile = true
-        api.acp.auto-port = true
         api.alsa.split-enable = false
       }
     }

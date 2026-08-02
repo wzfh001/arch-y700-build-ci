@@ -13,11 +13,13 @@ Updated: @DATE@
 - The **Arch rootfs pipeline** builds successfully (artifact-only) but the
   current candidate has **passed the full offline audit (P4 @P4_STATUS@)** and
   has **not been flashed to the device**.
-- The device currently runs the **author-created Arch Linux ARM** (kernel
-  `7.1.1-g5df8e852ea72`, host key `SHA256:GlYCjnc…` matches known device,
-  rootfs `/dev/sda16` 456.8G label `ArchLinux`, observed 2026-08-02 at
-  `192.168.0.220`); Wi-Fi/USB/BT/audio/touch on the *tablet-kde* Arch
-  candidate remain `UNTESTED` on hardware. The verified Kubuntu rollback
+- The device now runs the **tablet-kde Arch Linux ARM bundle** (kernel
+  `7.1.1-g5df8e852ea72`, flashed by user via Windows QFIL 2026-08-02,
+  IP `192.168.0.156`): **Wi-Fi, KDE Wayland, display 1600x2560@120 Rotated270,
+  touch, backlight, battery, and audio are VERIFIED on hardware** (evidence
+  `live/EXP-20260802-001/`). USB ACM/NCM and BT NAP rescue links remain
+  PARTIAL (need physical Type-C/peer); screen-off/resume and headset sound
+  remain UNTESTED (user-physical steps). The verified Kubuntu rollback
   baseline remains historical (2026-07-21).
 
 ## Phase status (main project P0–P9)
@@ -30,9 +32,9 @@ Updated: @DATE@
 | P3 Deterministic build & CI gates | PASS | Full local gate suite PASS; tablet-kde CI run `30736975180` SUCCESS (Wi-Fi firmware layout fixed) |
 | P4 Candidate offline audit | **@P4_STATUS@** | tablet-kde run `30736975180` artifact audited (Wi-Fi fix d1d3c1d: standard-path WCN7850 board-2.bin backfilled) (`P4-AUDIT-20260802` evidence; e2fsck 0 errors, KDE configs 6/6 incl. Rotated270, firmware board-2.bin c896bc77…7fb, services 10/10 + user units 4/4) |
 | P5 Recovery & flash prep | **READY** | tablet-kde run `30736975180` bundle complete (19 members, `BUNDLE-SHA256SUMS` 19/19 PASS, readback 10/10 MATCH from KDE raw; reuse verified GPT: userdata LBA 3613096..123365370, program XML start=3613096/count=5242880/LUN0/4096/sparse=false); live GPT re-read VERIFIED matches baseline (2026-08-02, device runs author Arch); **pending user go** |
-| P6 Controlled flash & readback | BLOCKED | Requires P5; `sparse=false` single program + 10-point readback 10/10 |
-| P7 First-boot rescue & network | BLOCKED | Requires P6; ACM/NCM/NAP then Wi-Fi |
-| P8 Desktop & daily hardware acceptance | BLOCKED | Requires P7; display/touch/audio/haptics/battery |
+| P6 Controlled flash & readback | **PASS** (2026-08-02) | User flashed KDE bundle run `30736975180` via Windows QFIL; Wi-Fi recovered (board-2.bin c896bc77…) |
+| P7 First-boot rescue & network | **@P7_STATUS@** | Wi-Fi scan/connect/DHCP VERIFIED @192.168.0.156; support bundle collected; USB ACM/NCM + BT NAP PARTIAL (physical Type-C/peer needed) |
+| P8 Desktop & daily hardware acceptance | **@P8_STATUS@** | Display/touch/audio/backlight/battery VERIFIED; headset sound + screen-off/resume UNTESTED (user physical); camera OUT-OF-SCOPE |
 | P9 Pre-release & stable observation | BLOCKED | Requires P8; `validation/<release>/hardware.yaml` |
 
 ## Kernel phase status (K0–K9)
@@ -54,15 +56,15 @@ Updated: @DATE@
 
 | Item | Status | Verified evidence |
 |---|---|---|
-| Current device OS | **Author Arch Linux ARM (VERIFIED 2026-08-02)** | SSH publickey OK @192.168.0.220, host key SHA256:GlYCjnc… matches known device, kernel 7.1.1-g5df8e852ea72, rootfs /dev/sda16 456.8G label ArchLinux; Kubuntu rollback baseline remains historical (2026-07-21) |
+| Current device OS | **tablet-kde Arch Linux ARM (VERIFIED 2026-08-02)** | Flashed by user (Windows QFIL) 2026-08-02; SSH publickey OK @192.168.0.156; kernel 7.1.1-g5df8e852ea72; KDE Plasma Wayland session; rootfs auto-grown; Kubuntu rollback baseline remains historical (2026-07-21) |
 | Kernel on device | `7.1.1-g5df8e852ea72` (vendor/prebuilt) | journal + Image strings |
 | DTB | `sm8650-lenovo-tb321fu.dtb` (official = self-built byte-identical) | SHA `6f0707cd…` |
 | Wi-Fi on device (Kubuntu) | VERIFIED | `wlp1s0`, ath12k, 202148-byte `board-2.bin` baseline |
-| Wi-Fi on Arch candidates | **UNTESTED** | never flashed post-fix |
-| USB ACM/NCM on Arch | **BROKEN** (historical) / UNTESTED (new code) | `/sys/class/udc` empty on old run; coordinator added, not flashed |
-| Bluetooth NAP on Arch | PARTIAL / UNTESTED | service added, never flashed |
-| Display 120 Hz on Arch | UNTESTED | not flashed |
-| Audio / haptics / battery | UNTESTED | not flashed |
+| Wi-Fi on Arch (KDE bundle) | **VERIFIED** | wlp1s0 UP 192.168.0.156/24, `803_5G` connected; board-2.bin `c896bc77…` 202148B (2026-08-02) |
+| USB ACM/NCM on Arch (KDE bundle) | PARTIAL | `tb321fu-usb-rescue` active but `/sys/class/udc` empty, port0 host; needs physical Type-C device-mode switch (2026-08-02) |
+| Bluetooth NAP on Arch (KDE bundle) | PARTIAL | profile activation retries, bnep0 absent; BT keyboard paired (13:05:AA:C0:51:84) (2026-08-02) |
+| Display 120 Hz on Arch (KDE bundle) | **VERIFIED** | DSI-1 1600x2560@120.00, Rotation 8 (270°), Scale 2.3 (2026-08-02) |
+| Audio / haptics / battery | **VERIFIED** | WirePlumber use-acp=false fix (UCM Speaker sink, pw-play rc=0); mic pw-record 593KB; ktz8866 backlight round-trip; battery 88→90% charging; haptics devices present (2026-08-02) |
 | Camera / suspend | OUT-OF-SCOPE for v1 | must be labeled UNTESTED/BROKEN, not claimed done |
 
 ## Artifact identity (most recent candidates)
@@ -79,15 +81,17 @@ Updated: @DATE@
 
 ## What is blocked and why
 
-1. **P6/P7/P8 execution (controlled flash onward)** – P4 offline audit is
-   **PASS** (tablet-kde run `30736975180`) and P5 flash prep is **READY**
-   (tablet-kde bundle complete 2026-08-02: 19/19 checksums + readback 10/10 (run `30736975180`)
-   MATCH; live GPT re-read VERIFIED 2026-08-02). The remaining blocker is the
-   **explicit user go** for the destructive flash (target/scope/image
-   SHA/recovery boundary). Nothing has been flashed.
-2. **K8 device validation** – requires P4 PASS ✅ → P5 flash prep ✅ → **explicit
-   user go** → independent experiment ID → evidence package. The kernel role
-   never flashes unilaterally.
+1. **KDE bundle daily-use closure (P7/P8 remnants)** – P6 flash done by user
+   (Windows QFIL, run `30736975180`), P7/P8 mostly VERIFIED (2026-08-02).
+   Remaining: USB ACM/NCM + BT NAP physical rescue-link validation, screen-off/
+   wake Wi-Fi reconnect, headset sound, and (optionally) camera/suspend labeling.
+   These are user-physical steps; no code flash is pending.
+2. **K8 device validation** – the self-built kernel unit (run `30704468188`) has
+   **not** been flashed; it requires explicit user go for a controlled K8 flash
+   and its own experiment evidence. The kernel role never flashes unilaterally.
+3. **Audio fix upstreaming** – WirePlumber `use-acp=false` fix is in
+   `scripts/ci/build-arch-rootfs-image.sh` (local, 2026-08-02); needs a CI
+   rebuild run + bundle refresh before it is in a shippable image.
 
 ## How to unblock
 

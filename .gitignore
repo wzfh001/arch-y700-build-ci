@@ -9,3 +9,6 @@ out/
 .rootfs-build.*
 .arch-rootfs-build.*
 .grub-build.*
+
+# local flash bundle mirrors (3.4G), not source
+builds/

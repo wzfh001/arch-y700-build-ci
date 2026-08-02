@@ -1,0 +1,130 @@
+=== SYSTEM ===
+Linux fuhao 7.1.1-g5df8e852ea72 #11 SMP PREEMPT Thu Jun 25 03:36:59 CST 2026 aarch64 GNU/Linux
+
+=== FAILED ===
+  UNIT LOAD ACTIVE SUB DESCRIPTION
+
+0 loaded units listed.
+
+=== SERVICES ===
+active
+active
+active
+active
+active
+active
+active
+active
+
+=== DISPLAY ===
+[01;32mOutput: [0;0m1 DSI-1 1397d528-1cf3-493a-b76e-42650f1a7d41
+	[01;32menabled[0;0m
+	[01;32mconnected[0;0m
+	[01;32mpriority 1[0;0m
+	[01;33mPanel[0;0m
+	[01;33mreplication source:[0;0m0
+	[01;34mModes: [0;0m 1:[01;32m1600x2560@120.00*[0;0m!  2:1600x2560@60.00 
+[01;33m	Custom modes:[0;0m None
+[01;33m	Geometry: [0;0m0,0 1114x696
+[01;33m	Scale: [0;0m2.3
+[01;33m	Rotation: [0;0m8
+[01;33m	Overscan: [0;0m0
+[01;33m	Vrr: [0;0mincapable
+[01;33m	RgbRange: [0;0munknown
+[01;33m	HDR: [0;0mincapable
+[01;33m	Wide Color Gamut: [0;0mincapable
+[01;33m	ICC profile: [0;0mnone
+[01;33m	Color profile source: [0;0msRGB
+[01;33m	Color power preference: [0;0mprefer efficiency and performance
+[01;33m	Brightness control: [0;0msupported, set to 50% and dimming to 100%
+[01;33m	Color resolution: unknown
+[01;33m	Allow EDR: [0;0malways
+[01;33m	Sharpness control: [0;0munsupported
+[01;33m	Automatic brightness: [0;0msupported, disabled
+[01;33m	Auto Rotate Policy: [0;0minTabletMode
+[01;33m	Adaptive backlight modulation: [0;0munsupported
+
+=== AUDIO ===
+ ├─ Devices:
+ │      59. 内置音频                        [alsa:pcm]
+ │  
+ ├─ Sinks:
+ │  *   55. 内置音频                        [vol: 1.00]
+ │  
+ ├─ Sources:
+ ├─ Devices:
+ │      33. Qualcomm Camera Subsystem           [v4l2]
+ │      35. Qualcomm Camera Subsystem           [v4l2]
+ │      36. Qualcomm Camera Subsystem           [v4l2]
+ │      37. Qualcomm Camera Subsystem           [v4l2]
+ │      38. Qualcomm Camera Subsystem           [v4l2]
+ │      39. Qualcomm Camera Subsystem           [v4l2]
+ │      40. Qualcomm Camera Subsystem           [v4l2]
+ │      41. Qualcomm Camera Subsystem           [v4l2]
+ │      43. Qualcomm Camera Subsystem           [v4l2]
+ │      44. Qualcomm Camera Subsystem           [v4l2]
+ │      45. Qualcomm Camera Subsystem           [v4l2]
+ │      46. Qualcomm Camera Subsystem           [v4l2]
+ │      47. Qualcomm Camera Subsystem           [v4l2]
+ │      48. Qualcomm Camera Subsystem           [v4l2]
+ │      49. Qualcomm Camera Subsystem           [v4l2]
+ │      50. Qualcomm Camera Subsystem           [v4l2]
+ │      51. Qualcomm Camera Subsystem           [v4l2]
+ │      52. Iris Encoder                        [v4l2]
+ │      53. Iris Decoder                        [v4l2]
+ │  
+ ├─ Sinks:
+ │  
+ ├─ Sources:
+ └─ Default Configured Devices:
+         0. Audio/Sink    alsa_output.platform-sound.playback.0.0
+
+=== BACKLIGHT ===
+1027
+
+=== BATTERY ===
+    state:               charging
+    energy-rate:         4.78619 W
+    voltage:             4.391 V
+    percentage:          91%
+    temperature:         37.3 degrees C
+  History (voltage):
+
+=== INPUT ===
+by-path
+event0
+event1
+event2
+event3
+event4
+event5
+event6
+event7
+event8
+tb321fu-haptics-left
+tb321fu-haptics-right
+
+=== WIFI ===
+*:803_5G:80
+wlp1s0:connected:803_5G
+lo:connected (externally):lo
+p2p-dev-wlp1s0:disconnected:
+sit0:unmanaged:
+
+=== UCM ===
+  0: Speaker
+    Internal stereo speakers
+  1: Headphones
+    Headphones
+  2: Headset
+    Headset microphone
+  3: Mic1
+    Microphone
+
+=== ATH12K ===
+c896bc7782e252aa915849d5c9c47d109ecfe9f0fc5650fe771f7ba8f8eb77fb  /usr/lib/firmware/ath12k/WCN7850/hw2.0/board-2.bin
+
+=== NET ===
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+sit0@NONE        DOWN           
+wlp1s0           UP             192.168.0.156/24 fe80::36eb:58a9:3158:9d84/64 

@@ -25,6 +25,8 @@ now=$(TZ=Asia/Shanghai date +%Y-%m-%d)
 # Keep in sync with .github/workflows/build-kernel.yml and
 # build-rootfs-and-grub.yml and the kernel project plan.
 export P4_STATUS="${P4_STATUS:-PASS}"
+export P7_STATUS="${P7_STATUS:-VERIFIED-PARTIAL}"
+export P8_STATUS="${P8_STATUS:-VERIFIED-PARTIAL}"
 export K8_STATUS="${K8_STATUS:-BLOCKED}"
 export KERNEL_RUN="${KERNEL_RUN:-30704468188}"
 export KERNEL_IMAGE_SHA="${KERNEL_IMAGE_SHA:-6e6d939eb25eb497c705d9779cfedbb165f708507741407e4b2bf8b86e5dc819}"
@@ -42,7 +44,7 @@ render() {
 import os, re, sys
 src, dst = sys.argv[1], sys.argv[2]
 text = open(src, encoding='utf-8').read()
-for key in ('DATE','P4_STATUS','K8_STATUS','KERNEL_RUN',
+for key in ('DATE','P4_STATUS','P7_STATUS','P8_STATUS','K8_STATUS','KERNEL_RUN',
             'KERNEL_IMAGE_SHA','KERNEL_DTB_SHA','KERNEL_CONFIG_SHA',
             'KERNEL_MODULES_SHA','BOOT_CANDIDATE_SHA','ROOTFS_RAW_SHA','GRUB_RAW_SHA'):
     text = text.replace('@' + key + '@', os.environ[key])

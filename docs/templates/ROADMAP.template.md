@@ -14,7 +14,7 @@ v0.1.0          Stable          (multi-round wake/suspend, network reconnect, ap
 ## Current position
 
 - Kernel pipeline: **K0–K7 PASS, K9 PASS, K8 @K8_STATUS@** (device validation).
-- Main Arch pipeline: **P0–P3 PASS, P4 @P4_STATUS@** (offline audit), P5 PARTIAL (bundle ready, GPT re-read pending), P6–P9 gated.
+- Main Arch pipeline: **P0–P3 PASS, P4 @P4_STATUS@** (offline audit), **P5 READY**, **P6 done** (user Windows QFIL flash 2026-08-02), **P7 @P7_STATUS@**, **P8 @P8_STATUS@**, P9 gated.
 
 ## Dependency-ordered execution path
 
@@ -22,11 +22,11 @@ v0.1.0          Stable          (multi-round wake/suspend, network reconnect, ap
 2. ✅ P1 rescue coordinators + support bundle (source-tested; hardware pending)
 3. ✅ P2 Wi-Fi firmware fix (source-tested; hardware pending)
 4. ✅ P3 deterministic build + CI gates (artifact-only CI PASS)
-5. ⛔ **P4 offline audit** – download main ZIP with hash match; e2fsck/FAT/boot/accounts/services/firmware audit
+5. ✅ **P4 offline audit** – tablet-kde run `30736975180` audited (Wi-Fi fix d1d3c1d); e2fsck/FAT/boot/accounts/services/firmware PASS
 6. 🟡 P5 flash prep – Firehose bundle + 10-point readback plan done (2026-08-02); re-read live GPT + user confirmation pending
-7. ⛔ P6 controlled flash + 10-point readback
-8. ⛔ P7 first-boot rescue & network acceptance (ACM/NCM/NAP → Wi-Fi)
-9. ⛔ P8 desktop & daily acceptance (display/touch/audio/haptics/battery)
+7. ✅ P6 controlled flash + readback (user Windows QFIL, run `30736975180`, 2026-08-02)
+8. 🟡 P7 first-boot rescue & network acceptance (Wi-Fi VERIFIED; ACM/NCM/NAP PARTIAL — physical Type-C/peer steps)
+9. 🟡 P8 desktop & daily acceptance (display/touch/audio/backlight/battery VERIFIED; headset sound + screen-off UNTESTED)
 10. ⛔ P9 pre-release & stable observation
 
 ## Kernel-side backlog (after P4 unblocks)
@@ -37,15 +37,18 @@ v0.1.0          Stable          (multi-round wake/suspend, network reconnect, ap
 - [ ] Optional CI end-to-end dry run: point `build-rootfs-and-grub.yml`
       `source_config` at the K4 artifact archive and consume the self-built unit
 
-## First-device-validation checklist (P7/P8)
+## First-device-validation checklist (P7/P8) — 2026-08-02 status
 
-- [ ] Boot to Plasma Wayland
-- [ ] Touch input + rotation
-- [ ] Wi-Fi and Bluetooth
+- [x] Boot to Plasma Wayland
+- [x] Touch input + rotation
+- [x] Wi-Fi (and BT keyboard pairing)
 - [ ] `/dev/dri/renderD128` + `vulkaninfo`
-- [ ] PipeWire audio device visibility
+- [x] PipeWire audio device visibility (after use-acp=false fix)
 - [ ] Fcitx5 Chinese input
 - [ ] Plasma Keyboard popup
 - [ ] Sensor rotation behavior
-- [ ] Haptics service status
+- [x] Haptics service status (devices present; physical feel untested)
+- [ ] Headset sound / mic physical confirmation
+- [ ] Screen-off + wake + Wi-Fi reconnect
+- [ ] USB ACM/NCM + BT NAP physical rescue-link drill
 - [ ] SSH access
