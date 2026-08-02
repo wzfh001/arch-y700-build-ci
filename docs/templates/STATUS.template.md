@@ -47,7 +47,7 @@ Updated: @DATE@
 | K5 Offline identity audit | PASS | `REPRO-CLOSE` (report `kernel/reports/K5-audit.md`) |
 | K6 Module packaging | PASS | 1535 modules + depmod + haptics co-exist |
 | K7 Boot/GRUB integration | PASS (offline dry-run) | Candidate boot image `@BOOT_CANDIDATE_SHA@`; EXP-20260801-002 |
-| K8 Device validation | **@K8_STATUS@** | Requires main-project P4→P5→user go; controlled-flash plan ready (`phases/K8-device-validation/`) |
+| K8 Device validation | **@K8_STATUS@** | Main-project P4 PASS + P5 READY met (2026-08-02); only remaining gate = explicit user go; controlled-flash plan ready (`phases/K8-device-validation/`) |
 | K9 Change control | PASS | Patch queue + rollback labels + compatible-unit naming |
 
 ## Firmware / hardware reality
@@ -79,19 +79,23 @@ Updated: @DATE@
 
 ## What is blocked and why
 
-1. **P4 offline audit** – the main candidate ZIP has not been fully downloaded;
-   only a partial transfer exists. This is the single upstream blocker for the
-   whole Arch flash chain.
-2. **K8 device validation** – requires P4 PASS → P5 flash prep → explicit user
-   go (target/scope/image SHA/recovery boundary) → independent experiment ID →
-   evidence package. The kernel role never flashes unilaterally.
+1. **P6/P7/P8 execution (controlled flash onward)** – P4 offline audit is
+   **PASS** and P5 flash prep is **READY** (run 29966711103 bundle complete;
+   live GPT re-read VERIFIED 2026-08-02). The single remaining blocker is the
+   **explicit user go** for the destructive flash (target/scope/image SHA/
+   recovery boundary). Nothing has been flashed.
+2. **K8 device validation** – requires P4 PASS ✅ → P5 flash prep ✅ → **explicit
+   user go** → independent experiment ID → evidence package. The kernel role
+   never flashes unilaterally.
 
 ## How to unblock
 
-1. Obtain the main ZIP with a reliable network path and a hash match, then
-   finish `AUDIT-20260723-001` (e2fsck, FAT, boot, accounts, services, firmware).
-2. Re-read the device GPT read-only, generate a device-specific Firehose bundle
-   and a 10-point readback plan (P5).
-3. After user confirmation, flash (P6), then run P7/P8 acceptance in order.
+1. ~~Obtain the main ZIP and finish `AUDIT-20260723-001`~~ – DONE (closed
+   2026-08-02; e2fsck 0 errors, FAT, boot, accounts, services, firmware all
+   audited; `AUDIT-20260802-001` evidence).
+2. ~~Re-read the device GPT and prepare the Firehose bundle~~ – DONE (P5 READY;
+   live GPT re-read VERIFIED 2026-08-02; bundle in run 29966711103).
+3. **Get the explicit user go** (target/scope/image SHA/recovery boundary), then
+   flash (P6), then run P7/P8 acceptance in order.
 4. Kernel side: on release, run K8 with an independent experiment ID; update
    this file afterward via `scripts/ci/update-project-status.sh`.
