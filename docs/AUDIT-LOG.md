@@ -24,7 +24,8 @@ The canonical full records live in the workspace kernel `experiments/`,
 | ID | Kind | Scope | Result |
 |---|---|---|---|
 | `CI-20260723-001` | CI record | artifact-only build run 29966711103 | PASS (no release, no write) |
-| `AUDIT-20260723-001` | offline audit | full candidate ZIP audit (rootfs/GRUB/boot) | **PARTIAL/BLOCKED** (main ZIP not fully downloaded) |
+| `AUDIT-20260723-001` | offline audit | full candidate ZIP audit (rootfs/GRUB/boot) | **PASS** (closed 2026-08-02: main ZIP downloaded, all checks green) |
+| `AUDIT-20260802-001` | offline audit | P4 full offline audit re-run on downloaded main ZIP | PASS (evidence `P4-AUDIT-20260802-EVIDENCE.txt`) |
 | `SRC-20260722-005` | source gate | pinned device archive + WCN7850 real SHAs + firmware package | PASS |
 | `SRC-20260722-004` | source gate | old raw board-2.bin.zst 33090-byte member | **FAIL — forbidden to repeat** |
 | `DEV-20260722-002/003` | dev failure | earlier WCN7850 extraction failures | FAIL (recorded) |
