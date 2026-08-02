@@ -1,7 +1,9 @@
-# P6→P7→P8 放行后执行命令包（2026-08-02）
+# P6→P7→P8 放行后执行命令包（2026-08-02，Wi-Fi 修复后 run 30736975180）
 
 status: READY（命令包已固化；未上机）
-适用: 用户放行后，Windows 端 Codex + 平板端按本页逐条执行。每步都有成功标志；失败即停并记录。
+适用: 用户放行后，Windows 端 Codex + 平板端按本页逐条执行。
+**bundle: builds/flash-bundles/TB321FU-tablet-kde-run-30736975180/（KDE Plasma，Wi-Fi 固件布局已修复：标准路径 board-2.bin=c896bc77…/202148B）**
+rootfs raw `3a472fbc…` / grub `f54035fd…` / boot `a9c2e176…`。每步都有成功标志；失败即停并记录。
 
 ## P6：受控刷写（Windows 端）
 
@@ -20,7 +22,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Verify-TB321FU
 # 6) QFIL 加载 firehose\read-userdata-10point.xml（10 点）
 # 7) 回读校验（应输出 MATCHED=10/10 + USERDATA_READBACK_VERIFY=PASS）
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Verify-Readback.ps1
-# 8) Fastboot 处理 GRUB/boot/槽位（boot 不重刷，SHA 45f923bc…；禁 fastboot 写 userdata）
+# 8) Fastboot 处理 GRUB/boot/槽位（boot 不重刷，SHA a9c2e176…；禁 fastboot 写 userdata）
 ```
 
 成功标志：`BUNDLE_VERIFY=PASS FILES=19` → `PREPARE_IMAGES=PASS` → `GPT_BASELINE_MATCH LUN=0..5` → 写入 OK → `MATCHED=10/10`。
@@ -42,7 +44,8 @@ systemctl status tb321fu-usb-rescue.service tb321fu-bt-nap.service
 systemctl status NetworkManager bluetooth nftables sshd
 ls /sys/class/udc; ip -details link show usb0 bnep0
 
-# 4) Wi-Fi：扫描/连接/DHCP/重连/关屏恢复
+# 4) Wi-Fi（本次修复重点）：扫描/连接/DHCP/重连/关屏恢复
+#    固件证据：/usr/lib/firmware/ath12k/WCN7850/hw2.0/board-2.bin = c896bc77…/202148B（标准路径，不再依赖 firmware_class.path）
 nmcli device wifi list
 nmcli device wifi connect "<SSID>" password "<PASS>"
 ip -br address show wlp1s0
