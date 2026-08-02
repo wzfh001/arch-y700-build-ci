@@ -15,7 +15,7 @@
 | Wi-Fi firmware | VERIFIED | `/usr/lib/firmware/ath12k/WCN7850/hw2.0/board-2.bin` = 202148B / `c896bc77…`（板级） |
 | 自动 support bundle | VERIFIED | 44 文件打包生成 |
 | USB ACM/NCM | PARTIAL | UDC 空、port0 host——需物理 Type-C 切 device |
-| Bluetooth NAP | PARTIAL | profile 激活重试中，bnep0 未出现 |
+| Bluetooth NAP | **VERIFIED（协调器；客户端 drill 待 peer）** | 缺 `dnsmasq`（NM shared 依赖）→ 安装后 bnep0 起来 `10.78.0.1/24`、NM connection activated、nap_uuid=yes（2026-08-02 18:57，`rescue-live-fix-evidence.txt`） |
 | Wi-Fi 重连/关屏恢复 | UNTESTED | 需物理按键测试；rfkill 未阻塞 |
 
 ## P8 桌面和硬件日用验收
@@ -44,5 +44,7 @@
 4. 听一下扬声器实际出声（pw-play 已 rc=0）
 
 ## 构建侧修复（已回填仓库，待 CI）
-- `scripts/ci/build-arch-rootfs-image.sh`：WirePlumber `use-acp=false`（音频修复）
+- `scripts/ci/build-arch-rootfs-image.sh`：WirePlumber `use-acp=false`（音频修复）+ **base 包新增 `dnsmasq`**（BT NAP/USB NCM 的 NM shared 需要）
 - 3 个失败服务为设备运行时问题，构建侧无需改（nftables 需内核 NF_TABLES 才有意义）
+- `tb321fu-usb-rescue`：`write_if_changed` 读 sysfs 去 NUL（消除每 2s null-byte journal 噪音）
+- **实机已应用**：dnsmasq 已装（pacman 2.93-1）、USB 脚本已 patch 并 restart；BT NAP bnep0=yes 实机留证（fork commit 5a7c572 已推）

@@ -1,0 +1,39 @@
+=== TB321FU rescue live fix evidence 2026-08-02 ===
+time: 2026-08-02T19:05:38+08:00
+kernel: 7.1.1-g5df8e852ea72
+
+--- BT NAP coordinator log tail ---
+Aug 02 18:57:35 fuhao tb321fu-bt-nap[576]: tb321fu-bt-nap: activated Bluetooth NAP profile tb321fu-rescue-bt
+Aug 02 18:57:40 fuhao tb321fu-bt-nap[576]: tb321fu-bt-nap: activated Bluetooth NAP profile tb321fu-rescue-bt
+Aug 02 18:57:46 fuhao tb321fu-bt-nap[576]: 已终止                  "$sleep_cmd" "$interval"
+Aug 02 18:57:46 fuhao systemd[1]: Stopping TB321FU Bluetooth NAP rescue coordinator...
+Aug 02 18:57:46 fuhao systemd[1]: tb321fu-bt-nap.service: Deactivated successfully.
+Aug 02 18:57:46 fuhao systemd[1]: Stopped TB321FU Bluetooth NAP rescue coordinator.
+Aug 02 18:57:46 fuhao systemd[1]: tb321fu-bt-nap.service: Consumed 2min 58.638s CPU time over 1h 58min 8.804s wall clock time, 18.9M memory peak.
+Aug 02 18:57:46 fuhao systemd[1]: Started TB321FU Bluetooth NAP rescue coordinator.
+Aug 02 18:57:47 fuhao tb321fu-bt-nap[258549]: tb321fu-bt-nap: activated Bluetooth NAP profile tb321fu-rescue-bt
+Aug 02 18:57:47 fuhao tb321fu-bt-nap[258549]: tb321fu-bt-nap: adapter=yes powered=yes profile_active=yes nap_uuid=yes bnep0=yes
+
+--- bnep0 link state ---
+bnep0            DOWN           10.78.0.1/24 
+1355: bnep0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN mode DEFAULT group default qlen 1000
+    link/ether 1e:38:bb:55:27:60 brd ff:ff:ff:ff:ff:ff
+
+--- dnsmasq installed ---
+dnsmasq 2.93-1
+
+--- USB coordinator log tail (post-fix, no null-byte spam) ---
+Aug 02 18:59:50 fuhao tb321fu-usb-rescue[262065]: /usr/local/libexec/tb321fu-usb-rescue: 行 251: 寻找匹配的 `"' 时遇到了未预期的 EOF
+Aug 02 18:59:50 fuhao systemd[1]: Stopping TB321FU USB network and serial rescue gadget...
+Aug 02 18:59:50 fuhao systemd[1]: tb321fu-usb-rescue.service: Main process exited, code=exited, status=143/n/a
+Aug 02 18:59:50 fuhao systemd[1]: tb321fu-usb-rescue.service: Failed with result 'exit-code'.
+Aug 02 18:59:50 fuhao systemd[1]: Stopped TB321FU USB network and serial rescue gadget.
+Aug 02 18:59:50 fuhao systemd[1]: Started TB321FU USB network and serial rescue gadget.
+Aug 02 18:59:50 fuhao tb321fu-usb-rescue[262569]: tb321fu-usb-rescue: USB ACM console ready at ttyGS0
+Aug 02 18:59:50 fuhao tb321fu-usb-rescue[262569]: tb321fu-usb-rescue: partner=no data_role=host [device]  power_role=source [sink]  udc=none bound=none usb0=no ttyGS0=yes
+
+--- null-byte warnings since 18:59:50 ---
+0
+
+--- failed services ---
+0
