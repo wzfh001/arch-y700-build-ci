@@ -15,27 +15,46 @@
 set -euo pipefail
 
 zip="$1"; work="$2"; prefix="${3:-TB321FU-archlinuxarm-plasma-aarch64}"
-[ -f "$zip" ] || { echo "missing main zip: $zip" >&2; exit 2; }
+# Accept either the artifact ZIP itself or a directory already extracted by
+# `gh run download` (which unzips artifacts automatically).
+if [ -f "$zip" ]; then
+  zip_mode=1
+elif [ -d "$zip" ]; then
+  zip_mode=0
+else
+  echo "missing main zip/dir: $zip" >&2; exit 2
+fi
 mkdir -p "$work"/{downloads,extract,evidence}
 
 evidence="$work/evidence/P4-AUDIT-$(date +%Y%m%d)-EVIDENCE.txt"
 exec > >(tee "$evidence")
 
 echo "=== AUDIT $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
-echo "zip: $zip"
-echo "size: $(stat -c%s "$zip")"
-sha256sum "$zip" | tee /dev/stderr
+echo "input: $zip"
+if [ "$zip_mode" = 1 ]; then
+  echo "size: $(stat -c%s "$zip")"
+  sha256sum "$zip" | tee /dev/stderr
+  echo "-- unzip -t --"
+  unzip -t "$zip" | tail -2
+  archive_root="$work/extract"
+  rm -rf "$archive_root"; mkdir -p "$archive_root"
+  unzip -q "$zip" -d "$archive_root"
+else
+  echo "mode: already-extracted artifact dir (gh run download unzips)"
+  echo "size(on disk): $(du -sb "$zip" | cut -f1)"
+  archive_root="$zip"
+fi
 
-echo "-- unzip -t --"
-unzip -t "$zip" | tail -2
-
-echo "-- inner SHA256SUMS --"
-unzip -p "$zip" SHA256SUMS | head -30 || true
-
-# locate archives inside zip
-archive_root="$work/extract"
-rm -rf "$archive_root"; mkdir -p "$archive_root"
-unzip -q "$zip" -d "$archive_root"
+echo "-- inner SHA256SUMS (find all) --"
+find "$archive_root" -name SHA256SUMS.txt -o -name '*.SHA256SUMS' | while read -r f; do
+  echo "## $f"
+  # release-level SHA256SUMS.txt references paths relative to the artifact root
+  if [ "$(basename "$f")" = "SHA256SUMS.txt" ]; then
+    ( cd "$archive_root" && sha256sum -c "$(realpath --relative-to="$archive_root" "$f")" 2>&1 | tail -4 )
+  else
+    ( cd "$(dirname "$f")" && sha256sum -c "$(basename "$f")" 2>&1 | tail -3 )
+  fi
+done
 rootfs_7z=$(find "$archive_root" -name '*-rootfs.img.7z' | head -1)
 grub_7z=$(find "$archive_root" -name '*-grub*.7z' -o -name '*-grub-fat.img.7z' | head -1)
 boot_7z=$(find "$archive_root" -name 'boot.img.7z' | head -1)

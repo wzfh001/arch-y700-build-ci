@@ -16,7 +16,7 @@ Updated: 2026-08-02
 - The device currently runs the **author-created Arch Linux ARM** (kernel
   `7.1.1-g5df8e852ea72`, host key `SHA256:GlYCjnc…` matches known device,
   rootfs `/dev/sda16` 456.8G label `ArchLinux`, observed 2026-08-02 at
-  `192.168.0.220`); Wi-Fi/USB/BT/audio/touch on the *tablet-niri* Arch
+  `192.168.0.220`); Wi-Fi/USB/BT/audio/touch on the *tablet-kde* Arch
   candidate remain `UNTESTED` on hardware. The verified Kubuntu rollback
   baseline remains historical (2026-07-21).
 
@@ -27,9 +27,9 @@ Updated: 2026-08-02
 | P0 Governance / baseline freeze | PASS | Branch/HEAD/diff/artifact identities recorded; governance commits in main |
 | P1 Rescue & auto evidence | SOURCE PASS | USB/BT coordinators + support bundle implemented and locally tested; **hardware UNTESTED** |
 | P2 WCN7850 Wi-Fi fix | SOURCE PASS | Pinned device archive + native firmware package + independent path + bootargs; **final raw/hardware UNTESTED** |
-| P3 Deterministic build & CI gates | PASS | Full local gate suite PASS; artifact-only CI run `29966711103` SUCCESS |
-| P4 Candidate offline audit | **PASS** | Main ZIP downloaded + full offline audit PASS (`AUDIT-20260723-001` closed 2026-08-02; `AUDIT-20260802` evidence) |
-| P5 Recovery & flash prep | **READY** | Run 29966711103 bundle completed (images+known-gpt+read-gpts XML+BUNDLE-SHA256SUMS, local verify PASS); live GPT re-read VERIFIED matches baseline (2026-08-02, device now runs author Arch); **pending user go** |
+| P3 Deterministic build & CI gates | PASS | Full local gate suite PASS; tablet-kde CI run `30730513005` SUCCESS |
+| P4 Candidate offline audit | **PASS** | tablet-kde run `30730513005` artifact audited (`P4-AUDIT-20260802` evidence; e2fsck 0 errors, KDE configs 6/6 incl. Rotated270, firmware board-2.bin c896bc77…7fb, services 10/10 + user units 4/4) |
+| P5 Recovery & flash prep | **READY** | tablet-kde bundle in progress (reuse verified GPT: userdata LBA 3613096..123365370, program XML start=3613096/count=5242880/LUN0/4096/sparse=false); live GPT re-read VERIFIED matches baseline (2026-08-02, device runs author Arch); **pending bundle completion + user go** |
 | P6 Controlled flash & readback | BLOCKED | Requires P5; `sparse=false` single program + 10-point readback 10/10 |
 | P7 First-boot rescue & network | BLOCKED | Requires P6; ACM/NCM/NAP then Wi-Fi |
 | P8 Desktop & daily hardware acceptance | BLOCKED | Requires P7; display/touch/audio/haptics/battery |
@@ -74,27 +74,28 @@ Updated: 2026-08-02
 | Kernel config (self-built) | same run | `36997050c94bd8bfd91cd8d850cc602a24c59f561b55010a6eccfcf43817f40f` |
 | Modules tarball | same run | `a3e5c0ce420997a873b42810d0ed932a48be113671ba98cccfbf4c1e92b89542` |
 | Candidate GRUB/boot FAT image | K7 dry-run EXP-20260801-002 | `dade9ac5b2de4673cbe7eb248c918efd534de8f8a2281fdbb24cfdca3610a7a5` |
-| Arch P3 rootfs raw | run `29966711103` (metadata) | `6d1af258405cb1edefe5d43b2a94d3568c6e098c573aaddef867b914d8e9f2d7` |
-| Arch P3 GRUB raw | run `29966711103` (metadata) | `13747e8638e8932de2a392358ffa5cfd4844ddb2f9309ac8dde9dbc2249898fd` |
+| Arch tablet-kde rootfs raw | run `30730513005` (metadata) | `c4efa7ce73ef33ff63551992a56b0e82c115e965d74e5ec7f7345fbb2a2e98a8` |
+| Arch tablet-kde GRUB raw | run `30730513005` (metadata) | `7378dc11fd597890e4130f9f62f607828086ef9c9cd4395169c566f437ff41cc` |
 
 ## What is blocked and why
 
 1. **P6/P7/P8 execution (controlled flash onward)** – P4 offline audit is
-   **PASS** and P5 flash prep is **READY** (run 29966711103 bundle complete;
-   live GPT re-read VERIFIED 2026-08-02). The single remaining blocker is the
-   **explicit user go** for the destructive flash (target/scope/image SHA/
-   recovery boundary). Nothing has been flashed.
+   **PASS** (tablet-kde run `30730513005`) and P5 flash prep is **READY**
+   (tablet-kde bundle in progress; live GPT re-read VERIFIED 2026-08-02). The
+   remaining blockers are **P5 bundle completion** and the **explicit user go**
+   for the destructive flash (target/scope/image SHA/recovery boundary).
+   Nothing has been flashed.
 2. **K8 device validation** – requires P4 PASS ✅ → P5 flash prep ✅ → **explicit
    user go** → independent experiment ID → evidence package. The kernel role
    never flashes unilaterally.
 
 ## How to unblock
 
-1. ~~Obtain the main ZIP and finish `AUDIT-20260723-001`~~ – DONE (closed
-   2026-08-02; e2fsck 0 errors, FAT, boot, accounts, services, firmware all
-   audited; `AUDIT-20260802-001` evidence).
-2. ~~Re-read the device GPT and prepare the Firehose bundle~~ – DONE (P5 READY;
-   live GPT re-read VERIFIED 2026-08-02; bundle in run 29966711103).
+1. ~~Obtain the main ZIP and finish the tablet-kde P4 audit~~ – DONE (run
+   `30730513005`; e2fsck 0 errors, FAT, boot, accounts, KDE configs, services,
+   firmware all audited; `P4-AUDIT-20260802` evidence).
+2. **Finish the tablet-kde P5 Firehose bundle** – in progress (reuse verified
+   GPT values; live GPT re-read VERIFIED 2026-08-02).
 3. **Get the explicit user go** (target/scope/image SHA/recovery boundary), then
    flash (P6), then run P7/P8 acceptance in order.
 4. Kernel side: on release, run K8 with an independent experiment ID; update

@@ -4,7 +4,7 @@
 |---|---|
 | fork | `wzfh001/arch-y700-build-ci`（只推此 fork，origin=GUF296 永不推） |
 | branch | `codex/tablet-kde-20260802` |
-| head | `ffcbf0c`（含 5e5017f 修复 + P4/P5/P7P8 文档 + 审计脚本） |
+| head | `5e5017f`（CI 实际构建 head；仓库 HEAD 已到 `dd07535`，审计脚本修复已推 fork，不影响产物） |
 | run id | `30730513005` |
 | workflow | `build-rootfs-and-grub.yml` |
 | desktop_profile | `tablet-kde` |
@@ -21,6 +21,13 @@
 - kernel: `7.1.1-g5df8e852ea72`（K4 复现验证）
 - secrets（fork）: `DEFAULT_USER_AUTHORIZED_KEYS`、`DEFAULT_USER_PASSWORD_HASH`
 - root: locked（无需 secret）；fuhao sudo password
+
+## CI 状态（2026-08-02）
+
+- run `30730513005` **SUCCESS**（head `5e5017f`，全部 13 步绿）
+- artifact 已取回：`/mnt/game/.TB321FU-tablet-kde-run-30730513005-audit/downloads/`
+- rootfs raw SHA `c4efa7ce…e98a8`；grub-fat `7378dc11…41cc`；boot `45f923bc…2d58f`
+- **P4 审计 VERIFIED（2026-08-02）**：外层 SHA 全 OK、e2fsck 0 错误、KDE 配置 6/6、固件 board-2.bin=c896bc77…7fb、系统服务 10/10 + 用户单元 4/4、账号/SSH 安全项全过。证据：`/mnt/game/.TB321FU-tablet-kde-run-30730513005-audit/evidence/P4-AUDIT-20260802-CONCLUSION.txt`
 
 ## 期望产物（CI 完成后核对）
 
