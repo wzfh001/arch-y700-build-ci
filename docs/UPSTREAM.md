@@ -7,12 +7,16 @@ of the vendor Y700/TB321FU kernel and build). It builds the **Arch Linux ARM**
 route with the same kernel/DTB/device archive as upstream.
 
 ```text
-origin  = https://github.com/GUF296/arch-y700-build-ci.git   (upstream)
-fork    = https://github.com/wzfh001/arch-y700-build-ci.git   (this repo)
+origin  = https://github.com/GUF296/arch-y700-build-ci.git   (upstream, fetch-only)
+fork    = https://github.com/wzfh001/arch-y700-build-ci.git   (this repo, push target)
 ```
 
-Local `main` = fork/main = `4e9e6e1`; upstream origin/main is behind by 23
-commits (not yet pushed upstream).
+> **Fork-only push policy (hard rule):** this workspace **never pushes to
+> `GUF296/arch-y700-build-ci` (origin)**. The `origin` remote is configured
+> fetch-only (push URL set to an invalid `*.invalid` endpoint); all local work
+> is pushed only to this fork (`wzfh001/arch-y700-build-ci`).
+
+Local `main` tracks `fork/main` (this repo).
 
 ## Kernel source
 
