@@ -20,7 +20,6 @@ if [[ "${1:-}" == "--check" ]]; then
 fi
 
 now=$(TZ=Asia/Shanghai date +%Y-%m-%d)
-head_short=$(git rev-parse --short HEAD)
 
 # --- Pinned facts (single source of truth for generated docs) ---------------
 # Keep in sync with .github/workflows/build-kernel.yml and
@@ -36,7 +35,6 @@ export BOOT_CANDIDATE_SHA="${BOOT_CANDIDATE_SHA:-dade9ac5b2de4673cbe7eb248c918ef
 export ROOTFS_RAW_SHA="${ROOTFS_RAW_SHA:-6d1af258405cb1edefe5d43b2a94d3568c6e098c573aaddef867b914d8e9f2d7}"
 export GRUB_RAW_SHA="${GRUB_RAW_SHA:-13747e8638e8932de2a392358ffa5cfd4844ddb2f9309ac8dde9dbc2249898fd}"
 export DATE="$now"
-export HEAD="$head_short"
 
 render() {
   local template="$1" out="$2"
@@ -44,7 +42,7 @@ render() {
 import os, re, sys
 src, dst = sys.argv[1], sys.argv[2]
 text = open(src, encoding='utf-8').read()
-for key in ('DATE','HEAD','P4_STATUS','K8_STATUS','KERNEL_RUN',
+for key in ('DATE','P4_STATUS','K8_STATUS','KERNEL_RUN',
             'KERNEL_IMAGE_SHA','KERNEL_DTB_SHA','KERNEL_CONFIG_SHA',
             'KERNEL_MODULES_SHA','BOOT_CANDIDATE_SHA','ROOTFS_RAW_SHA','GRUB_RAW_SHA'):
     text = text.replace('@' + key + '@', os.environ[key])
@@ -58,7 +56,7 @@ render docs/templates/ROADMAP.template.md docs/ROADMAP.md
 if [[ $check_mode -eq 1 ]]; then
   stale=0
   for doc in docs/STATUS.md docs/ROADMAP.md; do
-    # The "Updated ... HEAD" line is inherently dynamic (date + current HEAD);
+    # The "Updated:" line carries the regeneration date and is inherently dynamic;
     # the gate verifies the committed *facts* (statuses, hashes) are fresh.
     if ! diff -q <(sed '/^Updated: /d' "$doc") \
                  <(git cat-file -p "HEAD:$doc" 2>/dev/null | sed '/^Updated: /d') \
@@ -73,5 +71,5 @@ if [[ $check_mode -eq 1 ]]; then
     exit 1
   fi
 else
-  echo "regenerated docs/STATUS.md and docs/ROADMAP.md (HEAD=$head_short)"
+  echo "regenerated docs/STATUS.md and docs/ROADMAP.md"
 fi
