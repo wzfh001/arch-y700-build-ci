@@ -2079,15 +2079,18 @@ SOURCE
     "$stage" \
     wifi_dependencies wifi_provides wifi_conflicts wifi_replaces
 
-  # Match the upstream-verified layout: the board-specific WCN7850 firmware
-  # must also live at the standard firmware path that ath12k probes by default.
-  # We keep the tb321fu/ copy as a search-path backup, but the standard path
-  # must contain the board-specific files (not the generic linux-firmware ones).
+  # install_arch_native_stage_package removes $stage, so copy from the
+  # already-installed rootfs tree (tb321fu/ search-path copy) to the
+  # standard ath12k firmware path that the driver probes by default.
+  # This matches the upstream-verified layout: board-specific board-2.bin
+  # (202148B / c896bc77...) must win over the generic linux-firmware one.
+  local src_wifi_dir="$rootfs_dir/usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0"
   local std_wifi_dir="$rootfs_dir/usr/lib/firmware/ath12k/WCN7850/hw2.0"
   install -d -m 0755 "$std_wifi_dir"
+  local fname
   while read -r _ relative; do
-    install -m 0644 "$stage/usr/lib/firmware/tb321fu/ath12k/WCN7850/hw2.0/${relative##*/}" \
-      "$std_wifi_dir/${relative##*/}"
+    fname=${relative##*/}
+    install -m 0644 "$src_wifi_dir/$fname" "$std_wifi_dir/$fname"
   done < "$TB321FU_WIFI_FIRMWARE_MANIFEST"
   ci_log "TB321FU WCN7850 board firmware installed at standard path (board-2.bin=$(stat -c '%s' "$std_wifi_dir/board-2.bin")B)"
 }
