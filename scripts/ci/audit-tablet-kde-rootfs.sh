@@ -113,6 +113,9 @@ for p in /usr/bin/ssccli /usr/libexec/iio-sensor-proxy /usr/lib/systemd/system/i
   if exists "$p"; then echo "OK  $p"; else echo "MISS $p"; fi
 done
 
+echo "== rescue dnsmasq (NetworkManager shared needs it) =="
+if exists /usr/bin/dnsmasq; then echo "OK  /usr/bin/dnsmasq"; else echo "MISS /usr/bin/dnsmasq"; fi
+
 echo "== services (enabled) =="
 # A unit is "enabled" if any of the standard enable locations contains a
 # link for it. Different units use different targets:

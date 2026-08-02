@@ -25,7 +25,7 @@ v0.1.0          Stable          (multi-round wake/suspend, network reconnect, ap
 5. ✅ **P4 offline audit** – tablet-kde run `30736975180` audited (Wi-Fi fix d1d3c1d); e2fsck/FAT/boot/accounts/services/firmware PASS
 6. 🟡 P5 flash prep – Firehose bundle + 10-point readback plan done (2026-08-02); re-read live GPT + user confirmation pending
 7. ✅ P6 controlled flash + readback (user Windows QFIL, run `30736975180`, 2026-08-02)
-8. 🟡 P7 first-boot rescue & network acceptance (Wi-Fi VERIFIED; ACM/NCM/NAP PARTIAL — physical Type-C/peer steps)
+8. 🟡 P7 first-boot rescue & network acceptance (Wi-Fi VERIFIED; BT NAP bnep0 up after dnsmasq fix; ACM/NCM still needs physical Type-C/peer steps)
 9. 🟡 P8 desktop & daily acceptance (display/touch/audio/backlight/battery VERIFIED; headset sound + screen-off UNTESTED)
 10. ⛔ P9 pre-release & stable observation
 
@@ -50,5 +50,6 @@ v0.1.0          Stable          (multi-round wake/suspend, network reconnect, ap
 - [x] Haptics service status (devices present; physical feel untested)
 - [ ] Headset sound / mic physical confirmation
 - [ ] Screen-off + wake + Wi-Fi reconnect
-- [ ] USB ACM/NCM + BT NAP physical rescue-link drill
+- [ ] USB ACM/NCM physical rescue-link drill (Type-C partner)
+- [x] BT NAP coordinator up (bnep0 10.78.0.1/24, dnsmasq fixed; client drill pending)
 - [ ] SSH access

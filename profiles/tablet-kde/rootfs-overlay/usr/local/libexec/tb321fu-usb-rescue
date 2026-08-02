@@ -49,7 +49,9 @@ write_if_changed() {
   local value=$1
   local path=$2
   local current=
-  [ -r "$path" ] && current=$(cat "$path" 2>/dev/null || true)
+  if [ -r "$path" ]; then
+    current=$(tr -d '\000' < "$path" 2>/dev/null || true)
+  fi
   [ "$current" = "$value" ] && return 0
   write_value "$value" "$path"
 }

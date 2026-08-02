@@ -2770,7 +2770,7 @@ build_package_list() {
   local base_packages=(
     base bash-completion sudo openssh rsync curl wget ca-certificates gnupg fakeroot
     nano vim less which file htop usbutils pciutils iproute2 inetutils
-    networkmanager bluez bluez-utils power-profiles-daemon udisks2 upower
+    networkmanager dnsmasq bluez bluez-utils power-profiles-daemon udisks2 upower
     linux-firmware nftables
     alsa-ucm-conf alsa-utils iio-sensor-proxy feedbackd
     glib2 libgudev polkit protobuf-c libqmi libqrtr-glib
