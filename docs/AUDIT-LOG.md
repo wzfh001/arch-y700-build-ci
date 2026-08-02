@@ -18,6 +18,7 @@ The canonical full records live in the workspace kernel `experiments/`,
 | `EXP-20260801-001` | kernel experiment | K4 reproducible build (run 30704468188) | PASS (REPRO-CLOSE basis) |
 | `EXP-20260801-002` | kernel experiment | K7 boot/GRUB assembly dry-run vs official template | PASS (candidate `dade9ac5b2…`) |
 | `AUDIT-20260802-002` | device GPT re-read | live read-only GPT re-acquire @192.168.0.220 vs known baseline | PASS (LUN0/4 boundaries + CRCs match; bundle completed) |
+| `DEV-20260802-002` | bundle completion | run 30730513005 KDE Firehose bundle: 19 members complete incl. README-WINDOWS + BUNDLE-SHA256SUMS; readback 10/10 from KDE raw | PASS (local checksum 19/19, SHAs match ARTIFACT-IDENTITY) |
 | `DEV-20260802-001` | bundle completion | run 29966711103 Firehose bundle: images+known-gpt+read-gpts XML+BUNDLE-SHA256SUMS added; scripts re-pointed to run images/SHAs | PASS (local checksum 19/19, boot/rootfs/grub SHAs match ARTIFACT-IDENTITY) |
 | `EXP-20260729-001` | kernel experiment | source worktree HEAD verification | VERIFIED |
 

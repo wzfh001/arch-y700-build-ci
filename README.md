@@ -12,7 +12,7 @@ This repository is intentionally separate from the Ubuntu/Kubuntu build. It reus
 >
 > - Kernel is reproducibly buildable on GitHub Actions (`REPRO-CLOSE`); a
 >   candidate GRUB boot image is hash-bound (`dade9ac5b2…`).
-> - The Arch rootfs candidate passed **P4 offline audit** (run 29966711103);
+> - The Arch rootfs candidate passed **P4 offline audit** (run 30730513005, KDE Plasma);
 >   **P5 bundle is complete and the live GPT re-read is VERIFIED** — nothing
 >   has been flashed yet, and P6 requires explicit user go.
 > - Full status: [`docs/STATUS.md`](docs/STATUS.md) · roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md) · docs index: [`docs/README.md`](docs/README.md)

@@ -55,9 +55,10 @@ nmcli connection up "<CONN>"          # 重连测试
 ## P8：桌面与硬件验收（平板端）
 
 ```bash
-# 显示/输入
-niri msg outputs            # DSI-1 1600x2560@120、transform 270
-niri msg input-devices      # 触控映射
+# 显示/输入（KDE/KWin）
+kscreen-doctor -o           # 输出列表：DSI-1 1600x2560@120、transform 270 (Rotated270)
+kwin_wayland -h 2>&1 | head -1 || true
+libinput list-devices | grep -A4 -i touch  # 触控映射
 # 音频（PipeWire）
 wpctl status; pactl list short sinks
 aplay -l; arecord -l        # 内置扬声器/耳机/麦克风
@@ -75,7 +76,7 @@ systemctl --failed; journalctl -b -p warning
 
 ## 验收记录
 
-每项写 `PASS`/`FAIL`/`NOT TESTED` + 命令/日志路径。把 support bundle、journal、niri outputs 落盘到
+每项写 `PASS`/`FAIL`/`NOT TESTED` + 命令/日志路径。把 support bundle、journal、kscreen-doctor/KDE 输出落盘到
 `y700-linux/live/EXP-20260802-001/`，再回填 EXP-20260802-001 的"实测"段。失败即回基线（Kubuntu 26.04 +
 原版 GRUB `6C1C06A6…` + boot_a），不掩盖。
 

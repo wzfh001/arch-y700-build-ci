@@ -31,12 +31,12 @@
 4. After readback `10/10`, enter Fastboot and handle GRUB/boot/slot per audit
    conclusions.
 
-## Current P5 bundle (run 29966711103, READY 2026-08-02)
+## Current P5 bundle (run 30730513005, READY 2026-08-02)
 
-Windows-side bundle at `builds/flash-bundles/TB321FU-tablet-niri-run-29966711103/`:
+Windows-side bundle at `builds/flash-bundles/TB321FU-tablet-kde-run-30730513005/`:
 
 - `images/` — `rootfs.img.7z`, `grub-fat.img.7z`, `boot.img.7z` (raw SHAs
-  `6d1af258…` / `13747e86…` / `45f923bc…` match ARTIFACT-IDENTITY)
+  `c4efa7ce…` / `7378dc11…` / `45f923bc…` match ARTIFACT-IDENTITY)
 - `firehose/` — `program-userdata-raw-20g-arch.xml` (LUN0/4096B/start
   `3613096`/count `5242880`/end `8855975`/sparse=false), `read-gpts-prearch.xml`
   (LUN0-5), `read-userdata-10point.xml` (10×64 sectors, 0–18 GiB)

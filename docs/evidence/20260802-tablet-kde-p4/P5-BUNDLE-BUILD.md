@@ -1,15 +1,16 @@
-# tablet-kde P5 bundle 制作（2026-08-02 预置模板）
+# tablet-kde P5 bundle 制作（2026-08-02，已完成）
 
-> CI run `30730513005`（`codex/tablet-kde-20260802` @ `f083e42`）P4 VERIFIED 后执行。
+> CI run `30730513005`（`codex/tablet-kde-20260802` @ `c6bf693`）P4 VERIFIED 后执行。
 > 复用已验证 GPT 数值：userdata LBA 3613096..123365370，
 > program XML start=3613096/count=5242880/LUN0/4096/sparse=false。
-> 所有哈希/尺寸在 CI 产物下载后填入，禁止猜值。
+> **2026-08-02 完成**：19 成员全部就位，`sha256sum -c BUNDLE-SHA256SUMS.txt` 19/19 PASS；
+> 10 点回读期望从 KDE raw 重算 10/10 MATCH（`EXPECTED-READBACK-SHA256.tsv`）。
 
-## 输入
+## 输入（实际完成）
 
 | 项 | 来源 |
 |---|---|
-| 主 ZIP | `gh run download 30730513005`（预期 ~3.8 GiB） |
+| 主 ZIP | `gh run download 30730513005`（3.8 GiB，SHA 已验证） |
 | rootfs.img.7z / grub.img.7z / boot.img.7z | 主 ZIP 内（`SHA256SUMS` 交叉校验） |
 | known-gpt LUN0-5 | 旧 bundle `TB321FU-tablet-niri-run-29966711103/known-gpt/`（复用，实机 GPT 已验证） |
 | firehose XML（program/read-gpts/read-userdata） | 旧 bundle 复用（program-userdata-raw-20g-arch.xml 已验证） |
@@ -26,8 +27,17 @@
    - `Prepare-Images.ps1` 的 `$WorkRoot`（`Y700_Arch_tablet_kde_run_30730513005`）
    - `archives` 数组的 rootfs/grub 7z 文件名
    - `imageSpecs` 的 `Path`/`Size`/`Sha256`
-8. 生成 `BUNDLE-SHA256SUMS.txt`（自引用行按旧 bundle 修复方式排除；PS 脚本防御性跳过自身）
-9. `sha256sum -c BUNDLE-SHA256SUMS.txt` 19/19（或实际成员数）PASS
+8. 生成 `BUNDLE-SHA256SUMS.txt`（19 成员，无自引用行；PS 脚本防御性跳过自身）
+9. `sha256sum -c BUNDLE-SHA256SUMS.txt` 19/19 **PASS**（2026-08-02 实测）
+
+## 完成证据（2026-08-02）
+
+- `builds/flash-bundles/TB321FU-tablet-kde-run-30730513005/` 19 成员齐备
+- `BUNDLE-SHA256SUMS.txt` 本地 `sha256sum -c` 19/19 PASS（无自引用行）
+- `EXPECTED-READBACK-SHA256.tsv` 10 点 = 从 KDE raw（`c4efa7ce…`）用
+  `scripts/ci/generate-readback-expectations.sh` 重算 10/10 MATCH
+- `images/` 3 个 7z SHA 与 ARTIFACT-IDENTITY 一致（rootfs `c4efa7ce…`、grub `7378dc11…`、boot `45f923bc…`）
+- `known-gpt/`、`firehose/*.xml` 与已验证旧 bundle 逐字节一致（lun0-5、program/read-gpts/read-userdata）
 
 ## 回读验证（Windows QFIL）
 
