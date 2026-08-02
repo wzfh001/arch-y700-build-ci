@@ -31,11 +31,11 @@ Updated: 2026-08-02
 | P0 Governance / baseline freeze | PASS | Branch/HEAD/diff/artifact identities recorded; governance commits in main |
 | P1 Rescue & auto evidence | SOURCE PASS | USB/BT coordinators + support bundle implemented and locally tested; **hardware UNTESTED** |
 | P2 WCN7850 Wi-Fi fix | SOURCE PASS | Pinned device archive + native firmware package + independent path + bootargs; **final raw/hardware UNTESTED** |
-| P3 Deterministic build & CI gates | PASS | Full local gate suite PASS; tablet-kde CI run `30736975180` SUCCESS (Wi-Fi firmware layout fixed) |
-| P4 Candidate offline audit | **PASS** | tablet-kde run `30736975180` artifact audited (Wi-Fi fix d1d3c1d: standard-path WCN7850 board-2.bin backfilled) (`P4-AUDIT-20260802` evidence; e2fsck 0 errors, KDE configs 6/6 incl. Rotated270, firmware board-2.bin c896bc77…7fb, services 10/10 + user units 4/4) |
-| P5 Recovery & flash prep | **READY** | tablet-kde run `30736975180` bundle complete (19 members, `BUNDLE-SHA256SUMS` 19/19 PASS, readback 10/10 MATCH from KDE raw; reuse verified GPT: userdata LBA 3613096..123365370, program XML start=3613096/count=5242880/LUN0/4096/sparse=false); live GPT re-read VERIFIED matches baseline (2026-08-02, device runs author Arch); **pending user go** |
-| P6 Controlled flash & readback | **PASS** (2026-08-02) | User flashed KDE bundle run `30736975180` via Windows QFIL; Wi-Fi recovered (board-2.bin c896bc77…) |
-| P7 First-boot rescue & network | **VERIFIED-PARTIAL** | Wi-Fi scan/connect/DHCP VERIFIED @192.168.0.156; support bundle collected; **BT NAP bnep0 up (10.78.0.1/24) after dnsmasq install**; USB ACM/NCM still needs physical Type-C partner |
+| P3 Deterministic build & CI gates | PASS | Full local gate suite PASS; tablet-kde CI run `30745309676` SUCCESS (Wi-Fi firmware layout fixed + dnsmasq + audio use-acp + USB NUL) |
+| P4 Candidate offline audit | **PASS** | tablet-kde run `30745309676` artifact audited (head 3fee946: dnsmasq base pkg + audio use-acp=false + USB NUL; standard-path WCN7850 board-2.bin c896bc77… retained) (`P4-AUDIT-30745309676` evidence; e2fsck 0 errors/232610 files, KDE configs 6/6 incl. Rotated270, dnsmasq OK, services 10/10 + user units 4/4) |
+| P5 Recovery & flash prep | **READY** | tablet-kde run `30745309676` bundle complete (19 members, `BUNDLE-SHA256SUMS` 19/19 PASS, readback 10/10 MATCH from KDE raw `8ccb8d24…`; reuse verified GPT: userdata LBA 3613096..123365370, program XML start=3613096/count=5242880/LUN0/4096/sparse=false); live GPT re-read VERIFIED matches baseline (2026-08-02, device runs author Arch); **pending user go** |
+| P6 Controlled flash & readback | **PASS** (2026-08-02) | User flashed KDE bundle run `30736975180` via Windows QFIL; Wi-Fi recovered (board-2.bin c896bc77…); newer run `30745309676` bundle ready but not yet flashed |
+| P7 First-boot rescue & network | **VERIFIED-PARTIAL** | Wi-Fi scan/connect/DHCP VERIFIED @192.168.0.156; support bundle collected; **BT NAP bnep0 up (10.78.0.1/24); dnsmasq now baked into CI image (run 30745309676)**; USB ACM/NCM still needs physical Type-C partner |
 | P8 Desktop & daily hardware acceptance | **VERIFIED-PARTIAL** | Display/touch/audio/backlight/battery VERIFIED; headset sound + screen-off/resume UNTESTED (user physical); camera OUT-OF-SCOPE |
 | P9 Pre-release & stable observation | BLOCKED | Requires P8; `validation/<release>/hardware.yaml` |
 
@@ -78,8 +78,8 @@ Updated: 2026-08-02
 | Kernel config (self-built) | same run | `36997050c94bd8bfd91cd8d850cc602a24c59f561b55010a6eccfcf43817f40f` |
 | Modules tarball | same run | `a3e5c0ce420997a873b42810d0ed932a48be113671ba98cccfbf4c1e92b89542` |
 | Candidate GRUB/boot FAT image | K7 dry-run EXP-20260801-002 | `dade9ac5b2de4673cbe7eb248c918efd534de8f8a2281fdbb24cfdca3610a7a5` |
-| Arch tablet-kde rootfs raw | run `30736975180` (metadata) | `3a472fbca5ac591794ea238d27225029836919f9c23215db16ba562956d78ae2` |
-| Arch tablet-kde GRUB raw | run `30736975180` (metadata) | `f54035fd298b6f81ad7a26893b6007e3e7b62a03372899f8b49573be2ba09945` |
+| Arch tablet-kde rootfs raw | run `30745309676` (metadata) | `8ccb8d241d608e393343d8b53a24a4621130c5ff8ed3a6604f0f14ac332c22ea` |
+| Arch tablet-kde GRUB raw | run `30745309676` (metadata) | `8c98e56c3c353970cea2e5e42c8b73911806bd3f6197c45110ed72da5313d2bf` |
 
 ## What is blocked and why
 
@@ -92,18 +92,17 @@ Updated: 2026-08-02
 2. **K8 device validation** – the self-built kernel unit (run `30704468188`) has
    **not** been flashed; it requires explicit user go for a controlled K8 flash
    and its own experiment evidence. The kernel role never flashes unilaterally.
-3. **Audio fix upstreaming** – WirePlumber `use-acp=false` fix is in
-   `scripts/ci/build-arch-rootfs-image.sh` (local, 2026-08-02); needs a CI
-   rebuild run + bundle refresh before it is in a shippable image.
+3. ~~**Audio fix upstreaming**~~ – DONE: run `30745309676` rebuilt with
+   `use-acp=false` + `dnsmasq` + USB NUL fix; P4 audit PASS and P5 bundle ready (2026-08-02).
 
 ## How to unblock
 
 1. ~~Obtain the main ZIP and finish the tablet-kde P4 audit~~ – DONE (run
-   `30736975180`; e2fsck 0 errors, FAT, boot, accounts, KDE configs, services,
-   firmware all audited; `P4-AUDIT-20260802` evidence).
+   `30745309676`; e2fsck 0 errors, FAT, boot, accounts, KDE configs, services,
+   firmware, dnsmasq all audited; `P4-AUDIT-30745309676` evidence).
 2. ~~Finish the tablet-kde P5 Firehose bundle~~ – DONE (19 members,
    `BUNDLE-SHA256SUMS` 19/19 PASS; readback expectations 10/10 MATCH from KDE
-   raw `3a472fbc…`; live GPT re-read VERIFIED 2026-08-02).
+   raw `8ccb8d24…`; live GPT re-read VERIFIED 2026-08-02).
 3. **Get the explicit user go** (target/scope/image SHA/recovery boundary), then
    flash (P6), then run P7/P8 acceptance in order.
 4. Kernel side: on release, run K8 with an independent experiment ID; update

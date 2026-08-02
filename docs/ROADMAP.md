@@ -22,10 +22,10 @@ v0.1.0          Stable          (multi-round wake/suspend, network reconnect, ap
 2. ✅ P1 rescue coordinators + support bundle (source-tested; hardware pending)
 3. ✅ P2 Wi-Fi firmware fix (source-tested; hardware pending)
 4. ✅ P3 deterministic build + CI gates (artifact-only CI PASS)
-5. ✅ **P4 offline audit** – tablet-kde run `30736975180` audited (Wi-Fi fix d1d3c1d); e2fsck/FAT/boot/accounts/services/firmware PASS
-6. 🟡 P5 flash prep – Firehose bundle + 10-point readback plan done (2026-08-02); re-read live GPT + user confirmation pending
-7. ✅ P6 controlled flash + readback (user Windows QFIL, run `30736975180`, 2026-08-02)
-8. 🟡 P7 first-boot rescue & network acceptance (Wi-Fi VERIFIED; BT NAP bnep0 up after dnsmasq fix; ACM/NCM still needs physical Type-C/peer steps)
+5. ✅ **P4 offline audit** – tablet-kde run `30745309676` audited (head 3fee946: dnsmasq + audio use-acp + USB NUL; Wi-Fi board-2.bin retained); e2fsck/FAT/boot/accounts/services/firmware/dnsmasq PASS
+6. 🟡 P5 flash prep – Firehose bundle + 10-point readback plan done (2026-08-02, run `30745309676` 19/19, readback 10/10); re-read live GPT + user confirmation pending
+7. ✅ P6 controlled flash + readback (user Windows QFIL, run `30736975180`, 2026-08-02); newer run `30745309676` bundle ready but not yet flashed
+8. 🟡 P7 first-boot rescue & network acceptance (Wi-Fi VERIFIED; BT NAP bnep0 up; dnsmasq baked into run `30745309676`; ACM/NCM still needs physical Type-C/peer steps)
 9. 🟡 P8 desktop & daily acceptance (display/touch/audio/backlight/battery VERIFIED; headset sound + screen-off UNTESTED)
 10. ⛔ P9 pre-release & stable observation
 

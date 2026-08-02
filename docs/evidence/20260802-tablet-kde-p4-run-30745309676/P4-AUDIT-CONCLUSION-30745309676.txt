@@ -1,0 +1,36 @@
+P4 offline audit conclusion — tablet-kde run 30745309676
+Date: 2026-08-02 (Asia/Shanghai)
+Auditor: local debugfs e2fsck (no root, read-only)
+Artifact: ci-rootfs/TB321FU-archlinuxarm-plasma-aarch64-rootfs.img.7z
+Raw SHA-256: 8ccb8d241d608e393343d8b53a24a4621130c5ff8ed3a6604f0f14ac332c22ea
+
+## Result: PASS
+
+audit-tablet-kde-rootfs.sh (head 3fee946, includes dnsmasq assertion):
+- fuhao account: fuhao:x:1000:1000 (bash), password hash present (redacted)
+- root: locked
+- KDE user config 6/6: kwinoutputconfig.json, kwinrc, plasmakeyboardrc,
+  environment.d/90-tablet-kde.conf, mimeapps.list, fcitx5/profile
+- kwinoutputconfig: connector DSI-1, transform Rotated270, 1600x2560@120000, scale 2.3
+- kwinrc: VirtualKeyboardEnabled=true, InputMethod=org.kde.plasma.keyboard
+- firmware: standard /usr/lib/firmware/ath12k/WCN7850/hw2.0/board-2.bin
+  sha256 = c896bc7782e252aa915849d5c9c47d109ecfe9f0fc5650fe771f7ba8f8eb77fb (202148B board-specific) -> STD_PATH_WCN7850_BOARD=OK
+- native package dirs: tb321fu-wifi-firmware, tb321fu-bluetooth-firmware,
+  tb321fu-alsa-ucm, tb321fu-libssc, tb321fu-sensor-proxy
+- key binaries: ssccli, iio-sensor-proxy, iio-sensor-proxy.service
+- rescue dnsmasq: /usr/bin/dnsmasq OK (new assertion, NetworkManager shared)
+- services enabled 10/10: sddm, NetworkManager, sshd, bluetooth, nftables,
+  tb321fu-grow-rootfs, tb321fu-usb-rescue, tb321fu-bt-nap, systemd-timesyncd,
+  serial-getty@ttyGS0
+- default target: graphical.target
+- user units enabled 4/4: pipewire.socket, pipewire-pulse.socket,
+  wireplumber.service, fcitx5-tablet.service
+
+e2fsck -fn: PASS (232610/1310720 files, 1991261/5242880 blocks, 0.1% non-contiguous, 0 errors)
+fsck.fat grub: PASS (269 files, label Y700BOOT)
+boot.img: SHA-256 45f923bc3980a8ba6e12ce606c30b4b08c2de48047626648a3d1861c95d2a58f (unchanged verified boot template)
+
+## Fixes included vs run 30736975180
+1. dnsmasq in base package set (BT NAP / NetworkManager shared DHCP+DNS)
+2. WirePlumber api.alsa.use-acp=false + use-ucm=true (UCM speaker sink, audio)
+3. tb321fu-usb-rescue write_if_changed NUL-safe reads (journal noise)

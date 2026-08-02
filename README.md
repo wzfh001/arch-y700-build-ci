@@ -8,13 +8,15 @@ This repository is intentionally separate from the Ubuntu/Kubuntu build. It reus
 >
 > | Kernel pipeline (K0–K9) | Main Arch pipeline (P0–P9) | Device |
 > |---|---|---|
-> | **K0–K7 PASS · K9 PASS · K8 BLOCKED** | **P0–P4 PASS · P5 READY** | Author Arch Linux ARM (VERIFIED 2026-08-02) |
+> | **K0–K7 PASS · K9 PASS · K8 BLOCKED** | **P0–P6 PASS · P7/P8 VERIFIED-PARTIAL · P9 BLOCKED** | KDE Arch Linux ARM (VERIFIED 2026-08-02, IP 192.168.0.156) |
 >
 > - Kernel is reproducibly buildable on GitHub Actions (`REPRO-CLOSE`); a
 >   candidate GRUB boot image is hash-bound (`dade9ac5b2…`).
-> - The Arch rootfs candidate passed **P4 offline audit** (run 30730513005, KDE Plasma);
->   **P5 bundle is complete and the live GPT re-read is VERIFIED** — nothing
->   has been flashed yet, and P6 requires explicit user go.
+> - The device runs the **tablet-kde bundle run 30736975180** (Wi-Fi, KDE
+>   Wayland, display/touch/audio VERIFIED). The refreshed bundle
+>   **run 30745309676** (dnsmasq + audio use-acp + USB NUL fixes) passed
+>   **P4 offline audit** and its **P5 Firehose bundle is READY** (19/19,
+>   readback 10/10) — flashing it is optional and requires explicit user go.
 > - Full status: [`docs/STATUS.md`](docs/STATUS.md) · roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md) · docs index: [`docs/README.md`](docs/README.md)
 
 ## Current Scope
