@@ -1983,20 +1983,17 @@ apply_tablet_kde_profile() {
 
   chmod 0755 \
     "$root/usr/local/bin/tb321fu-support-bundle" \
-    "$root/usr/local/libexec/tb321fu-bt-nap" \
     "$root/usr/local/libexec/tb321fu-grow-rootfs" \
     "$root/usr/local/libexec/tb321fu-pre-upgrade-snapshot" \
     "$root/usr/local/libexec/tb321fu-redact-support-bundle" \
     "$root/usr/local/libexec/tb321fu-usb-rescue" \
     "$root/usr/lib/systemd/system-sleep/tb321fu-suspend-log"
   chmod 0644 \
-    "$root/etc/systemd/system/tb321fu-bt-nap.service" \
     "$root/etc/systemd/system/tb321fu-grow-rootfs.service" \
     "$root/etc/systemd/system/tb321fu-usb-rescue.service" \
     "$root/etc/modules-load.d/60-tb321fu-rescue.conf"
   chmod 0600 \
-    "$root/etc/NetworkManager/system-connections/tb321fu-rescue-usb.nmconnection" \
-    "$root/etc/NetworkManager/system-connections/tb321fu-rescue-bt.nmconnection"
+    "$root/etc/NetworkManager/system-connections/tb321fu-rescue-usb.nmconnection"
 
   rm -f "$root"/etc/ssh/ssh_host_*
   : > "$root/etc/machine-id"
@@ -2681,7 +2678,6 @@ verify_tablet_kde_profile() {
   local -a custom_executables=(
     /usr/local/bin/tb321fu-support-bundle
     /usr/local/libexec/tb321fu-usb-rescue
-    /usr/local/libexec/tb321fu-bt-nap
     /usr/local/libexec/tb321fu-grow-rootfs
   )
 
@@ -2717,13 +2713,11 @@ verify_tablet_kde_profile() {
   local connection_dir="$root/etc/NetworkManager/system-connections"
   local unexpected_connection
   unexpected_connection=$(find "$connection_dir" -maxdepth 1 -type f \
-    ! -name tb321fu-rescue-usb.nmconnection \
-    ! -name tb321fu-rescue-bt.nmconnection -print -quit 2>/dev/null)
+    ! -name tb321fu-rescue-usb.nmconnection -print -quit 2>/dev/null)
   [ -z "$unexpected_connection" ] || \
     ci_die "unexpected NetworkManager profile leaked into tablet-kde image: $unexpected_connection"
   for path in \
-    "$connection_dir/tb321fu-rescue-usb.nmconnection" \
-    "$connection_dir/tb321fu-rescue-bt.nmconnection"; do
+    "$connection_dir/tb321fu-rescue-usb.nmconnection"; do
     [ -f "$path" ] || ci_die "required rescue connection is missing: $path"
     [ "$(stat -c '%a' "$path")" = 600 ] || \
       ci_die "rescue connection mode is not 0600: $path"
@@ -2731,12 +2725,6 @@ verify_tablet_kde_profile() {
   grep -Fxq 'address1=10.77.0.1/24' \
     "$connection_dir/tb321fu-rescue-usb.nmconnection" || \
     ci_die "USB rescue address is missing"
-  grep -Fxq 'address1=10.78.0.1/24' \
-    "$connection_dir/tb321fu-rescue-bt.nmconnection" || \
-    ci_die "Bluetooth rescue address is missing"
-  grep -Fxq 'type=nap' "$connection_dir/tb321fu-rescue-bt.nmconnection" || \
-    ci_die "Bluetooth rescue profile is not a NAP"
-
   for target in sleep.target suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target; do
     path="$root/etc/systemd/system/$target"
     if [ -L "$path" ] && [ "$(readlink "$path")" = /dev/null ]; then
@@ -2961,7 +2949,7 @@ required_user_units=(pipewire.socket pipewire-pulse.socket wireplumber.service)
 if [ "$DESKTOP_PROFILE" = tablet-kde ]; then
   required_system_units+=(
     nftables.service tb321fu-grow-rootfs.service tb321fu-usb-rescue.service
-    tb321fu-bt-nap.service serial-getty@ttyGS0.service systemd-timesyncd.service
+    serial-getty@ttyGS0.service systemd-timesyncd.service
   )
   required_user_units+=(fcitx5-tablet.service)
   systemctl --root="$rootfs_dir" set-default graphical.target

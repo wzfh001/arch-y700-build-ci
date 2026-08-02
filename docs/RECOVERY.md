@@ -23,7 +23,7 @@ Only the Kubuntu baseline is currently verified on hardware:
 
 1. **USB ACM** — serial console over USB gadget
 2. **USB NCM** — network over USB gadget
-3. **Bluetooth NAP** — network over Bluetooth
+3. ~~Bluetooth NAP~~ — removed 2026-08-02 (Wi-Fi primary); overlay + kernel BNEP dropped
 
 Historical Arch run (`29709555909`) showed `/sys/class/udc` empty and `port0`
 host; the coordinators were added afterward and remain unflashed/UNTESTED.

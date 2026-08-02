@@ -85,7 +85,6 @@ collect bluetooth-devices bluetoothctl devices
 collect system-failed systemctl --failed --no-pager
 collect system-analyze systemd-analyze
 collect service-usb systemctl status tb321fu-usb-rescue.service --no-pager
-collect service-bt-nap systemctl status tb321fu-bt-nap.service --no-pager
 collect service-network systemctl status NetworkManager.service bluetooth.service sshd.service nftables.service sddm.service --no-pager
 collect user-failed systemctl --user --failed --no-pager
 collect kde-outputs kscreen-doctor --outputs
@@ -106,7 +105,7 @@ collect_shell usb-typec \
 collect_privileged_shell usb-configfs \
   'find /sys/kernel/config/usb_gadget -maxdepth 6 -printf "%M %u:%g %p -> %l\n" 2>/dev/null | sort'
 collect_shell network-rescue \
-  'ip -details link show usb0 2>&1; ip -details link show bnep0 2>&1; networkctl status usb0 bnep0 2>&1 || true'
+  'ip -details link show usb0 2>&1; networkctl status usb0 2>&1 || true'
 collect_shell power-supplies \
   'find /sys/class/power_supply -maxdepth 2 -type f -readable -print 2>/dev/null | sort | while read -r path; do printf "%s=" "$path"; head -c 4096 "$path"; printf "\n"; done'
 collect_shell backlights \
@@ -117,7 +116,7 @@ collect_privileged_shell journal-current \
 collect_privileged_shell journal-previous \
   'journalctl -b -1 --no-pager -o short-precise'
 collect_privileged_shell journal-hardware \
-  'journalctl -b --no-pager -o short-precise | grep -Ei "ath12k|firmware|wlp|a600000|dwc3|ucsi|type.?c|gadget|ttyGS|usb0|bnep|bluetooth|sddm|plasma|kwin|drm|dsi|pipewire|wireplumber|battery|charger|aw869"'
+  'journalctl -b --no-pager -o short-precise | grep -Ei "ath12k|firmware|wlp|a600000|dwc3|ucsi|type.?c|gadget|ttyGS|usb0|bluetooth|sddm|plasma|kwin|drm|dsi|pipewire|wireplumber|battery|charger|aw869"'
 
 "$redactor" --tree "$work"
 (

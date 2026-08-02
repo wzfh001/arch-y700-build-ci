@@ -12,7 +12,7 @@ Y700 2025 (TB321FU / SM8650). Start here if you are new.
  How the two GitHub Actions workflows build the kernel and the rootfs/GRUB images, plus inputs and pins. |
 | [`FLASHING.md`](FLASHING.md) | Flash discipline and safety red lines. Read before touching a device. |
 | [`RECOVERY.md`](RECOVERY.md) | Rescue channels and rollback paths (Kubuntu baseline, Fastboot, Firehose). |
-| [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | Known root causes: Wi-Fi, USB/UDC, Bluetooth NAP, and how to verify each. |
+| [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | Known root causes: Wi-Fi, USB/UDC, and how to verify each. |
 | [`UPSTREAM.md`](UPSTREAM.md) | Repository topology: this fork, GUF296 upstream, kernel source, and artifact sources. |
 | [`AUDIT-LOG.md`](AUDIT-LOG.md) | Append-only record of offline audits and device experiments (EXP-/AUDIT-/CI- IDs). |
 

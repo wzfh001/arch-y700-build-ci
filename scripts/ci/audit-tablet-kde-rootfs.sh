@@ -135,7 +135,7 @@ service_enabled() {
   esac
   exists "$path"
 }
-for s in sddm.service NetworkManager.service sshd.service bluetooth.service nftables.service tb321fu-grow-rootfs.service tb321fu-usb-rescue.service tb321fu-bt-nap.service systemd-timesyncd.service serial-getty@ttyGS0.service; do
+for s in sddm.service NetworkManager.service sshd.service bluetooth.service nftables.service tb321fu-grow-rootfs.service tb321fu-usb-rescue.service systemd-timesyncd.service serial-getty@ttyGS0.service; do
   if service_enabled "$s"; then
     echo "OK  $s"
   else

@@ -17,9 +17,9 @@ Updated: 2026-08-02
   `7.1.1-g5df8e852ea72`, flashed by user via Windows QFIL 2026-08-02,
   IP `192.168.0.156`): **Wi-Fi, KDE Wayland, display 1600x2560@120 Rotated270,
   touch, backlight, battery, and audio are VERIFIED on hardware** (evidence
-  `live/EXP-20260802-001/`). **BT NAP now comes up on the device**
-  (bnep0 `10.78.0.1/24`, NM connection activated) after adding `dnsmasq`
-  (NetworkManager `shared` needs it); USB ACM/NCM still needs a physical
+  `live/EXP-20260802-001/`). **BT NAP removed** (2026-08-02, user decision — Wi-Fi is the primary network;
+  overlay coordinator/service/nmconnection + kernel BNEP dropped via fragment
+  `50-tablet-bt-nap-off`); USB ACM/NCM still needs a physical
   Type-C device-mode partner. Screen-off/resume and headset sound remain
   UNTESTED (user-physical steps). The verified Kubuntu rollback baseline
   remains historical (2026-07-21).
@@ -35,7 +35,7 @@ Updated: 2026-08-02
 | P4 Candidate offline audit | **PASS** | tablet-kde run `30745309676` artifact audited (head 3fee946: dnsmasq base pkg + audio use-acp=false + USB NUL; standard-path WCN7850 board-2.bin c896bc77… retained) (`P4-AUDIT-30745309676` evidence; e2fsck 0 errors/232610 files, KDE configs 6/6 incl. Rotated270, dnsmasq OK, services 10/10 + user units 4/4) |
 | P5 Recovery & flash prep | **READY** | tablet-kde run `30745309676` bundle complete (19 members, `BUNDLE-SHA256SUMS` 19/19 PASS, readback 10/10 MATCH from KDE raw `8ccb8d24…`; reuse verified GPT: userdata LBA 3613096..123365370, program XML start=3613096/count=5242880/LUN0/4096/sparse=false); live GPT re-read VERIFIED matches baseline (2026-08-02, device runs author Arch); **pending user go** |
 | P6 Controlled flash & readback | **PASS** (2026-08-02) | User flashed KDE bundle run `30736975180` via Windows QFIL; Wi-Fi recovered (board-2.bin c896bc77…); newer run `30745309676` bundle ready but not yet flashed |
-| P7 First-boot rescue & network | **VERIFIED-PARTIAL** | Wi-Fi scan/connect/DHCP VERIFIED @192.168.0.156; support bundle collected; **BT NAP bnep0 up (10.78.0.1/24); dnsmasq now baked into CI image (run 30745309676)**; USB ACM/NCM still needs physical Type-C partner |
+| P7 First-boot rescue & network | **VERIFIED-PARTIAL** | Wi-Fi scan/connect/DHCP VERIFIED @192.168.0.156; support bundle collected; **BT NAP removed (2026-08-02 user decision)**; dnsmasq retained for USB rescue `shared`; USB ACM/NCM still needs physical Type-C partner |
 | P8 Desktop & daily hardware acceptance | **VERIFIED-PARTIAL** | Display/touch/audio/backlight/battery VERIFIED; headset sound + screen-off/resume UNTESTED (user physical); camera OUT-OF-SCOPE |
 | P9 Pre-release & stable observation | BLOCKED | Requires P8; `validation/<release>/hardware.yaml` |
 
@@ -64,7 +64,7 @@ Updated: 2026-08-02
 | Wi-Fi on device (Kubuntu) | VERIFIED | `wlp1s0`, ath12k, 202148-byte `board-2.bin` baseline |
 | Wi-Fi on Arch (KDE bundle) | **VERIFIED** | wlp1s0 UP 192.168.0.156/24, `803_5G` connected; board-2.bin `c896bc77…` 202148B (2026-08-02) |
 | USB ACM/NCM on Arch (KDE bundle) | PARTIAL | `tb321fu-usb-rescue` active but `/sys/class/udc` empty, port0 host; needs physical Type-C device-mode switch (2026-08-02) |
-| Bluetooth NAP on Arch (KDE bundle) | **VERIFIED (coordinator; client drill pending)** | bnep0 up `10.78.0.1/24`, NM `tb321fu-rescue-bt` activated after installing `dnsmasq` (NetworkManager `shared`); BT keyboard paired (13:05:AA:C0:51:84) (2026-08-02) |
+| Bluetooth NAP on Arch (KDE bundle) | **REMOVED (2026-08-02, user decision)** | BT NAP coordinator/service/connection removed from overlay; kernel BNEP disabled via `50-tablet-bt-nap-off`; BT keyboard (HIDP) stays available (13:05:AA:C0:51:84) |
 | Display 120 Hz on Arch (KDE bundle) | **VERIFIED** | DSI-1 1600x2560@120.00, Rotation 8 (270°), Scale 2.3 (2026-08-02) |
 | Audio / haptics / battery | **VERIFIED** | WirePlumber use-acp=false fix (UCM Speaker sink, pw-play rc=0); mic pw-record 593KB; ktz8866 backlight round-trip; battery 88→90% charging; haptics devices present (2026-08-02) |
 | Camera / suspend | OUT-OF-SCOPE for v1 | must be labeled UNTESTED/BROKEN, not claimed done |
@@ -86,7 +86,7 @@ Updated: 2026-08-02
 1. **KDE bundle daily-use closure (P7/P8 remnants)** – P6 flash done by user
    (Windows QFIL, run `30736975180`), P7/P8 mostly VERIFIED (2026-08-02).
    Remaining: USB ACM/NCM physical rescue-link validation (Type-C partner),
-   BT NAP client-side drill, screen-off/wake Wi-Fi reconnect, headset sound,
+   screen-off/wake Wi-Fi reconnect, headset sound,
    and (optionally) camera/suspend labeling. These are user-physical steps;
    no code flash is pending.
 2. **K8 device validation** – the self-built kernel unit (run `30704468188`) has

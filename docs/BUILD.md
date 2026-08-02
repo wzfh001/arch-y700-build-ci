@@ -95,6 +95,7 @@ unit):
 | `20-tablet-memory` | `ZRAM=m`, `ZSWAP=y`, `PSI=y` | 16 GiB RAM swap backstop; earlyoom/systemd-oomd pressure signals | ALARM linux-aarch64 |
 | `30-tablet-network` | `WIREGUARD=m`, `NF_TABLES=m`, `CFS_BANDWIDTH=y` | VPN/nftables support; clears nftables service failed state | ALARM linux-aarch64 |
 | `40-arch-compat` | `SECURITY_LANDLOCK=y`, `BINFMT_MISC=y` | pacman filesystem sandbox (Landlock) + binfmt_misc; fixes `DisableSandboxFilesystem` workaround | ALARM linux-aarch64 |
+| `50-tablet-bt-nap-off` | `BT_BNEP`/`_MC_FILTER`/`_PROTO_FILTER` off | Drop Bluetooth NAP (BNEP); HIDP keyboard/audio kept | vendor baseline minus BNEP |
 
 Fragments only set explicit symbols; everything else stays byte-identical to
 the baseline. The merged `.config` is uploaded as `kernel.config` and recorded

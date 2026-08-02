@@ -23,16 +23,17 @@ Status words: `VERIFIED` / `PARTIAL` / `BROKEN` / `UNTESTED` / `BLOCKED`.
    A non-blocking coordinator now handles role/UDC/ConfigFS/ACM/NCM with
    hotplug, retry, timeout and cleanup. **Hardware status: UNTESTED.**
 
-## Bluetooth NAP — config exists, activation chain was missing
+## Bluetooth NAP — removed (2026-08-02, user decision)
 
-- A `tb321fu-bt-nap` coordinator (Type=simple, retry/timeout/cleanup) is
-   implemented and source-tested. **Hardware status: UNTESTED.**
+- Wi-Fi is the primary network; BT NAP coordinator/service/NM connection were
+  dropped from the overlay and kernel BNEP disabled (`50-tablet-bt-nap-off`).
+  Bluetooth itself stays enabled (keyboard/audio via HIDP/RFCOMM).
 
 ## General verification sequence (post-flash)
 
 1. Boot chain and local TTY
 2. Automatic support bundle
-3. USB ACM → USB NCM → Bluetooth NAP (at least two channels PASS)
+3. USB ACM → USB NCM (at least one rescue channel PASS)
 4. Wi-Fi: PCI enum, module, firmware request, `wlp1s0`, scan, connect, DHCP,
    reconnect, screen-off recovery
 5. `/dev/dri/renderD128`, `vulkaninfo`
