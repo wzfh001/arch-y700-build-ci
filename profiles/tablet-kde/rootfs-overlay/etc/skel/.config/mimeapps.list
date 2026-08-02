@@ -1,16 +1,17 @@
 [Default Applications]
-text/html=zen-browser.desktop
-x-scheme-handler/http=zen-browser.desktop
-x-scheme-handler/https=zen-browser.desktop
+text/html=firefox.desktop
+x-scheme-handler/http=firefox.desktop
+x-scheme-handler/https=firefox.desktop
 inode/directory=org.kde.dolphin.desktop
 application/pdf=org.kde.okular.desktop
-video/mp4=mpv.desktop
-video/x-matroska=mpv.desktop
+video/mp4=org.kde.elisa.desktop
+video/x-matroska=org.kde.elisa.desktop
 audio/mpeg=org.kde.elisa.desktop
 
 [Added Associations]
-text/html=zen-browser.desktop;firefox.desktop;
-x-scheme-handler/http=zen-browser.desktop;firefox.desktop;
-x-scheme-handler/https=zen-browser.desktop;firefox.desktop;
-video/mp4=mpv.desktop;vlc.desktop;
-video/x-matroska=mpv.desktop;vlc.desktop;
+text/html=firefox.desktop
+x-scheme-handler/http=firefox.desktop
+x-scheme-handler/https=firefox.desktop
+video/mp4=org.kde.elisa.desktop
+video/x-matroska=org.kde.elisa.desktop
+audio/mpeg=org.kde.elisa.desktop

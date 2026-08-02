@@ -2732,23 +2732,13 @@ copy_skel_to_user() {
 
   [ -d "$user_home" ] || return 0
   group_name=$(arch_chroot id -gn "$DEFAULT_USER_NAME")
-  install -d -m 0755 "$user_home/.config"
 
-  local skel_config
-  for skel_config in kwinrc plasmakeyboardrc kwinoutputconfig.json; do
-    cp -a "$root/etc/skel/.config/$skel_config" "$user_home/.config/$skel_config"
-  done
-
-  if ci_bool "$INSTALL_FCITX5_CHINESE"; then
-    install -d -m 0755 \
-      "$user_home/.config/environment.d" \
-      "$user_home/.config/autostart" \
-      "$user_home/.config/fcitx5" \
-      "$user_home/.config/plasma-workspace/env"
-    cp -a "$root/etc/skel/.config/environment.d/90-fcitx5.conf" "$user_home/.config/environment.d/90-fcitx5.conf"
-    cp -a "$root/etc/skel/.config/autostart/org.fcitx.Fcitx5.desktop" "$user_home/.config/autostart/org.fcitx.Fcitx5.desktop"
-    cp -a "$root/etc/skel/.config/fcitx5/profile" "$user_home/.config/fcitx5/profile"
-    cp -a "$root/etc/skel/.config/plasma-workspace/env/fcitx5.sh" "$user_home/.config/plasma-workspace/env/fcitx5.sh"
+  # Fully copy the skeleton config tree (kwin, fcitx5, environment.d, mimeapps, …)
+  # so tablet-kde overlay files reach the user home instead of only surviving in
+  # /etc/skel. Non-destructive: only adds/overwrites skeleton-managed files.
+  if [ -d "$root/etc/skel/.config" ]; then
+    install -d -m 0755 "$user_home/.config"
+    cp -a "$root/etc/skel/.config/." "$user_home/.config/"
   fi
 
   chroot "$root" chown -R "$DEFAULT_USER_NAME:$group_name" "/home/$DEFAULT_USER_NAME/.config"
@@ -2938,10 +2928,10 @@ write_plasma_tablet_config "$rootfs_dir"
 if ci_bool "$INSTALL_FCITX5_CHINESE"; then
   write_fcitx5_config "$rootfs_dir"
 fi
-copy_skel_to_user "$rootfs_dir"
 if [ "$DESKTOP_PROFILE" = tablet-kde ]; then
   apply_tablet_kde_profile "$rootfs_dir"
 fi
+copy_skel_to_user "$rootfs_dir"
 
 ci_log "enabling system services"
 required_system_units=(NetworkManager.service sshd.service sddm.service bluetooth.service)
