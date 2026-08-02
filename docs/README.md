@@ -24,7 +24,9 @@ Status words used everywhere: `VERIFIED`, `PARTIAL`, `BROKEN`, `UNTESTED`,
 |---|---|---|
 | 2026-08-02 | Live GPT re-read (VERIFIED) | [`docs/evidence/20260802-gpt-reacquire/`](evidence/20260802-gpt-reacquire/) |
 | 2026-08-02 | P7 preset offline check (VERIFIED) | [`docs/evidence/20260802-p7-preset/`](evidence/20260802-p7-preset/) |
-| 2026-08-02 | P6 execution-chain final check + bundle fix (VERIFIED) | [`docs/evidence/20260802-p6-final/`](evidence/20260802-p6-final/) |
+| 2026-08-02 | P6 execution-chain final check + bundle fix (VERIFIED) |
+| 2026-08-02 | P6→P7→P8 post-go command pack (READY) | [`docs/evidence/20260802-command-pack/`](evidence/20260802-command-pack/) |
+ [`docs/evidence/20260802-p6-final/`](evidence/20260802-p6-final/) |
 
 > The canonical long-form handoff document lives outside this repository
 > (`TB321FU-HANDOFF-CURRENT.md` in the workspace). This `docs/` tree is the
