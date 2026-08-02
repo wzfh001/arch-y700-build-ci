@@ -56,11 +56,22 @@ render docs/templates/STATUS.template.md docs/STATUS.md
 render docs/templates/ROADMAP.template.md docs/ROADMAP.md
 
 if [[ $check_mode -eq 1 ]]; then
-  if ! git diff --quiet -- docs/STATUS.md docs/ROADMAP.md; then
-    echo "docs/STATUS.md or docs/ROADMAP.md are out of date; run scripts/ci/update-project-status.sh" >&2
+  stale=0
+  for doc in docs/STATUS.md docs/ROADMAP.md; do
+    # The "Updated ... HEAD" line is inherently dynamic (date + current HEAD);
+    # the gate verifies the committed *facts* (statuses, hashes) are fresh.
+    if ! diff -q <(sed '/^Updated: /d' "$doc") \
+                 <(git cat-file -p "HEAD:$doc" 2>/dev/null | sed '/^Updated: /d') \
+                 >/dev/null 2>&1; then
+      echo "$doc is out of date; run scripts/ci/update-project-status.sh" >&2
+      stale=1
+    fi
+  done
+  if [[ $stale -eq 0 ]]; then
+    echo "project status docs are up to date"
+  else
     exit 1
   fi
-  echo "project status docs are up to date"
 else
   echo "regenerated docs/STATUS.md and docs/ROADMAP.md (HEAD=$head_short)"
 fi
