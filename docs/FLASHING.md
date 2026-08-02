@@ -2,7 +2,8 @@
 
 > **Nothing in this repository may be flashed to a device until P4 offline audit
 > PASS, P5 flash prep is complete, and the user explicitly confirms
-> target/scope/image SHA/recovery boundary.**
+> target/scope/image SHA/recovery boundary. (P4 PASS + P5 READY as of
+> 2026-08-02; live GPT re-read VERIFIED. Awaiting user go for P6.)**
 
 ## Red lines (never)
 
@@ -35,4 +36,4 @@
 - Fastboot may query device state and write the verified 96 MiB `boot.img` and
   256 MiB `super`.
 - Fastboot must NOT write the 20 GiB rootfs.
-- Kubuntu 26.04 remains the verified rollback baseline; keep it intact.
+- Kubuntu 26.04 remains the verified rollback baseline (historical 2026-07-21); the device currently runs author Arch Linux ARM (2026-08-02).

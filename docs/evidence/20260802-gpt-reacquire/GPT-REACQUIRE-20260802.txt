@@ -1,0 +1,39 @@
+=== P5 准备2: 实机 GPT 只读重读核对 (2026-08-02) ===
+status: VERIFIED (只读, 与 bundle 数值一致)
+method: SSH publickey 登录 GUF296@192.168.0.220 (Arch Linux ARM, 7.1.1-g5df8e852ea72)
+        sysfs 只读 (GUF296 不在 disk 组, fdisk/parted 权限拒绝, 无需 sudo)
+
+[设备身份]
+hostname: GUF296
+SSH host key: SHA256:GlYCjnc67At/jFxYxzu5sYbJh6BQM7IQtv/wiNE3PWM
+             (与历史 192.168.0.137 / .227 一致 => 同一台设备, IP 动态)
+UFS model: MT512GAYAX4U40 (sysfs /sys/class/block/sda/device/model)
+sda logical_block_size=4096 physical_block_size=4096
+
+[LUN0 GPT 关键分区 (sysfs start/size, 512B 扇区)]
+super   = sda10 start=724032 size=27262976  => LBA 90504..3498375 (13G)   baseline 一致
+metadata= sda15 start=28642624 size=262144  => LBA 3498408..3514791 (64M) baseline 一致
+userdata= sda16 start=28904768 size=958018200
+         => LBA 3613096..123365370 (456.819G) baseline 一致
+
+[boot_a (LUN4)]
+boot_a = sde11 start=896048 size=196608 => LBA 112006..136581 (96M) baseline 一致
+(未重刷; 候选 boot raw 45f923bc... 与已验证 boot_a 相同)
+
+[与 run 29966711103 bundle 核对]
+bundle userdata_write: LUN0 sector=4096 start=3613096 count=5242880 end=8855975 sparse=false
+实机 GPT userdata:     start=3613096 (VERIFIED MATCH)
+结论: 写入范围是 userdata 分区内前 20GiB (count=5242880), 分区本身保持 456.8G;
+      GPT 边界与 bundle 数值完全一致 => 可进入 P5 放行门禁。
+
+[当前实机运行时态 (非 tablet-niri 候选)]
+OS: Arch Linux ARM (作者原版, pacman 安装日期 2026-07-31)
+rootfs: /dev/sda16 ext4 label=ArchLinux 456.8G (490505318400 bytes), 已用 19.5G
+cmdline: BOOT_IMAGE=/Image root=PARTLABEL=userdata rw rootwait drm_client_lib.active=none
+fstab: LABEL=ArchLinux / ext4 rw,relatime 0 1
+super 当前内容: sda10 FAT32 LABEL=Y700BOOT (原版 GRUB)
+说明: 刷写会覆盖 userdata 前 20G 为 tablet-niri 候选 rootfs (首启扩容回 456.8G);
+      当前作者原版 Arch 现场将被覆盖, 需用户明确放行。
+
+[证据文件]
+原始输出: /home/fuhao/002/y700-linux/live/gpt-reacquire-20260802/raw-ssh-20260802.txt

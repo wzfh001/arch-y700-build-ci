@@ -8,12 +8,13 @@ This repository is intentionally separate from the Ubuntu/Kubuntu build. It reus
 >
 > | Kernel pipeline (K0–K9) | Main Arch pipeline (P0–P9) | Device |
 > |---|---|---|
-> | **K0–K7 PASS · K9 PASS · K8 BLOCKED** | **P0–P3 PASS · P4 BLOCKED** | Kubuntu 26.04 rollback baseline (VERIFIED) |
+> | **K0–K7 PASS · K9 PASS · K8 BLOCKED** | **P0–P4 PASS · P5 READY** | Author Arch Linux ARM (VERIFIED 2026-08-02) |
 >
 > - Kernel is reproducibly buildable on GitHub Actions (`REPRO-CLOSE`); a
 >   candidate GRUB boot image is hash-bound (`dade9ac5b2…`).
-> - The Arch rootfs candidate has **not passed P4 offline audit** and has
->   **never been flashed**. Nothing here is a flashable release yet.
+> - The Arch rootfs candidate passed **P4 offline audit** (run 29966711103);
+>   **P5 bundle is complete and the live GPT re-read is VERIFIED** — nothing
+>   has been flashed yet, and P6 requires explicit user go.
 > - Full status: [`docs/STATUS.md`](docs/STATUS.md) · roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md) · docs index: [`docs/README.md`](docs/README.md)
 
 ## Current Scope

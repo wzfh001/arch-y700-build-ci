@@ -1,0 +1,43 @@
+== identity ==
+GUF296
+GUF296
+== kernel ==
+Linux GUF296 7.1.1-g5df8e852ea72 #11 SMP PREEMPT Thu Jun 25 03:36:59 CST 2026 aarch64 GNU/Linux
+== sda sysfs ==
+986923008
+4096
+4096
+sda1 start=48 size=6144
+sda10 start=724032 size=27262976
+sda11 start=27987008 size=128
+sda12 start=27987136 size=128
+sda13 start=27987264 size=131072
+sda14 start=28118336 size=524288
+sda15 start=28642624 size=262144
+sda16 start=28904768 size=958018200
+sda2 start=6192 size=1024
+sda3 start=7216 size=614400
+sda4 start=621616 size=32768
+sda5 start=654384 size=16
+sda6 start=654400 size=65536
+sda7 start=719936 size=2048
+sda8 start=721984 size=1024
+sda9 start=723008 size=1024
+== boot_a ==
+/sys/class/block/sde11/start: 896048
+/sys/class/block/sde11/size: 196608
+== model ==
+MT512GAYAX4U40  
+== super blkid ==
+/dev/sda10: LABEL_FATBOOT="Y700BOOT" LABEL="Y700BOOT" UUID="7579-2F99" BLOCK_SIZE="512" TYPE="vfat" PARTLABEL="super" PARTUUID="d0b6fc0d-7472-71ac-490d-ddc01003111c"
+== rootfs ==
+/dev/sda16 ext4 ArchLinux 19.5G
+/dev/sda16 0
+== pacman date ==
+2026-07-31 23:25:04.560143218 +0800
+== network ==
+wlp1s0           UP             192.168.0.220/24 fe80::8b54:15ec:3812:119/64 
+== services ==
+enabled
+enabled
+disabled
