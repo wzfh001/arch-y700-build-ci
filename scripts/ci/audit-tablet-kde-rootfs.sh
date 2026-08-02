@@ -131,4 +131,20 @@ done
 dt=$(debugfs -R 'stat /etc/systemd/system/default.target' "$raw" 2>/dev/null | sed -n 's/.*Fast link dest: "\(.*\)"/\1/p' || true)
 echo "default target: ${dt:-MISSING}"
 
+echo "== user units (enabled) =="
+user_unit_enabled() {
+  local name="$1" path
+  case "$name" in
+    pipewire.socket)            path=/etc/systemd/user/sockets.target.wants/pipewire.socket ;;
+    pipewire-pulse.socket)      path=/etc/systemd/user/sockets.target.wants/pipewire-pulse.socket ;;
+    wireplumber.service)        path=/etc/systemd/user/pipewire.service.wants/wireplumber.service ;;
+    fcitx5-tablet.service)      path=/etc/systemd/user/plasma-workspace.target.wants/fcitx5-tablet.service ;;
+    *)                          path=/etc/systemd/user/$name ;;
+  esac
+  exists "$path"
+}
+for u in pipewire.socket pipewire-pulse.socket wireplumber.service fcitx5-tablet.service; do
+  if user_unit_enabled "$u"; then echo "OK  $u"; else echo "MISS $u"; fi
+done
+
 echo "== AUTH COMPLETE =="
