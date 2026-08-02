@@ -17,6 +17,15 @@ Y700 2025 (TB321FU / SM8650). Start here if you are new.
 Status words used everywhere: `VERIFIED`, `PARTIAL`, `BROKEN`, `UNTESTED`,
 `BLOCKED`, `OUT-OF-SCOPE`, `UNKNOWN`, `PASS`, `FAIL`.
 
+
+## Offline evidence (append-only)
+
+| Date | Topic | Location |
+|---|---|---|
+| 2026-08-02 | Live GPT re-read (VERIFIED) | [`docs/evidence/20260802-gpt-reacquire/`](evidence/20260802-gpt-reacquire/) |
+| 2026-08-02 | P7 preset offline check (VERIFIED) | [`docs/evidence/20260802-p7-preset/`](evidence/20260802-p7-preset/) |
+| 2026-08-02 | P6 execution-chain final check + bundle fix (VERIFIED) | [`docs/evidence/20260802-p6-final/`](evidence/20260802-p6-final/) |
+
 > The canonical long-form handoff document lives outside this repository
 > (`TB321FU-HANDOFF-CURRENT.md` in the workspace). This `docs/` tree is the
 > GitHub-facing, human-readable view of the same facts.
