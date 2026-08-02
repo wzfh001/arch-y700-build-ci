@@ -26,7 +26,7 @@ Updated: @DATE@
 | P2 WCN7850 Wi-Fi fix | SOURCE PASS | Pinned device archive + native firmware package + independent path + bootargs; **final raw/hardware UNTESTED** |
 | P3 Deterministic build & CI gates | PASS | Full local gate suite PASS; artifact-only CI run `29966711103` SUCCESS |
 | P4 Candidate offline audit | **@P4_STATUS@** | Main ZIP downloaded + full offline audit PASS (`AUDIT-20260723-001` closed 2026-08-02; `AUDIT-20260802` evidence) |
-| P5 Recovery & flash prep | BLOCKED | Requires P4 PASS; GPT re-read + device-specific Firehose bundle + readback plan + user confirmation |
+| P5 Recovery & flash prep | PARTIAL | Run 29966711103 Firehose bundle + 10-point readback plan generated (2026-08-02); pending live GPT re-read + user go |
 | P6 Controlled flash & readback | BLOCKED | Requires P5; `sparse=false` single program + 10-point readback 10/10 |
 | P7 First-boot rescue & network | BLOCKED | Requires P6; ACM/NCM/NAP then Wi-Fi |
 | P8 Desktop & daily hardware acceptance | BLOCKED | Requires P7; display/touch/audio/haptics/battery |

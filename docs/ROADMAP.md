@@ -14,7 +14,7 @@ v0.1.0          Stable          (multi-round wake/suspend, network reconnect, ap
 ## Current position
 
 - Kernel pipeline: **K0–K7 PASS, K9 PASS, K8 BLOCKED** (device validation).
-- Main Arch pipeline: **P0–P3 PASS, P4 PASS** (offline audit), P5–P9 gated.
+- Main Arch pipeline: **P0–P3 PASS, P4 PASS** (offline audit), P5 PARTIAL (bundle ready, GPT re-read pending), P6–P9 gated.
 
 ## Dependency-ordered execution path
 
@@ -23,7 +23,7 @@ v0.1.0          Stable          (multi-round wake/suspend, network reconnect, ap
 3. ✅ P2 Wi-Fi firmware fix (source-tested; hardware pending)
 4. ✅ P3 deterministic build + CI gates (artifact-only CI PASS)
 5. ⛔ **P4 offline audit** – download main ZIP with hash match; e2fsck/FAT/boot/accounts/services/firmware audit
-6. ⛔ P5 flash prep – re-read GPT, device-specific Firehose bundle, readback plan, user confirmation
+6. 🟡 P5 flash prep – Firehose bundle + 10-point readback plan done (2026-08-02); re-read live GPT + user confirmation pending
 7. ⛔ P6 controlled flash + 10-point readback
 8. ⛔ P7 first-boot rescue & network acceptance (ACM/NCM/NAP → Wi-Fi)
 9. ⛔ P8 desktop & daily acceptance (display/touch/audio/haptics/battery)
