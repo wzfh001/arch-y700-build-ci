@@ -39,10 +39,11 @@ everything else stays byte-identical to baseline.
 | Fragment | Changes | Notes |
 |---|---|---|
 | `10-tablet-perf` | `HZ=1000` (+ `HZ_1000=y`, `HZ_250` unset), `PREEMPT_DYNAMIC=y` | KDE touch/scroll latency; slight power cost |
-| `20-tablet-memory` | `ZRAM=m`, `ZSWAP=y`, `PSI=y` | 16 GiB RAM swap backstop; systemd/earlyoom pressure signals |
+| `20-tablet-memory` | `ZRAM=m` (+LZO backend, `lzo-rle`), `ZSWAP=y`, `PSI=y` | 16 GiB RAM swap backstop (zram-generator config 配套); systemd/earlyoom pressure signals |
 | `30-tablet-network` | `WIREGUARD=m`, `NF_TABLES=m`, `CFS_BANDWIDTH=y` | VPN/nftables; clears the `nftables` service failed state on the device |
 | `40-arch-compat` | `SECURITY_LANDLOCK=y` (auto-selects `SECURITY_NETWORK`/`SECURITY_PATH`), `BINFMT_MISC=y` | **pacman 7.1.x filesystem sandbox 依赖 Landlock**（作者内核未开 → 设备曾用 `DisableSandboxFilesystem` 绕过）；ALARM 官方 config 已开此两项 |
 | `50-tablet-bt-nap-off` | `BT_BNEP` (+ `_MC_FILTER`/`_PROTO_FILTER`) 关闭 | **去掉蓝牙网络（BT NAP）**；蓝牙键盘（HIDP）/音频保留 |
+| `60-tablet-harden` | `SLAB_FREELIST_RANDOM`, `SHUFFLE_PAGE_ALLOCATOR`, `INIT_ON_ALLOC_DEFAULT_ON`, `INIT_ON_FREE_DEFAULT_ON`, `FORTIFY_SOURCE`, `HARDENED_USERCOPY` | 日用加固（slab/页分配随机化、敏感内存清零、FORTIFY/HARDENED_USERCOPY）；baseline 已有 STACKPROTECTOR_STRONG/RANDOMIZE_BASE 互补 |
 
 All candidates are **off-device** until an EXP ID + explicit user go. Device
 kernel today: `7.1.1-g5df8e852ea72` (vendor). Version bump (e.g. 7.1.1 → 7.1.5)
