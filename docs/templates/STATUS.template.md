@@ -17,9 +17,9 @@ Updated: @DATE@
   `7.1.1-g5df8e852ea72`, flashed by user via Windows QFIL 2026-08-02,
   IP `192.168.0.156`): **Wi-Fi, KDE Wayland, display 1600x2560@120 Rotated270,
   touch, backlight, battery, and audio are VERIFIED on hardware** (evidence
-  `live/EXP-20260802-001/`). **BT NAP now comes up on the device**
-  (**BT NAP removed** 2026-08-02 user decision; dnsmasq retained for USB rescue)
-  (NetworkManager `shared` needs it); USB ACM/NCM still needs a physical
+  `live/EXP-20260802-001/`). **BT NAP removed** (2026-08-02, user decision — Wi-Fi is the primary network;
+  overlay coordinator/service/nmconnection + kernel BNEP dropped via fragment
+  `50-tablet-bt-nap-off`); USB ACM/NCM still needs a physical
   Type-C device-mode partner. Screen-off/resume and headset sound remain
   UNTESTED (user-physical steps). The verified Kubuntu rollback baseline
   remains historical (2026-07-21).
@@ -86,7 +86,7 @@ Updated: @DATE@
 1. **KDE bundle daily-use closure (P7/P8 remnants)** – P6 flash done by user
    (Windows QFIL, run `30736975180`), P7/P8 mostly VERIFIED (2026-08-02).
    Remaining: USB ACM/NCM physical rescue-link validation (Type-C partner),
-   BT NAP client-side drill, screen-off/wake Wi-Fi reconnect, headset sound,
+   screen-off/wake Wi-Fi reconnect, headset sound,
    and (optionally) camera/suspend labeling. These are user-physical steps;
    no code flash is pending.
 2. **K8 device validation** – the self-built kernel unit (run `30704468188`) has
