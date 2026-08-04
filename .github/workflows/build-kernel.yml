@@ -144,6 +144,11 @@ jobs:
           INPUT_FRAGMENTS: ${{ inputs.fragments }}
         run: |
           set -euo pipefail
+          # Drop build/source symlinks (they point into the ephemeral CI
+          # checkout and are meaningless on the target; safe-extract-archive
+          # rejects absolute links that escape the extraction root).
+          find modout/lib/modules -mindepth 2 -maxdepth 2 -type l \
+            \( -name build -o -name source \) -delete
           tar -C modout -czf out/modules.tar.gz lib/modules
           {
             echo "kernel_ref=$INPUT_KERNEL_REF"
