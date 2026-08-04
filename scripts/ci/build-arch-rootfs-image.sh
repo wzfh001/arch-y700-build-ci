@@ -152,6 +152,8 @@ SOURCE_DATE_EPOCH=$(ci_source_date_epoch)
 export SOURCE_DATE_EPOCH
 OVERLAY_DIR=${OVERLAY_DIR:-}
 KERNEL_VERSION=${KERNEL_VERSION:-7.1.1-g5df8e852ea72}
+KERNEL_MODULES_ARCHIVE=${KERNEL_MODULES_ARCHIVE:-}
+KERNEL_MODULES_ARCHIVE_SHA256=${KERNEL_MODULES_ARCHIVE_SHA256:-}
 APPLY_Y700_FIRMWARE_FIXES=${APPLY_Y700_FIRMWARE_FIXES:-1}
 APPLY_Y700_AUDIO_POLICY_FIXES=${APPLY_Y700_AUDIO_POLICY_FIXES:-1}
 COMPRESS=${COMPRESS:-7z}
@@ -1254,6 +1256,40 @@ extract_device_payload_dir() {
         ;;
     esac
   done < <(find "$payload_dir" -type f \( -name '*.tar' -o -name '*.tar.gz' -o -name '*.tgz' -o -name '*.tar.xz' -o -name '*.tar.zst' \) -print0 | sort -z)
+}
+
+apply_kernel_modules_archive() {
+  # Optional: overlay the fragment-built kernel modules (KERNEL_MODULES_ARCHIVE)
+  # over the device-archive modules for $KERNEL_VERSION. The device archive
+  # contains the vendor modules for the same kernel version; when building with
+  # a fragment kernel we must replace them so Image and modules come from the
+  # same build. The archive layout is lib/modules/$KERNEL_VERSION/... (from
+  # build-kernel.yml modules.tar.gz).
+  [ -n "$KERNEL_MODULES_ARCHIVE" ] || return 0
+  [ -n "$KERNEL_MODULES_ARCHIVE_SHA256" ] || \
+    ci_die "KERNEL_MODULES_ARCHIVE requires KERNEL_MODULES_ARCHIVE_SHA256"
+  local archive="$work_dir/kernel-modules.archive"
+  local extract="$work_dir/kernel-modules"
+  ci_log "downloading fragment kernel modules archive: $KERNEL_MODULES_ARCHIVE"
+  ci_download "$KERNEL_MODULES_ARCHIVE" "$archive" "$KERNEL_MODULES_ARCHIVE_SHA256"
+  rm -rf "$extract"
+  mkdir -p "$extract"
+  ci_extract_archive "$archive" "$extract"
+  local src="$extract/lib/modules/$KERNEL_VERSION"
+  [ -d "$src" ] || ci_die "kernel modules archive missing lib/modules/$KERNEL_VERSION"
+  [ -n "$(find "$src" -maxdepth 1 -name '*.ko*' -print -quit)" ] || \
+    ci_die "kernel modules archive has no modules for $KERNEL_VERSION"
+  # remove the vendor modules for this version, then install the fragment ones
+  rm -rf "$rootfs_dir/usr/lib/modules/$KERNEL_VERSION"
+  install -d -m 0755 "$rootfs_dir/usr/lib/modules"
+  cp -a "$src" "$rootfs_dir/usr/lib/modules/$KERNEL_VERSION"
+  # preserve the haptics extra module from the device archive
+  local device_haptics="$arch_import_stage/usr/lib/modules/$KERNEL_VERSION/extra/aw86937-haptics.ko"
+  if [ -f "$device_haptics" ]; then
+    install -D -m 0644 "$device_haptics" \
+      "$rootfs_dir/usr/lib/modules/$KERNEL_VERSION/extra/aw86937-haptics.ko"
+  fi
+  ci_log "kernel modules replaced from $KERNEL_MODULES_ARCHIVE"
 }
 
 apply_device_payloads() {
@@ -2979,6 +3015,7 @@ CONF
 fi
 
 apply_device_payloads
+apply_kernel_modules_archive
 apply_tb321fu_deb_payloads
 install_tb321fu_wifi_firmware_package
 install_tb321fu_bluetooth_firmware_package
