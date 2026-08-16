@@ -3022,8 +3022,8 @@ CONF
 fi
 
 apply_device_payloads
-apply_kernel_modules_archive
 apply_tb321fu_deb_payloads
+apply_kernel_modules_archive
 install_tb321fu_wifi_firmware_package
 install_tb321fu_bluetooth_firmware_package
 install_tb321fu_alsa_ucm_package
