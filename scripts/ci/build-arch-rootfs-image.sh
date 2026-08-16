@@ -1277,7 +1277,7 @@ apply_kernel_modules_archive() {
   ci_extract_archive "$archive" "$extract"
   local src="$extract/lib/modules/$KERNEL_VERSION"
   [ -d "$src" ] || ci_die "kernel modules archive missing lib/modules/$KERNEL_VERSION"
-  [ -n "$(find "$src" -maxdepth 1 -name '*.ko*' -print -quit)" ] || \
+  [ -n "$(find "$src" -name '*.ko*' -print -quit)" ] || \
     ci_die "kernel modules archive has no modules for $KERNEL_VERSION"
   # remove the vendor modules for this version, then install the fragment ones
   rm -rf "$rootfs_dir/usr/lib/modules/$KERNEL_VERSION"
