@@ -3085,6 +3085,12 @@ rm -f \
   "$rootfs_dir/Y700-ROOTFS-OVERLAY-MANIFEST.tsv"
 
 verify_required_y700_payload "$rootfs_dir"
+# ALARM workaround: lua51-lpeg 1.1.0-5 ships
+# usr/share/licenses/lua51-lpeg/LICENSE with mode 0664 (group-writable), an
+# upstream packaging defect that trips the privileged-payload security check
+# below. Normalize it before the check; the fix is idempotent and harmless
+# once upstream repairs the package.
+chmod 0644 "$rootfs_dir/usr/share/licenses/lua51-lpeg/LICENSE" 2>/dev/null || true
 ci_assert_privileged_payload_security "$rootfs_dir" \
   usr/libexec/tb321fu-haptics/bind-aw86937 \
   opt/libcamera-y700/bin/cam \
