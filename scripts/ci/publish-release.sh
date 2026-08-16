@@ -99,7 +99,9 @@ local_asset_records=$(
 )
 
 fetch_release_snapshot() {
-  gh api "repos/$GITHUB_REPOSITORY/releases/tags/$release_tag" --jq \
+  # Draft releases are not resolvable via the releases/tags/<tag> endpoint
+  # (GitHub REST returns 404 for drafts), so always snapshot by release id.
+  gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" --jq \
     '(["release", (.id | tostring), (.draft | tostring), .target_commitish, (.prerelease | tostring)], (.assets[] | ["asset", .name, (.size | tostring), (.digest // "")])) | @tsv'
 }
 
@@ -207,9 +209,11 @@ gh release create "$release_tag" --draft --target "$GITHUB_SHA" \
   --verify-tag --title "$release_tag" --notes-file "$notes_file"
 verify_tag_target || exit 1
 
-release_id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$release_tag" --jq .id)
+# release_tag is validated above to [A-Za-z0-9._-], safe to inline in jq.
+release_id=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+  --paginate --jq ".[] | select(.tag_name == \"$release_tag\" and .draft == true) | .id" | head -1)
 [[ $release_id =~ ^[0-9]+$ ]] || {
-  printf 'release API returned an invalid id: %s\n' "$release_id" >&2
+  printf 'release API returned an invalid draft id: %s\n' "$release_id" >&2
   exit 1
 }
 initial_snapshot=$(fetch_release_snapshot)

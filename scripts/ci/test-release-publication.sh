@@ -157,7 +157,11 @@ if [ "${1:-}" = api ]; then
   case "$endpoint" in
     'repos/owner/repository/releases?per_page=100')
       [ "${GH_FAIL_RELEASE_LIST:-0}" != 1 ] || exit 70
-      [ ! -f "$GH_STATE/exists" ] || cat "$GH_STATE/tag"
+      if [ -f "$GH_STATE/exists" ]; then
+        # draft release id resolution uses an id-selecting query; plain
+        # tag-name inventory queries keep printing the tag.
+        if [[ $query == *'.id'* ]]; then cat "$GH_STATE/id"; else cat "$GH_STATE/tag"; fi
+      fi
       exit
       ;;
     repos/owner/repository/git/matching-refs/tags/*)
@@ -265,6 +269,11 @@ grep -Fxq 'draft=false' "$state_prerelease/patch-fields.log"
 grep -Fxq 'prerelease=true' "$state_prerelease/patch-fields.log"
 grep -Fxq 'make_latest=false' "$state_prerelease/patch-fields.log"
 [ "$(cat "$state_prerelease/prerelease")" = true ]
+! grep -q 'releases/tags/' "$state_prerelease/calls.log" || {
+  printf 'draft release was resolved through the tags endpoint (404 for drafts)
+' >&2
+  exit 1
+}
 before=$(wc -l < "$state_prerelease/events.log")
 if run_publish "$state_prerelease" env PRERELEASE=1 >/dev/null 2>&1; then
   printf 'existing public release was accepted on rerun\n' >&2
