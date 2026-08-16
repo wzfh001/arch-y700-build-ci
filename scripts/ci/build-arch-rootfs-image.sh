@@ -981,6 +981,13 @@ install_arch_import_package() {
   [ -d "$arch_import_stage" ] || return 0
   [ -n "$(find "$arch_import_stage" -mindepth 1 -print -quit)" ] || return 0
 
+  if [ -n "$KERNEL_MODULES_ARCHIVE" ]; then
+    # The fragment kernel build already replaced the entire module tree in the
+    # rootfs (via apply_kernel_modules_archive). The vendor module copies still
+    # staged here would byte-differ on every module and make the import dedup
+    # check fail; they are superseded by the fragment build, so drop them.
+    rm -rf -- "$arch_import_stage/usr/lib/modules"
+  fi
   remove_generated_module_dependency_files "$arch_import_stage" "$KERNEL_VERSION"
   remove_existing_identical_arch_import_members "$arch_import_stage" "$rootfs_dir"
 
