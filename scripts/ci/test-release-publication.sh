@@ -158,6 +158,14 @@ if [ "${1:-}" = api ]; then
     'repos/owner/repository/releases?per_page=100')
       [ "${GH_FAIL_RELEASE_LIST:-0}" != 1 ] || exit 70
       if [ -f "$GH_STATE/exists" ]; then
+        # optional simulated list lag: draft id not yet visible
+        if [ -f "$GH_STATE/lag-remaining" ]; then
+          n=$(cat "$GH_STATE/lag-remaining")
+          if [ "$n" -gt 0 ]; then
+            printf '%s\n' "$((n - 1))" > "$GH_STATE/lag-remaining"
+            exit
+          fi
+        fi
         # draft release id resolution uses an id-selecting query; plain
         # tag-name inventory queries keep printing the tag.
         if [[ $query == *'.id'* ]]; then cat "$GH_STATE/id"; else cat "$GH_STATE/tag"; fi
@@ -274,6 +282,13 @@ grep -Fxq 'make_latest=false' "$state_prerelease/patch-fields.log"
 ' >&2
   exit 1
 }
+state_lag=$scratch/state-lag
+mkdir -p "$state_lag"
+printf '3\n' > "$state_lag/lag-remaining"
+run_publish "$state_lag" env PRERELEASE=1 >/dev/null
+[ "$(cat "$state_lag/prerelease")" = true ]
+[ "$(cat "$state_lag/lag-remaining")" = 0 ]
+printf 'PASS draft id resolution retries through list lag\n'
 before=$(wc -l < "$state_prerelease/events.log")
 if run_publish "$state_prerelease" env PRERELEASE=1 >/dev/null 2>&1; then
   printf 'existing public release was accepted on rerun\n' >&2

@@ -209,9 +209,16 @@ gh release create "$release_tag" --draft --target "$GITHUB_SHA" \
   --verify-tag --title "$release_tag" --notes-file "$notes_file"
 verify_tag_target || exit 1
 
-# release_tag is validated above to [A-Za-z0-9._-], safe to inline in jq.
-release_id=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
-  --paginate --jq ".[] | select(.tag_name == \"$release_tag\" and .draft == true) | .id" | head -1)
+# The releases list can lag a just-created draft (eventual consistency),
+# so retry the draft id resolution before giving up. The tag name is
+# validated above to [A-Za-z0-9._-], safe to inline in jq.
+release_id=
+for attempt in $(seq 1 10); do
+  release_id=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+    --paginate --jq ".[] | select(.tag_name == \"$release_tag\" and .draft == true) | .id" | head -1)
+  [[ $release_id =~ ^[0-9]+$ ]] && break
+  [ "$attempt" -eq 10 ] || sleep 2
+done
 [[ $release_id =~ ^[0-9]+$ ]] || {
   printf 'release API returned an invalid draft id: %s\n' "$release_id" >&2
   exit 1
